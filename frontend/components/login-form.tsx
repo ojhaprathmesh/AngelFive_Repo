@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
-import { authService } from "@/lib/firebase";
+import { authService, type AuthRequest } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
+import { Field, FieldLabel } from "@/components/ui/field";
 
 export function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +36,13 @@ export function LoginForm() {
     const password = formData.get("password") as string;
 
     try {
-      const result = await authService.signIn(email, password);
+      const authRequest: AuthRequest = {
+        operation: 'login',
+        email,
+        password
+      };
+
+      const result = await authService.authenticate(authRequest);
 
       if (result.success && result.user) {
         toast.success("Successfully logged in!");

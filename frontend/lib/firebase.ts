@@ -83,6 +83,24 @@ export interface AuthResult {
   errorCode?: string;
 }
 
+// Authentication operation type
+export type AuthOperation = 'login' | 'signup';
+
+// Authentication request interface
+export interface AuthRequest {
+  operation: AuthOperation;
+  email: string;
+  password: string;
+  fullName?: string;
+  confirmPassword?: string;
+}
+
+// Validation result interface
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
 // Firebase Authentication Service for Frontend
 export class FirebaseClientAuth {
   private static instance: FirebaseClientAuth;
@@ -97,8 +115,122 @@ export class FirebaseClientAuth {
   }
 
   /**
-   * Sign up with email and password
+   * Unified authentication function that handles both login and signup operations
+   * 
+   * @param request - Authentication request containing operation type, credentials, and optional user data
+   * @returns Promise<AuthResult> - Result object containing success status, user data, or error information
+   * 
+   * @example
+   * // Login example
+   * const loginResult = await authService.authenticate({
+   *   operation: 'login',
+   *   email: 'user@example.com',
+   *   password: 'password123'
+   * });
+   * 
+   * @example
+   * // Signup example
+   * const signupResult = await authService.authenticate({
+   *   operation: 'signup',
+   *   email: 'sahil.mane23cse@bmu.edu.in',
+   *   password: 'password123',
+   *   confirmPassword: 'password123',
+   *   fullName: 'John Doe'
+   * });
    */
+  async authenticate(request: AuthRequest): Promise<AuthResult> {
+    try {
+      // Validate input
+      const validation = this.validateAuthRequest(request);
+      if (!validation.isValid) {
+        return {
+          success: false,
+          error: validation.errors.join(', '),
+          errorCode: 'validation-error'
+        };
+      }
+
+      // Route to appropriate authentication method
+      if (request.operation === 'login') {
+        return await this.signIn(request.email, request.password);
+      } else if (request.operation === 'signup') {
+        if (!request.fullName) {
+          return {
+            success: false,
+            error: 'Full name is required for signup',
+            errorCode: 'missing-full-name'
+          };
+        }
+        return await this.signUp(request.email, request.password, request.fullName);
+      } else {
+        return {
+          success: false,
+          error: 'Invalid operation type',
+          errorCode: 'invalid-operation'
+        };
+      }
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      return {
+        success: false,
+        error: error.message || 'An unexpected error occurred',
+        errorCode: error.code || 'unknown-error'
+      };
+    }
+  }
+
+  /**
+   * Validates authentication request data
+   * 
+   * @param request - Authentication request to validate
+   * @returns ValidationResult - Object containing validation status and any errors
+   */
+  private validateAuthRequest(request: AuthRequest): ValidationResult {
+    const errors: string[] = [];
+
+    // Validate email
+    if (!request.email || !request.email.trim()) {
+      errors.push('Email is required');
+    } else if (!this.isValidEmail(request.email)) {
+      errors.push('Invalid email format');
+    }
+
+    // Validate password
+    if (!request.password || !request.password.trim()) {
+      errors.push('Password is required');
+    } else if (request.password.length < 6) {
+      errors.push('Password must be at least 6 characters long');
+    }
+
+    // Additional validation for signup
+    if (request.operation === 'signup') {
+      if (!request.fullName || !request.fullName.trim()) {
+        errors.push('Full name is required for signup');
+      }
+
+      if (!request.confirmPassword) {
+        errors.push('Password confirmation is required');
+      } else if (request.password !== request.confirmPassword) {
+        errors.push('Passwords do not match');
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Validates email format using a simple regex
+   * 
+   * @param email - Email string to validate
+   * @returns boolean - True if email format is valid
+   */
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
   async signUp(
     email: string,
     password: string,

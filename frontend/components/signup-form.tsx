@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
-import { authService } from "@/lib/firebase";
+import { authService, type AuthRequest } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
+import { Field, FieldLabel } from "@/components/ui/field";
 
 export function SignupForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -19,27 +19,21 @@ export function SignupForm() {
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
-    const name = formData.get("name") as string;
+    const fullName = formData.get("name") as string;
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirmPassword") as string;
 
-    // Validate passwords match
-    if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Validate password strength
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters long");
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
-      const result = await authService.signUp(email, password, name);
+      const authRequest: AuthRequest = {
+        operation: 'signup',
+        email,
+        password,
+        confirmPassword,
+        fullName
+      };
+
+      const result = await authService.authenticate(authRequest);
 
       if (result.success && result.user) {
         toast.success("Account created successfully! Please check your email for verification.");

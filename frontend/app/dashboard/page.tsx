@@ -16,8 +16,4 @@ export default function Dashboard() {
       <SectorMovements />
     </div>
   );
-import { redirect } from "next/navigation";
-
-export default function Dashboard() {
-  redirect("/dashboard/market");
 }

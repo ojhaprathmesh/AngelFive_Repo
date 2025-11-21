@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { marketDataService } from "@/lib/market-data";
+import { marketDataService, type MarketData as LiveMarketData } from "@/lib/market-data";
 import { format } from "date-fns";
 import {
   TrendingUp,
@@ -51,7 +51,7 @@ interface ChartData {
 
 type TimeFrame = "1D" | "5D" | "1M" | "6M" | "1Y" | "5Y" | "Max";
 type ChartType = "Area" | "Candles";
-type IndexType = "SENSEX" | "NIFTY";
+type IndexType = "SENSEX" | "NIFTY" | "BANKNIFTY" | "INDIAVIX" | "FINNIFTY" | "MIDCPNIFTY";
 
 interface IndexData {
   symbol: string;
@@ -76,12 +76,13 @@ export function TradingChart() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
-  const [marketData, setMarketData] = useState<{
-    sensex: MarketData | null;
-    nifty: MarketData | null;
-  }>({
-    sensex: null,
-    nifty: null,
+  const [indexState, setIndexState] = useState<Record<IndexType, LiveMarketData | null>>({
+    SENSEX: null,
+    NIFTY: null,
+    BANKNIFTY: null,
+    INDIAVIX: null,
+    FINNIFTY: null,
+    MIDCPNIFTY: null,
   });
 
   // Persist chart type selection across sessions
@@ -135,7 +136,32 @@ export function TradingChart() {
     },
   };
 
-  const currentData = indexData[selectedIndex];
+  const currentData = indexState[selectedIndex]
+    ? {
+        symbol: selectedIndex,
+        price: indexState[selectedIndex]!.price,
+        change: indexState[selectedIndex]!.change,
+        changePercent: indexState[selectedIndex]!.changePercent,
+        open: indexState[selectedIndex]!.open || 0,
+        high: indexState[selectedIndex]!.high || 0,
+        low: indexState[selectedIndex]!.low || 0,
+        close: indexState[selectedIndex]!.close || 0,
+        dayRange: {
+          low: indexState[selectedIndex]!.low || 0,
+          high: indexState[selectedIndex]!.high || 0,
+        },
+      }
+    : {
+        symbol: selectedIndex,
+        price: 0,
+        change: 0,
+        changePercent: 0,
+        open: 0,
+        high: 0,
+        low: 0,
+        close: 0,
+        dayRange: { low: 0, high: 0 },
+      };
   const isPositive = currentData.change >= 0;
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
 
@@ -276,7 +302,6 @@ export function TradingChart() {
     return () => window.removeEventListener("resize", handleResize);
   }, [chartType, selectedIndex, isPositive, timeFrame]);
 
-  // Generate sample chart data based on selected index and timeframe
   const generateSampleData = (timeframe: TimeFrame = timeFrame) => {
     const data: ChartData[] = [];
     const basePrice = currentData.price;
@@ -359,32 +384,107 @@ export function TradingChart() {
     return cleanup;
   }, [initializeChart]);
 
-  // Fetch market data
   useEffect(() => {
-    const fetchMarketData = async () => {
+    const map: Record<IndexType, string> = {
+      SENSEX: "BSE:SENSEX",
+      NIFTY: "NSE:NIFTY",
+      BANKNIFTY: "NSE:BANKNIFTY",
+      INDIAVIX: "NSE:INDIAVIX",
+      FINNIFTY: "NSE:FINNIFTY",
+      MIDCPNIFTY: "NSE:MIDCPNIFTY",
+    };
+    const load = async () => {
       try {
-        const [sensexData, niftyData] = await Promise.all([
-          marketDataService.getSensexData(),
-          marketDataService.getNiftyData(),
-        ]);
-
-        setMarketData({
-          sensex: sensexData,
-          nifty: niftyData,
-        });
-      } catch (error) {
-        console.error("Error fetching market data:", error);
+        const keys: IndexType[] = ["SENSEX","NIFTY","BANKNIFTY","INDIAVIX","FINNIFTY","MIDCPNIFTY"];
+        const updates: Record<IndexType, LiveMarketData | null> = { SENSEX:null,NIFTY:null,BANKNIFTY:null,INDIAVIX:null,FINNIFTY:null,MIDCPNIFTY:null };
+        for (const k of keys) {
+          const r = await marketDataService.getMarketDataWithStatus(map[k]);
+          updates[k] = r.data;
+        }
+        setIndexState(updates);
+      } catch (err) {
         setError("Failed to fetch market data");
       }
     };
-
-    fetchMarketData();
-    const interval = setInterval(fetchMarketData, 30000);
-    return () => clearInterval(interval);
+    load();
+    const i = setInterval(load, 60000);
+    return () => clearInterval(i);
   }, []);
 
+  useEffect(() => {
+    const map: Record<IndexType, string> = {
+      SENSEX: "BSE:SENSEX",
+      NIFTY: "NSE:NIFTY",
+      BANKNIFTY: "NSE:BANKNIFTY",
+      INDIAVIX: "NSE:INDIAVIX",
+      FINNIFTY: "NSE:FINNIFTY",
+      MIDCPNIFTY: "NSE:MIDCPNIFTY",
+    };
+    const run = async () => {
+      try {
+        const symbol = map[selectedIndex];
+        const now = new Date();
+        const toDate = `${format(now, "yyyy-MM-dd HH:mm")}`;
+        const from = new Date(now);
+        let interval = "ONE_DAY";
+        switch (timeFrame) {
+          case "1D":
+            interval = "ONE_MINUTE";
+            from.setHours(now.getHours() - 8);
+            break;
+          case "5D":
+            interval = "THREE_MINUTE";
+            from.setDate(now.getDate() - 5);
+            break;
+          case "1M":
+            interval = "FIFTEEN_MINUTE";
+            from.setMonth(now.getMonth() - 1);
+            break;
+          case "6M":
+            interval = "ONE_DAY";
+            from.setMonth(now.getMonth() - 6);
+            break;
+          case "1Y":
+            interval = "ONE_DAY";
+            from.setFullYear(now.getFullYear() - 1);
+            break;
+          case "5Y":
+            interval = "ONE_DAY";
+            from.setFullYear(now.getFullYear() - 5);
+            break;
+          case "Max":
+            interval = "ONE_DAY";
+            from.setFullYear(now.getFullYear() - 10);
+            break;
+        }
+        const fromDate = `${format(from, "yyyy-MM-dd HH:mm")}`;
+        const tokenInfo = await marketDataService.getSymbolToken(symbol);
+        if (!tokenInfo) return;
+        const candles = await marketDataService.getCandleData(tokenInfo.exchange, tokenInfo.token, interval, fromDate, toDate);
+        const mapped = candles.map((c) => ({
+          time: Math.floor(new Date(c[0]).getTime() / 1000) as UTCTimestamp,
+          value: c[4],
+          open: c[1],
+          high: c[2],
+          low: c[3],
+          close: c[4],
+        }));
+        setChartData(mapped);
+        if (seriesRef.current) {
+          if (chartType === "Area") {
+            seriesRef.current.setData(mapped.map((d) => ({ time: d.time, value: d.value })));
+          } else {
+            seriesRef.current.setData(mapped.map((d) => ({ time: d.time, open: d.open!, high: d.high!, low: d.low!, close: d.close! })));
+          }
+          chartRef.current?.timeScale().fitContent();
+        }
+      } catch {}
+    };
+    run();
+  }, [selectedIndex, timeFrame, chartType]);
+
   const timeFrames: TimeFrame[] = ["1D", "5D", "1M", "6M", "1Y", "5Y", "Max"];
-  const indices: IndexType[] = ["SENSEX", "NIFTY"];
+  const indices: IndexType[] = ["SENSEX", "NIFTY", "BANKNIFTY", "INDIAVIX", "FINNIFTY", "MIDCPNIFTY"];
 
   if (error) {
     return (
@@ -406,9 +506,21 @@ export function TradingChart() {
 
       {/* Index tabs with solid vertical dividers and active bottom line */}
       <div className="border border-solid border-[var(--divider-color)] rounded-lg">
-        <div className="flex items-center min-w-max overflow-x-auto ">
+        <div className="flex flex-wrap items-center overflow-x-auto ">
           {indices.map((index, i) => {
-            const data = indexData[index];
+            const data = indexState[index]
+              ? {
+                  symbol: index,
+                  price: indexState[index]!.price,
+                  change: indexState[index]!.change,
+                  changePercent: indexState[index]!.changePercent,
+                  open: indexState[index]!.open || 0,
+                  high: indexState[index]!.high || 0,
+                  low: indexState[index]!.low || 0,
+                  close: indexState[index]!.close || 0,
+                  dayRange: { low: indexState[index]!.low || 0, high: indexState[index]!.high || 0 },
+                }
+              : currentData;
             const isActive = selectedIndex === index;
             const isPositiveChange = data.change >= 0;
 
@@ -420,7 +532,7 @@ export function TradingChart() {
                     isActive ? "border-b-blue-500" : "border-b-transparent"
                   } ${index === "SENSEX" && isActive ? "rounded-tl-lg" : ""}`}
                 >
-                  <div className="text-[11px] font-medium text-gray-600 dark:text-gray-400 text-left">
+                  <div className="text-[11px] font-medium text-gray-600 dark:text-gray-400 text-left truncate max-w-[100px]">
                     {index}
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -431,9 +543,9 @@ export function TradingChart() {
                     </div>
                     <div className="flex items-center gap-1">
                       {isPositiveChange ? (
-                        <TrendIcon className="h-3 w-3 text-green-600" />
+                        <TrendingUp className="h-3 w-3 text-green-600" />
                       ) : (
-                        <TrendIcon className="h-3 w-3 text-red-600" />
+                        <TrendingDown className="h-3 w-3 text-red-600" />
                       )}
                       <span
                         className={`text-xs font-medium ${

@@ -41,8 +41,8 @@ export function SignupForm() {
         // Refresh user data in context
         await refreshUser();
         
-        // Redirect to dashboard
-        router.push("/dashboard");
+        // Redirect to dashboard/market
+        router.push("/dashboard/market");
       } else {
         toast.error(result.error || "Signup failed");
       }

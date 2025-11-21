@@ -26,6 +26,11 @@ import {
   Bell,
   AlertCircle,
   GalleryVerticalEnd,
+  Bookmark,
+  Briefcase,
+  Activity,
+  BarChart3,
+  type LucideIcon,
 } from "lucide-react";
 
 interface MarketData {
@@ -167,21 +172,37 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
     }
   };
 
-  const navigationLinks = [
+  type NavLink = {
+    href: string;
+    label: string;
+    icon: LucideIcon;
+    active: boolean;
+  };
+
+  const navigationLinks: NavLink[] = [
     {
       href: "/dashboard/market",
       label: "Market",
+      icon: BarChart3,
       active: pathname === "/dashboard/market",
     },
     {
       href: "/dashboard/watchlist",
       label: "Watchlist",
+      icon: Bookmark,
       active: pathname === "/dashboard/watchlist",
     },
     {
       href: "/dashboard/portfolio",
       label: "Portfolio",
+      icon: Briefcase,
       active: pathname === "/dashboard/portfolio",
+    },
+    {
+      href: "/dashboard/dsfm",
+      label: "DSFM",
+      icon: Activity,
+      active: pathname === "/dashboard/dsfm",
     },
   ];
 
@@ -303,7 +324,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
           <div className="flex items-center space-x-4 lg:space-x-8">
             {/* Logo */}
             <Link
-              href="/dashboard"
+              href="/dashboard/market"
               className="flex items-center space-x-2 touch-target"
             >
               <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg">
@@ -334,20 +355,29 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
           <div className="flex items-center space-x-1">
             {/* Navigation Links */}
             <div className="hidden md:flex items-center space-x-1">
-              {navigationLinks.map((link) => (
-                <Link key={link.href} href={link.href}>
-                  <Button
-                    variant={link.active ? "default" : "ghost"}
-                    className={`px-4 py-2 text-sm font-medium transition-colors touch-target ${
-                      link.active
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-                    }`}
-                  >
-                    {link.label}
-                  </Button>
-                </Link>
-              ))}
+              {navigationLinks.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <Link key={link.href} href={link.href}>
+                    <Button
+                      variant={link.active ? "default" : "ghost"}
+                      size={link.active ? "default" : "icon-sm"}
+                      title={link.label}
+                      aria-label={link.label}
+                      className={`transition-all duration-200 ease-out touch-target ${
+                        link.active
+                          ? "px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {link.active && (
+                        <span className="ml-2 text-sm font-medium">{link.label}</span>
+                      )}
+                    </Button>
+                  </Link>
+                );
+              })}
             </div>
 
             {/* Profile and Notifications */}

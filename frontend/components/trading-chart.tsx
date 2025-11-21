@@ -150,13 +150,13 @@ export function TradingChart() {
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#333",
+        textColor: "#374151",
       },
       width: chartContainerRef.current.clientWidth,
-      height: 400,
+      height: chartContainerRef.current.clientHeight,
       grid: {
         vertLines: { color: "transparent" },
-        horzLines: { color: "transparent" },
+        horzLines: { color: "#e5e7eb" },
       },
       crosshair: {
         mode: 1,
@@ -172,15 +172,15 @@ export function TradingChart() {
         },
       },
       rightPriceScale: {
-        borderColor: "#e0e0e0",
-        visible: false,
+        borderColor: "#e5e7eb",
+        visible: true,
       },
       leftPriceScale: {
         visible: false,
       },
       timeScale: {
         borderVisible: false,
-        tickMarkFormatter: () => "",
+        timeVisible: true,
       },
       // Disable zoom and pan interactions
       handleScroll: false,
@@ -267,6 +267,7 @@ export function TradingChart() {
       if (chartContainerRef.current && chartRef.current) {
         chartRef.current.applyOptions({
           width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight,
         });
       }
     };
@@ -466,7 +467,7 @@ export function TradingChart() {
         <div className="divider-line" />
 
         {/* Main Container - Flexbox Layout */}
-        <div className="flex flex-col lg:flex-row gap-8 min-h-[500px]">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Section - OHLC Chart Component and Heatscale Visualization */}
           <div
             className="flex-1 lg:flex-[1] space-y-6 min-w-[300px]"
@@ -483,7 +484,7 @@ export function TradingChart() {
               </h3>
               <div className="space-y-3">
                 <div className="relative">
-                  <div className="w-full h-1.75 bg-gradient-to-r from-[#d64d4d] to-[#029076] rounded-full shadow-inner"></div>
+                  <div className="w-full h-1.5 bg-gradient-to-r from-[#d64d4d] to-[#029076] rounded-full"></div>
                   <div
                     className="absolute -top-2 transition-all duration-300"
                     style={{
@@ -511,7 +512,7 @@ export function TradingChart() {
                       width="16"
                       height="16"
                       viewBox="0 0 16 16"
-                      className="text-gray-800 dark:text-white drop-shadow-lg"
+                      className="text-gray-800 dark:text-white"
                       fill="currentColor"
                     >
                       <path d="M8 2l4 6H4l4-6z" />
@@ -590,17 +591,10 @@ export function TradingChart() {
           {/* Dotted vertical separation between heatscale and chart */}
           <div className="hidden lg:block v-divider-air v-divider-air-chart self-center mx-2" />
 
-          {/* Right Section - Primary Chart Visualization */}
-          <div
-            className="flex-1 lg:flex-[1] space-y-4"
-            role="main"
-            aria-label="Primary Chart Section"
-          >
-            {/* Chart Controls moved to bottom overlay within chart container */}
-
-            {/* Primary Chart Container */}
+          {/* Right Section */}
+          {/* Primary Chart Container */}
             <div
-              className="relative bg-white dark:bg-gray-900 rounded-lg border shadow-sm margin-auto"
+              className="flex-1 lg:flex-[1] relative bg-white dark:bg-gray-900 rounded-lg"
               style={{ zIndex: 1 }}
             >
               {isLoading && (
@@ -608,76 +602,61 @@ export function TradingChart() {
                   className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-800/80 rounded-lg"
                   style={{ zIndex: 10 }}
                 >
-                  <Skeleton className="w-full h-[400px]" />
+                  <Skeleton className="w-full h-[280px]" />
                 </div>
               )}
               <div
                 ref={chartContainerRef}
-                className="w-full h-[400px] rounded-lg"
+                className="w-full h-[280px] rounded-lg"
                 role="img"
                 aria-label={`${selectedIndex} price chart showing ${chartType.toLowerCase()} visualization for ${timeFrame} timeframe`}
               />
 
-              {/* Bottom gradient to blend chart into background */}
-              <div
-                className="absolute inset-x-0 bottom-0 h-20 pointer-events-none bg-gradient-to-t from-white dark:from-gray-900 to-transparent"
-                style={{ zIndex: 4 }}
-                aria-hidden="true"
-              />
-
-              {/* Bottom overlay controls */}
-              <div
-                className="absolute bottom-6 left-6 flex items-center gap-3 flex-wrap"
-                style={{ zIndex: 6 }}
-                aria-label="Select chart timeframe"
-              >
-                {timeFrames.map((tf) => (
+              <div className="flex items-center justify-between p-2">
+                <div className="flex items-center gap-1.5 flex-wrap" aria-label="Select chart timeframe">
+                  {timeFrames.map((tf) => (
+                    <Button
+                      key={tf}
+                      variant={timeFrame === tf ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setTimeFrame(tf)}
+                      className="text-xs px-3 py-1 rounded-full"
+                      aria-label={`Select ${tf} time frame`}
+                    >
+                      {tf}
+                    </Button>
+                  ))}
+                </div>
+                <div>
                   <Button
-                    key={tf}
-                    variant={timeFrame === tf ? "default" : "ghost"}
+                    variant="outline"
                     size="sm"
-                    onClick={() => setTimeFrame(tf)}
-                    className="text-xs px-3 py-1 rounded-full transition-all duration-200"
-                    aria-label={`Select ${tf} time frame`}
+                    onClick={toggleChartType}
+                    aria-label={
+                      chartType === "Area"
+                        ? "Area chart selected. Click to switch to Candlestick chart"
+                        : "Candlestick chart selected. Click to switch to Area chart"
+                    }
+                    aria-pressed={chartType === "Candles"}
+                    className="rounded-lg px-2"
+                    title={
+                      chartType === "Area"
+                        ? "Switch to Candles"
+                        : "Switch to Area"
+                    }
                   >
-                    {tf}
+                    {chartType === "Area" ? (
+                      <Activity className="h-5 w-5" />
+                    ) : (
+                      <BarChart3 className="h-5 w-5" />
+                    )}
+                    <span className="sr-only">
+                      {chartType === "Area" ? "Area chart selected" : "Candlestick chart selected"}
+                    </span>
                   </Button>
-                ))}
-              </div>
-
-              {/* Chart style toggle - bottom right */}
-              <div className="absolute bottom-6 right-6" style={{ zIndex: 6 }}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleChartType}
-                  aria-label={
-                    chartType === "Area"
-                      ? "Area chart selected. Click to switch to Candlestick chart"
-                      : "Candlestick chart selected. Click to switch to Area chart"
-                  }
-                  aria-pressed={chartType === "Candles"}
-                  className="rounded-lg px-3 shadow-xs transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:ring-ring/50"
-                  title={
-                    chartType === "Area"
-                      ? "Switch to Candles"
-                      : "Switch to Area"
-                  }
-                >
-                  {chartType === "Area" ? (
-                    <Activity className="h-5 w-5 transition-transform duration-200" />
-                  ) : (
-                    <BarChart3 className="h-5 w-5 transition-transform duration-200" />
-                  )}
-                  <span className="sr-only">
-                    {chartType === "Area"
-                      ? "Area chart selected"
-                      : "Candlestick chart selected"}
-                  </span>
-                </Button>
+                </div>
               </div>
             </div>
-          </div>
         </div>
       </div>
     </div>

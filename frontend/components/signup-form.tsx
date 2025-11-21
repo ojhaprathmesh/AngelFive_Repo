@@ -36,7 +36,7 @@ export function SignupForm() {
       const result = await authService.authenticate(authRequest);
 
       if (result.success && result.user) {
-        toast.success("Account created successfully! Please check your email for verification.");
+        toast.success("Account created successfully!");
         
         // Refresh user data in context
         await refreshUser();

@@ -2,26 +2,12 @@ import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import {
   getAuth,
   Auth,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   User,
-  UserCredential,
-  updateProfile,
-  sendEmailVerification,
   AuthError,
 } from "firebase/auth";
-import {
-  getFirestore,
-  Firestore,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  serverTimestamp,
-  Timestamp,
-} from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -42,7 +28,6 @@ const firebaseConfig = {
 // Initialize Firebase
 let app: FirebaseApp;
 let auth: Auth;
-let firestore: Firestore;
 
 try {
   // Initialize Firebase app (avoid duplicate initialization)
@@ -54,7 +39,6 @@ try {
 
   // Initialize Firebase services
   auth = getAuth(app);
-  firestore = getFirestore(app);
 
   console.log("Firebase initialized successfully");
 } catch (error) {
@@ -169,12 +153,14 @@ export class FirebaseClientAuth {
           errorCode: 'invalid-operation'
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Authentication error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      const errorCode = (error as { code?: string })?.code || 'unknown-error';
       return {
         success: false,
-        error: error.message || 'An unexpected error occurred',
-        errorCode: error.code || 'unknown-error'
+        error: errorMessage,
+        errorCode: errorCode
       };
     }
   }
@@ -237,74 +223,107 @@ export class FirebaseClientAuth {
     fullName: string
   ): Promise<AuthResult> {
     try {
-      // Create user with Firebase Auth
-      const userCredential: UserCredential =
-        await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      // Use backend API for signup instead of direct Firebase calls
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/frontend/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+          confirmPassword: password, // Since we're handling validation in backend
+        }),
+      });
 
-      try {
-        // Update user profile
-        await updateProfile(user, {
-          displayName: fullName,
-        });
+      const data = await response.json();
 
-        // Create user profile in Firestore
-        const userProfile = await this.createUserProfile(user, fullName);
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || "Signup failed",
+          errorCode: data.errorCode || "unknown-error",
+        };
+      }
 
-        // Send email verification only after successful profile creation
-        await sendEmailVerification(user);
-
+      // Sign in with the custom token returned from backend
+      if (data.data?.token) {
+        const { signInWithCustomToken } = await import('firebase/auth');
+        await signInWithCustomToken(auth, data.data.token);
+        
         return {
           success: true,
-          user: userProfile,
+          user: data.data.user,
         };
-      } catch (profileError) {
-        // If profile creation fails, delete the auth user to maintain consistency
-        console.error(
-          "Profile creation failed, cleaning up auth user:",
-          profileError
-        );
-        await user.delete();
-        throw profileError;
       }
-    } catch (error: any) {
+
+      return {
+        success: true,
+        user: data.data.user,
+      };
+    } catch (error: unknown) {
       console.error("Sign up error:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      const errorCode = (error as { code?: string })?.code || "unknown-error";
       return {
         success: false,
-        error: this.getErrorMessage(error),
-        errorCode: error.code,
+        error: errorMessage,
+        errorCode: errorCode,
       };
     }
   }
 
   /**
-   * Sign in with email and password
+   * Sign in with email and password via backend API
    */
   async signIn(email: string, password: string): Promise<AuthResult> {
     try {
-      const userCredential: UserCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
+      // Use backend API for login instead of direct Firebase calls
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/frontend/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
 
-      // Update last login time
-      await this.updateLastLoginTime(user.uid);
+      const data = await response.json();
 
-      // Get user profile
-      const userProfile = await this.getUserProfile(user.uid);
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || "Login failed",
+          errorCode: data.errorCode || "unknown-error",
+        };
+      }
+
+      // Sign in with the custom token returned from backend
+      if (data.data?.token) {
+        const { signInWithCustomToken } = await import('firebase/auth');
+        await signInWithCustomToken(auth, data.data.token);
+        
+        return {
+          success: true,
+          user: data.data.user,
+        };
+      }
 
       return {
         success: true,
-        user: userProfile ?? undefined,
+        user: data.data.user,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Sign in error:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      const errorCode = (error as { code?: string })?.code || "unknown-error";
       return {
         success: false,
-        error: this.getErrorMessage(error),
-        errorCode: error.code,
+        error: errorMessage,
+        errorCode: errorCode,
       };
     }
   }
@@ -337,37 +356,65 @@ export class FirebaseClientAuth {
   }
 
   /**
-   * Get user profile from Firestore
+   * Get user profile from backend API (to avoid Firestore permission issues)
    */
   async getUserProfile(uid: string): Promise<UserProfile | null> {
     try {
-      const userDoc = await getDoc(doc(firestore, "users", uid));
-
-      if (!userDoc.exists()) {
-        console.warn("User profile not found in Firestore");
+      const user = auth.currentUser;
+      if (!user) {
         return null;
       }
 
-      return userDoc.data() as UserProfile;
+      let token = await user.getIdToken(true);
+
+      let response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/user/${uid}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.status === 403 || response.status === 401) {
+        token = await user.getIdToken(true);
+        response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/user/${uid}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      }
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn("User profile not found");
+          return null;
+        }
+        return null;
+      }
+
+      const data = await response.json();
+      return data.user || null;
     } catch (error) {
-      console.error("Error getting user profile:", error);
+      console.error("Error getting user profile via API:", error);
       return null;
     }
   }
 
   /**
-   * Create user profile in Firestore
+   * Create user profile - now handled by backend API
+   * This method is kept for compatibility but not used directly
    */
   private async createUserProfile(
     user: User,
     fullName: string
   ): Promise<UserProfile> {
-    const now = serverTimestamp();
+    // This method is no longer used since profile creation is handled by backend
+    // But kept for compatibility with existing code
+    const now = Timestamp.now();
 
-    const userProfile: Omit<UserProfile, "createdAt" | "updatedAt"> & {
-      createdAt: any;
-      updatedAt: any;
-    } = {
+    return {
       uid: user.uid,
       email: user.email || "",
       fullName,
@@ -377,29 +424,66 @@ export class FirebaseClientAuth {
       createdAt: now,
       updatedAt: now,
     };
-
-    // Save to Firestore
-    await setDoc(doc(firestore, "users", user.uid), userProfile);
-
-    // Return profile with proper timestamp types
-    return {
-      ...userProfile,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    };
   }
 
   /**
-   * Update last login time
+   * Update last login time via backend API
    */
   private async updateLastLoginTime(uid: string): Promise<void> {
     try {
-      await updateDoc(doc(firestore, "users", uid), {
-        lastLoginAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/user/${uid}/last-login`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await auth.currentUser?.getIdToken()}`
+        }
       });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update last login time: ${response.statusText}`);
+      }
     } catch (error) {
-      console.error("Error updating last login time:", error);
+      console.error("Error updating last login time via API:", error);
+    }
+  }
+
+  /**
+   * Send password reset email via backend API
+   */
+  async sendPasswordResetEmail(email: string): Promise<AuthResult> {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/frontend/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || "Failed to send password reset email",
+          errorCode: "unknown-error",
+        };
+      }
+
+      return {
+        success: true,
+      };
+    } catch (error: unknown) {
+      console.error("Password reset error:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      const errorCode = (error as { code?: string })?.code || "unknown-error";
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode: errorCode,
+      };
     }
   }
 
@@ -433,7 +517,7 @@ export class FirebaseClientAuth {
 }
 
 // Export Firebase services and auth instance
-export { auth, firestore };
+export { auth };
 export const firebaseClientAuth = FirebaseClientAuth.getInstance();
 
 // Export auth service for easier access

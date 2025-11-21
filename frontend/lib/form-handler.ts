@@ -31,7 +31,7 @@ export interface SubmissionPayload {
 export interface ServerResponse {
   status: "success" | "error";
   message: string;
-  data?: any;
+  data?: unknown;
   timestamp: string;
 }
 

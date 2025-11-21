@@ -1,4 +1,7 @@
 import { GalleryVerticalEnd } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
+import { Suspense } from "react";
 
 import { SignupForm } from "@/components/signup-form";
 
@@ -7,24 +10,28 @@ export default function SignupPage() {
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
-          <a href="/" className="flex items-center gap-2 font-medium" aria-label="AngelFive - Go to homepage">
+          <Link href="/" className="flex items-center gap-2 font-medium" aria-label="AngelFive - Go to homepage">
             <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md" aria-hidden="true">
               <GalleryVerticalEnd className="size-4" />
             </div>
             <span className="text-responsive-lg font-semibold">AngelFive</span>
-          </a>
+          </Link>
         </div>
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-xs">
-            <SignupForm />
+            <Suspense fallback={<div>Loading...</div>}>
+              <SignupForm />
+            </Suspense>
           </div>
         </div>
       </div>
       <div className="bg-muted relative hidden lg:block">
-        <img
+        <Image
           src="/signup-illustration.svg"
           alt="Financial dashboard illustration showing charts and market data visualization"
           className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          fill
+          priority
         />
       </div>
     </div>

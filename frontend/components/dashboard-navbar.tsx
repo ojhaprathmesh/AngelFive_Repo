@@ -53,11 +53,21 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [marketData, setMarketData] = useState<{
-    sensex: { data: MarketData | null; isLoading: boolean; error: string | null; lastUpdated: Date | null };
-    nifty: { data: MarketData | null; isLoading: boolean; error: string | null; lastUpdated: Date | null };
-  }>({ 
+    sensex: {
+      data: MarketData | null;
+      isLoading: boolean;
+      error: string | null;
+      lastUpdated: Date | null;
+    };
+    nifty: {
+      data: MarketData | null;
+      isLoading: boolean;
+      error: string | null;
+      lastUpdated: Date | null;
+    };
+  }>({
     sensex: { data: null, isLoading: true, error: null, lastUpdated: null },
-    nifty: { data: null, isLoading: true, error: null, lastUpdated: null }
+    nifty: { data: null, isLoading: true, error: null, lastUpdated: null },
   });
 
   const marketService = marketDataService;
@@ -66,54 +76,64 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
     const fetchMarketData = async () => {
       try {
         const results = await marketService.getAllMarketDataWithStatus();
-        
+
         setMarketData({
           sensex: results.sensex,
-          nifty: results.nifty
+          nifty: results.nifty,
         });
 
         // Show error toast if there are any errors
         if (results.sensex.error || results.nifty.error) {
-          const errors = [results.sensex.error, results.nifty.error].filter(Boolean);
+          const errors = [results.sensex.error, results.nifty.error].filter(
+            Boolean
+          );
           if (errors.length > 0) {
             console.warn("Market data errors:", errors);
           }
         }
       } catch (error) {
         console.error("Failed to fetch market data:", error);
-        
+
         // Set error state for both indices
-        setMarketData(prev => ({
-          sensex: { ...prev.sensex, error: "Failed to load data", isLoading: false },
-          nifty: { ...prev.nifty, error: "Failed to load data", isLoading: false }
+        setMarketData((prev) => ({
+          sensex: {
+            ...prev.sensex,
+            error: "Failed to load data",
+            isLoading: false,
+          },
+          nifty: {
+            ...prev.nifty,
+            error: "Failed to load data",
+            isLoading: false,
+          },
         }));
       }
     };
 
     fetchMarketData();
-    
+
     // Start auto-refresh for both indices
-    marketService.startAutoRefresh('BSE:SENSEX', 30000, (data, error) => {
-      setMarketData(prev => ({
+    marketService.startAutoRefresh("BSE:SENSEX", 30000, (data, error) => {
+      setMarketData((prev) => ({
         ...prev,
         sensex: {
           data,
           isLoading: false,
           error: error || null,
-          lastUpdated: new Date()
-        }
+          lastUpdated: new Date(),
+        },
       }));
     });
 
-    marketService.startAutoRefresh('NSE:NIFTY', 30000, (data, error) => {
-      setMarketData(prev => ({
+    marketService.startAutoRefresh("NSE:NIFTY", 30000, (data, error) => {
+      setMarketData((prev) => ({
         ...prev,
         nifty: {
           data,
           isLoading: false,
           error: error || null,
-          lastUpdated: new Date()
-        }
+          lastUpdated: new Date(),
+        },
       }));
     });
 
@@ -127,23 +147,23 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
       // Clear session storage
       sessionStorage.clear();
       localStorage.clear();
-      
+
       // Clear any cached data
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         // Clear any application-specific storage
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('angelfive_')) {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith("angelfive_")) {
             localStorage.removeItem(key);
           }
         });
       }
-      
+
       // Redirect to login with success message
-      router.push('/login?message=Successfully logged out');
+      router.push("/login?message=Successfully logged out");
     } catch (error) {
       console.error("Logout error:", error);
       // Force redirect even if cleanup fails
-      router.push('/login');
+      router.push("/login");
     }
   };
 
@@ -169,12 +189,21 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
     marketInfo,
     isCompact = false,
   }: {
-    marketInfo: { data: MarketData | null; isLoading: boolean; error: string | null; lastUpdated: Date | null };
+    marketInfo: {
+      data: MarketData | null;
+      isLoading: boolean;
+      error: string | null;
+      lastUpdated: Date | null;
+    };
     isCompact?: boolean;
   }) => {
     if (marketInfo.isLoading) {
       return (
-        <div className={`flex flex-col space-y-1 ${isCompact ? 'items-center' : ''}`}>
+        <div
+          className={`flex flex-col space-y-1 ${
+            isCompact ? "items-center" : ""
+          }`}
+        >
           <Skeleton className="h-4 w-16" />
           <Skeleton className="h-3 w-12" />
           {!isCompact && <Skeleton className="h-2 w-20" />}
@@ -184,17 +213,21 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
 
     if (marketInfo.error) {
       return (
-        <div className={`flex flex-col ${isCompact ? 'items-center text-center' : ''}`}>
+        <div
+          className={`flex flex-col ${
+            isCompact ? "items-center text-center" : ""
+          }`}
+        >
           <div className="flex items-center space-x-1">
             <AlertCircle className="h-3 w-3 text-red-500" />
-            <span className={`text-red-500 ${isCompact ? 'text-xs' : 'text-sm'}`}>
+            <span
+              className={`text-red-500 ${isCompact ? "text-xs" : "text-xs"}`}
+            >
               Error
             </span>
           </div>
           {!isCompact && (
-            <div className="text-xs text-red-400">
-              {marketInfo.error}
-            </div>
+            <div className="text-xs text-red-400">{marketInfo.error}</div>
           )}
         </div>
       );
@@ -205,28 +238,41 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
     const data = marketInfo.data;
     const isPositive = data.change >= 0;
     const TrendIcon = isPositive ? TrendingUp : TrendingDown;
-    const isDataFresh = marketInfo.lastUpdated && marketService.isDataFresh(marketInfo.lastUpdated);
+    const isDataFresh =
+      marketInfo.lastUpdated &&
+      marketService.isDataFresh(marketInfo.lastUpdated);
 
     return (
-      <div className={`flex flex-col ${isCompact ? 'items-center text-center' : ''}`}>
+      <div
+        className={`flex flex-col ${
+          isCompact ? "items-center text-center" : ""
+        }`}
+      >
         <div className="flex items-center space-x-1">
-          <span className={`font-medium text-gray-900 dark:text-gray-100 ${
-            isCompact ? 'text-xs' : 'text-sm'
-          }`}>
+          <span
+            className={`font-medium text-gray-900 dark:text-gray-100 ${
+              isCompact ? "text-xs" : "text-xs"
+            }`}
+          >
             {data.symbol}
           </span>
-          <span className={`font-semibold text-gray-900 dark:text-gray-100 ${
-            isCompact ? 'text-xs' : 'text-sm'
-          }`}>
-            ₹{data.price.toLocaleString('en-IN', { 
-              minimumFractionDigits: 2, 
-              maximumFractionDigits: 2 
+          <span
+            className={`font-semibold text-gray-900 dark:text-gray-100 ${
+              isCompact ? "text-xs" : "text-xs"
+            }`}
+          >
+            {data.price.toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
             })}
           </span>
           {!isCompact && (
-            <div className={`h-2 w-2 rounded-full ${
-              isDataFresh ? 'bg-green-500' : 'bg-yellow-500'
-            }`} title={isDataFresh ? 'Data is fresh' : 'Data may be stale'} />
+            <div
+              className={`h-2 w-2 rounded-full ${
+                isDataFresh ? "bg-green-500" : "bg-yellow-500"
+              }`}
+              title={isDataFresh ? "Data is fresh" : "Data may be stale"}
+            />
           )}
         </div>
         <div className="flex items-center space-x-1">
@@ -238,7 +284,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
           <span
             className={`font-medium ${
               isPositive ? "text-green-600" : "text-red-600"
-            } ${isCompact ? 'text-xs' : 'text-xs'}`}
+            } ${isCompact ? "text-xs" : "text-xs"}`}
           >
             {isPositive ? "+" : ""}
             {data.change.toFixed(2)} ({isPositive ? "+" : ""}
@@ -256,7 +302,10 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
           {/* Left Section */}
           <div className="flex items-center space-x-4 lg:space-x-8">
             {/* Logo */}
-            <Link href="/dashboard" className="flex items-center space-x-2 touch-target">
+            <Link
+              href="/dashboard"
+              className="flex items-center space-x-2 touch-target"
+            >
               <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg">
                 <GalleryVerticalEnd className="size-4" />
               </div>
@@ -265,7 +314,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
               </span>
             </Link>
 
-            {/* Market Indicators - Desktop */}
+            {/* Market Indicators */}
             <div className="hidden lg:flex items-center space-x-6">
               {(marketData.sensex.error || marketData.nifty.error) && (
                 <Alert className="w-auto p-2">
@@ -281,47 +330,50 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
             </div>
           </div>
 
-          {/* Center Section - Navigation Links */}
-          <div className="hidden md:flex items-center space-x-1">
-            {navigationLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <Button
-                  variant={link.active ? "default" : "ghost"}
-                  className={`px-4 py-2 text-sm font-medium transition-colors touch-target ${
-                    link.active
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-                  }`}
-                >
-                  {link.label}
-                </Button>
-              </Link>
-            ))}
-          </div>
+          {/* Left Section */}
+          <div className="flex items-center space-x-1">
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center space-x-1">
+              {navigationLinks.map((link) => (
+                <Link key={link.href} href={link.href}>
+                  <Button
+                    variant={link.active ? "default" : "ghost"}
+                    className={`px-4 py-2 text-sm font-medium transition-colors touch-target ${
+                      link.active
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                    }`}
+                  >
+                    {link.label}
+                  </Button>
+                </Link>
+              ))}
+            </div>
 
-          {/* Right Section */}
-          <div className="flex items-center space-x-2 lg:space-x-4">
-            {/* Mobile Market Indicators */}
-            <div className="flex lg:hidden items-center space-x-2">
-              {!(marketData.sensex.error && marketData.nifty.error) && (
-                <>
-                  <MarketIndicator 
-                    marketInfo={marketData.sensex} 
-                    isCompact={true}
-                  />
-                  <div className="h-6 w-px bg-gray-200 dark:bg-gray-700" />
-                  <MarketIndicator 
-                    marketInfo={marketData.nifty} 
-                    isCompact={true}
-                  />
-                </>
-              )}
+            {/* Profile and Notifications */}
+            <div className="flex items-center space-x-2 lg:space-x-4">
+              {/* Mobile Market Indicators */}
+              <div className="flex lg:hidden items-center space-x-2">
+                {!(marketData.sensex.error && marketData.nifty.error) && (
+                  <>
+                    <MarketIndicator
+                      marketInfo={marketData.sensex}
+                      isCompact={true}
+                    />
+                    <div className="h-6 w-px bg-gray-200 dark:bg-gray-700" />
+                    <MarketIndicator
+                      marketInfo={marketData.nifty}
+                      isCompact={true}
+                    />
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Notifications */}
             <Button variant="ghost" size="sm" className="relative touch-target">
               <Bell className="h-5 w-5" />
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs">
+              <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 text-[9.75px]">
                 3
               </Badge>
             </Button>
@@ -365,7 +417,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="cursor-pointer text-red-600 focus:text-red-600"
                   onClick={handleLogout}
                 >

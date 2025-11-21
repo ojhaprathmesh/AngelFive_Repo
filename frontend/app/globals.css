@@ -6,8 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jetbrains-mono);
+  --font-mono: var(--font-jetbrains-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -76,6 +76,9 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+  /* Custom UI divider variables */
+  --divider-color: #E0E0E0; /* light gray for solid dividers */
+  --dotted-color: #CCCCCC;  /* gray for dotted separators */
 }
 
 .dark {
@@ -110,6 +113,9 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+  /* Maintain divider variables in dark mode for consistency */
+  --divider-color: #3f3f46; /* zinc-700 approx for dark separators */
+  --dotted-color: #4b5563;  /* gray-600 approx for dotted separators */
 }
 
 @layer base {
@@ -135,6 +141,18 @@
   .font-regular { font-weight: 400; }
   .font-medium { font-weight: 500; }
   .font-bold { font-weight: 700; }
+  
+
+  
+  /* Numeric tabular alignment utilities */
+  .numeric-tabular {
+    font-feature-settings: 'tnum' on;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  .numeric-right {
+    text-align: right;
+  }
   
   /* Mobile-first Container Utilities */
   .container-responsive {
@@ -189,4 +207,18 @@
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
   .safe-left { padding-left: env(safe-area-inset-left); }
   .safe-right { padding-right: env(safe-area-inset-right); }
+
+  /* Divider utilities */
+  .divide-custom { --tw-divide-color: var(--divider-color); }
+  .divide-dotted > :not([hidden]) ~ :not([hidden]) { border-left-style: dotted; border-left-color: var(--dotted-color); }
+  .v-divider-air { width: 1px; border-right: 1px dotted var(--dotted-color); }
+  .v-divider-air-tabs { height: 3rem; }
+  .v-divider-air-chart { height: 30rem; }
+
+  /* Horizontal divider line */
+  .divider-line { height: 1px; width: 100%; background-color: var(--divider-color); }
+
+  /* Numeric alignment utilities */
+  .numeric-tabular { font-variant-numeric: tabular-nums; }
+  .numeric-right { text-align: end; }
 }

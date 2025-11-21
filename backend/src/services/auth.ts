@@ -237,7 +237,7 @@ export class FirebaseAuthService {
   /**
    * Create user profile in Firestore
    */
-  private async createUserProfile(
+  public async createUserProfile(
     userRecord: UserRecord,
     fullName?: string
   ): Promise<UserProfile> {

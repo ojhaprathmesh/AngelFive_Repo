@@ -46,7 +46,7 @@ interface SmartAPIQuoteResponse {
         sell: Array<{ price: number; quantity: number; orders: number }>;
       };
     }>;
-    unfetched: Array<any>;
+    unfetched: Array<unknown>;
   };
 }
 
@@ -83,7 +83,7 @@ class MarketDataService {
   
   // Rate limiting properties
   private lastApiCall: number = 0;
-  private apiCallQueue: Array<() => Promise<any>> = [];
+  private apiCallQueue: Array<() => Promise<unknown>> = [];
   private isProcessingQueue: boolean = false;
   private readonly MIN_API_INTERVAL = 100; // 100ms between calls (10 calls per second max)
 

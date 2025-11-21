@@ -1,4 +1,5 @@
 import { initializeApp, cert, getApps, App } from "firebase-admin/app";
+import fs from "fs";
 import { getAuth, Auth } from "firebase-admin/auth";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 
@@ -10,22 +11,37 @@ interface FirebaseConfig {
 }
 
 // Environment variables validation
-const validateFirebaseConfig = (): FirebaseConfig => {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+const resolveFirebaseConfig = (): FirebaseConfig => {
+  const envProjectId = process.env.FIREBASE_PROJECT_ID;
+  const envClientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const envPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      "Missing Firebase configuration. Please ensure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set in environment variables."
-    );
+  if (envProjectId && envClientEmail && envPrivateKey) {
+    return {
+      projectId: envProjectId,
+      clientEmail: envClientEmail,
+      privateKey: envPrivateKey.replace(/\\n/g, "\n"),
+    };
   }
 
-  return {
-    projectId,
-    clientEmail,
-    privateKey: privateKey.replace(/\\n/g, "\n"), // Handle escaped newlines
-  };
+  const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (credentialsPath && fs.existsSync(credentialsPath)) {
+    const raw = fs.readFileSync(credentialsPath, "utf8");
+    const json = JSON.parse(raw);
+    const projectId: string | undefined = json.project_id;
+    const clientEmail: string | undefined = json.client_email;
+    const privateKey: string | undefined = json.private_key;
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error(
+        "Invalid credentials JSON. Missing project_id, client_email or private_key."
+      );
+    }
+    return { projectId, clientEmail, privateKey };
+  }
+
+  throw new Error(
+    "Missing Firebase configuration. Provide FIREBASE_* env or a valid GOOGLE_APPLICATION_CREDENTIALS file."
+  );
 };
 
 // Initialize Firebase Admin SDK
@@ -34,7 +50,7 @@ let firebaseAuth: Auth;
 let firebaseFirestore: Firestore;
 
 try {
-  const config = validateFirebaseConfig();
+  const config = resolveFirebaseConfig();
 
   // Check if Firebase app is already initialized
   if (getApps().length === 0) {

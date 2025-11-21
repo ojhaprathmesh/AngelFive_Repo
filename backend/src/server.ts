@@ -3,7 +3,7 @@ import path from "path";
 
 // Load environment variables with absolute paths
 const backendDir = path.resolve(__dirname, '..');
-dotenv.config({ path: path.join(backendDir, '.env.local') });
+dotenv.config({ path: path.join(backendDir, '.env.local'), override: true });
 
 import express from "express";
 import cors from "cors";

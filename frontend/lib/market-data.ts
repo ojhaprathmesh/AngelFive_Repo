@@ -11,6 +11,8 @@ interface MarketData {
   low?: number;
   close?: number;
   volume?: number;
+  totBuyQuan?: number;
+  totSellQuan?: number;
 }
 
 interface SmartAPIQuoteResponse {
@@ -68,6 +70,14 @@ interface SmartAPILoginResponse {
   };
 }
 
+interface InstrumentEntry {
+  token: string | number;
+  symbol?: string;
+  name?: string;
+  instrumenttype?: string;
+  exch_seg?: string;
+}
+
 class MarketDataService {
   private clientcode: string;
   private password: string;
@@ -86,6 +96,8 @@ class MarketDataService {
   private apiCallQueue: Array<() => Promise<unknown>> = [];
   private isProcessingQueue: boolean = false;
   private readonly MIN_API_INTERVAL = 100; // 100ms between calls (10 calls per second max)
+  private instrumentCache: InstrumentEntry[] | null = null;
+  private instrumentCacheTime: number = 0;
 
   constructor() {
     this.clientcode = process.env.NEXT_PUBLIC_SMARTAPI_CLIENT_CODE || '';
@@ -101,7 +113,7 @@ class MarketDataService {
     }
   }
 
-  private async getJwtToken(): Promise<string> {
+  private async getJwtToken(): Promise<string | null> {
     // Check if token is still valid (with 5 minute buffer)
     if (this.jwtToken && Date.now() < this.tokenExpiry - 300000) {
       return this.jwtToken;
@@ -133,13 +145,21 @@ class MarketDataService {
       );
 
       if (!response.ok) {
+        // If 403 or other auth errors, clear token and return null
+        if (response.status === 403 || response.status === 401) {
+          this.jwtToken = null;
+          this.tokenExpiry = 0;
+          console.warn('SmartAPI authentication failed (403/401). Some features may not work.');
+          return null;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data: SmartAPILoginResponse = await response.json();
       
       if (!data.status || !data.data?.jwtToken) {
-        throw new Error(data.message || 'Login failed');
+        console.warn('SmartAPI login failed:', data.message || 'Login failed');
+        return null;
       }
 
       this.jwtToken = data.data.jwtToken;
@@ -149,7 +169,9 @@ class MarketDataService {
       return this.jwtToken;
     } catch (error) {
       console.error('❌ SmartAPI Login failed:', error);
-      throw error;
+      this.jwtToken = null;
+      this.tokenExpiry = 0;
+      return null;
     }
   }
 
@@ -198,6 +220,10 @@ class MarketDataService {
     return this.rateLimitedApiCall(async () => {
       try {
         const jwtToken = await this.getJwtToken();
+        if (!jwtToken) {
+          console.warn('JWT token not available, skipping quote fetch');
+          return [];
+        }
 
         const response = await fetch(
           "https://apiconnect.angelone.in/rest/secure/angelbroking/market/v1/quote/",
@@ -241,12 +267,87 @@ class MarketDataService {
           low: quote.low,
           close: quote.close,
           volume: quote.tradeVolume,
+          totBuyQuan: quote.totBuyQuan,
+          totSellQuan: quote.totSellQuan,
         }));
       } catch (error) {
         console.error('Error fetching quote:', error);
         return [];
       }
     });
+  }
+
+  async getInstrumentMaster(filter?: { exch?: string; type?: string }): Promise<InstrumentEntry[]> {
+    try {
+      if (this.instrumentCache && Date.now() - this.instrumentCacheTime < 10 * 60 * 1000) {
+        const data = this.instrumentCache;
+        return data.filter((i) =>
+          (!filter?.exch || (i.exch_seg?.toUpperCase() === filter.exch.toUpperCase())) &&
+          (!filter?.type || (i.instrumenttype?.toUpperCase() === filter.type.toUpperCase()))
+        );
+      }
+      const resp = await fetch('https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json');
+      if (!resp.ok) return [];
+      const instruments: Array<InstrumentEntry> = await resp.json();
+      this.instrumentCache = instruments;
+      this.instrumentCacheTime = Date.now();
+      return instruments.filter((i) =>
+        (!filter?.exch || (i.exch_seg?.toUpperCase() === filter.exch.toUpperCase())) &&
+        (!filter?.type || (i.instrumenttype?.toUpperCase() === filter.type.toUpperCase()))
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  async getTopEquityTokens(limit: number = 60): Promise<string[]> {
+    const equities = await this.getInstrumentMaster({ exch: 'NSE', type: 'EQ' });
+    return equities.slice(0, limit).map((e) => String(e.token));
+  }
+
+  async getQuotesByTokens(exchange: string, tokens: string[]): Promise<MarketData[]> {
+    if (tokens.length === 0) return [];
+    // Chunk tokens to avoid API payload/limit issues
+    const chunkSize = 30;
+    const chunks: string[][] = [];
+    for (let i = 0; i < tokens.length; i += chunkSize) {
+      chunks.push(tokens.slice(i, i + chunkSize));
+    }
+    const results: MarketData[] = [];
+    for (const chunk of chunks) {
+      const part = await this.fetchQuote({ [exchange]: chunk }, 'FULL');
+      results.push(...part);
+    }
+    return results;
+  }
+
+  async getDiscoveryLists(): Promise<{
+    mostBought: MarketData[];
+    topGainers: MarketData[];
+    topLosers: MarketData[];
+    pocketFriendly: { under50: MarketData[]; under100: MarketData[]; under200: MarketData[] };
+  }> {
+    try {
+      const tokens = await this.getTopEquityTokens(200);
+      const quotes = await this.getQuotesByTokens('NSE', tokens);
+      const withDepth = quotes;
+
+      const mostBought = [...withDepth]
+        .sort((a, b) => (b.totBuyQuan || 0) - (a.totBuyQuan || 0))
+        .slice(0, 8);
+
+      const sortedByPct = [...quotes].sort((a, b) => b.changePercent - a.changePercent);
+      const topGainers = sortedByPct.slice(0, 8);
+      const topLosers = [...quotes].sort((a, b) => a.changePercent - b.changePercent).slice(0, 8);
+
+      const under50 = quotes.filter((q) => q.price < 50).slice(0, 8);
+      const under100 = quotes.filter((q) => q.price < 100).slice(0, 8);
+      const under200 = quotes.filter((q) => q.price < 200).slice(0, 8);
+
+      return { mostBought, topGainers, topLosers, pocketFriendly: { under50, under100, under200 } };
+    } catch {
+      return { mostBought: [], topGainers: [], topLosers: [], pocketFriendly: { under50: [], under100: [], under200: [] } };
+    }
   }
 
   async getCandleData(
@@ -290,6 +391,11 @@ class MarketDataService {
       const data: SmartAPICandleResponse = await response.json();
       
       if (!data.status || !data.data) {
+        // If token is invalid, return empty array instead of throwing
+        if (data.message?.includes('Token') || data.message?.includes('Invalid')) {
+          console.warn('SmartAPI token invalid, returning empty candle data');
+          return [];
+        }
         throw new Error(data.message || 'Invalid API response format');
       }
 
@@ -324,15 +430,33 @@ class MarketDataService {
 
     // Map symbols to SmartAPI tokens
     const symbolTokenMap: { [key: string]: { exchange: string; token: string } } = {
-      'BSE:SENSEX': { exchange: 'BSE', token: '99919000' },  // Correct BSE SENSEX token
-      'NSE:NIFTY': { exchange: 'NSE', token: '26000' },      // NSE NIFTY 50 token
-      'SBIN-EQ': { exchange: 'NSE', token: '3045' },         // SBI token
+      'BSE:SENSEX': { exchange: 'BSE', token: '99919000' },
+      'NSE:NIFTY': { exchange: 'NSE', token: '99926000' },
+      'NSE:BANKNIFTY': { exchange: 'NSE', token: '99926009' },
+      'NSE:INDIAVIX': { exchange: 'NSE', token: '99926017' },
+      'NSE:FINNIFTY': { exchange: 'NSE', token: '99926037' },
+      'SBIN-EQ': { exchange: 'NSE', token: '3045' },
     };
 
-    const symbolInfo = symbolTokenMap[symbol];
+    let symbolInfo = symbolTokenMap[symbol];
     if (!symbolInfo) {
-      console.warn(`Symbol ${symbol} not found in token map`);
-      return this.getFallbackData(symbol);
+      try {
+        const resp = await fetch('https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json');
+        if (resp.ok) {
+          const instruments: Array<InstrumentEntry> = await resp.json();
+          const found = instruments.find((i) =>
+            (i.name?.toUpperCase() === symbol.split(':')[1]?.toUpperCase()) &&
+            (i.instrumenttype?.toUpperCase() === 'AMXIDX') &&
+            (i.exch_seg?.toUpperCase() === symbol.split(':')[0]?.toUpperCase())
+          );
+          if (found && found.token) {
+            symbolInfo = { exchange: symbol.split(':')[0], token: String(found.token) } as { exchange: string; token: string };
+          }
+        }
+      } catch {}
+      if (!symbolInfo) {
+        return this.getFallbackData(symbol);
+      }
     }
 
     try {
@@ -363,29 +487,84 @@ class MarketDataService {
     return this.getMarketData('NSE:NIFTY');
   }
 
+  async getBankNiftyData(): Promise<MarketData> {
+    return this.getMarketData('NSE:BANKNIFTY');
+  }
+
+  async getIndiaVixData(): Promise<MarketData> {
+    return this.getMarketData('NSE:INDIAVIX');
+  }
+
+  async getFinniftyData(): Promise<MarketData> {
+    return this.getMarketData('NSE:FINNIFTY');
+  }
+
+  async getSymbolToken(symbol: string): Promise<{ exchange: string; token: string } | null> {
+    const baseMap: { [key: string]: { exchange: string; token: string } } = {
+      'BSE:SENSEX': { exchange: 'BSE', token: '99919000' },
+      'NSE:NIFTY': { exchange: 'NSE', token: '99926000' },
+      'NSE:BANKNIFTY': { exchange: 'NSE', token: '99926009' },
+      'NSE:INDIAVIX': { exchange: 'NSE', token: '99926017' },
+      'NSE:FINNIFTY': { exchange: 'NSE', token: '99926037' },
+      'SBIN-EQ': { exchange: 'NSE', token: '3045' },
+    };
+    if (baseMap[symbol]) return baseMap[symbol];
+    try {
+      const resp = await fetch('https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json');
+      if (resp.ok) {
+        const instruments: Array<InstrumentEntry> = await resp.json();
+        const found = instruments.find((i) =>
+          (i.name?.toUpperCase() === symbol.split(':')[1]?.toUpperCase()) &&
+          (i.instrumenttype?.toUpperCase() === 'AMXIDX') &&
+          (i.exch_seg?.toUpperCase() === symbol.split(':')[0]?.toUpperCase())
+        );
+        if (found && found.token) {
+          return { exchange: symbol.split(':')[0], token: String(found.token) } as { exchange: string; token: string };
+        }
+      }
+    } catch {}
+    return null;
+  }
+
   async getSBINData(): Promise<MarketData> {
     return this.getMarketData('SBIN-EQ');
   }
 
   // Method to get multiple quotes at once for better performance
   async getMultipleQuotes(symbols: string[]): Promise<MarketData[]> {
-    const symbolTokenMap: { [key: string]: { exchange: string; token: string } } = {
-      'BSE:SENSEX': { exchange: 'BSE', token: '99919000' },  // Correct BSE SENSEX token
-      'NSE:NIFTY': { exchange: 'NSE', token: '26000' },      // NSE NIFTY 50 token
-      'SBIN-EQ': { exchange: 'NSE', token: '3045' },         // SBI token
-    };
-
     const exchangeTokens: { [exchange: string]: string[] } = {};
-    
-    symbols.forEach(symbol => {
-      const symbolInfo = symbolTokenMap[symbol];
-      if (symbolInfo) {
-        if (!exchangeTokens[symbolInfo.exchange]) {
-          exchangeTokens[symbolInfo.exchange] = [];
-        }
-        exchangeTokens[symbolInfo.exchange].push(symbolInfo.token);
+    for (const symbol of symbols) {
+      let info: { exchange: string; token: string } | null = null;
+      const baseMap: { [key: string]: { exchange: string; token: string } } = {
+        'BSE:SENSEX': { exchange: 'BSE', token: '99919000' },
+        'NSE:NIFTY': { exchange: 'NSE', token: '99926000' },
+        'NSE:BANKNIFTY': { exchange: 'NSE', token: '99926009' },
+        'NSE:INDIAVIX': { exchange: 'NSE', token: '99926017' },
+        'NSE:FINNIFTY': { exchange: 'NSE', token: '99926037' },
+        'SBIN-EQ': { exchange: 'NSE', token: '3045' },
+      };
+      info = baseMap[symbol] || null;
+      if (!info) {
+        try {
+          const resp = await fetch('https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json');
+          if (resp.ok) {
+            const instruments: Array<InstrumentEntry> = await resp.json();
+            const found = instruments.find((i) =>
+              (i.name?.toUpperCase() === symbol.split(':')[1]?.toUpperCase()) &&
+              (i.instrumenttype?.toUpperCase() === 'AMXIDX') &&
+              (i.exch_seg?.toUpperCase() === symbol.split(':')[0]?.toUpperCase())
+            );
+            if (found && found.token) {
+              info = { exchange: symbol.split(':')[0], token: String(found.token) } as { exchange: string; token: string };
+            }
+          }
+        } catch {}
       }
-    });
+      if (info) {
+        if (!exchangeTokens[info.exchange]) exchangeTokens[info.exchange] = [];
+        exchangeTokens[info.exchange].push(info.token);
+      }
+    }
 
     try {
       return await this.fetchQuote(exchangeTokens, 'FULL');

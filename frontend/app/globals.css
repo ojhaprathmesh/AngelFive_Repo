@@ -221,4 +221,11 @@
   /* Numeric alignment utilities */
   .numeric-tabular { font-variant-numeric: tabular-nums; }
   .numeric-right { text-align: end; }
+
+  /* Hide scrollbars but keep scroll functionality */
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; } /* Chrome, Safari */
 }

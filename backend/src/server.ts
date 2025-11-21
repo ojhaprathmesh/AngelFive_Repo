@@ -11,6 +11,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { Express } from "express";
 import authRoutes from "./routes/auth";
+import watchlistRoutes from "./routes/watchlists";
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/watchlists", watchlistRoutes);
 
 // Basic routes
 app.get("/", (req, res) => {

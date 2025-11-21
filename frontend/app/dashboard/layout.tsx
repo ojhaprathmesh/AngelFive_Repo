@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { DashboardNavbar } from "@/components/dashboard-navbar";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 export default function DashboardLayout({
@@ -12,6 +12,8 @@ export default function DashboardLayout({
 }) {
   const { user, loading, error } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const isWatchlist = pathname === "/dashboard/watchlist";
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -68,9 +70,9 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className={isWatchlist ? "h-screen overflow-hidden bg-gray-50 dark:bg-gray-900" : "min-h-screen bg-gray-50 dark:bg-gray-900"}>
       <DashboardNavbar user={navbarUser} />
-      <main className="flex-1">
+      <main className={isWatchlist ? "flex-1 h-[calc(100vh-4rem)] overflow-hidden" : "flex-1"}>
         {children}
       </main>
     </div>

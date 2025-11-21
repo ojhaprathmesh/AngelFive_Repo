@@ -16,7 +16,9 @@
     "express-validator": "^7.2.1",
     "firebase-admin": "^13.5.0",
     "helmet": "^7.2.0",
-    "morgan": "^1.10.1"
+    "morgan": "^1.10.1",
+    "undici": "^6.19.8",
+    "otplib": "^12.0.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

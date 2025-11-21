@@ -300,6 +300,35 @@ router.get('/technical-screeners', async (req: Request, res: Response): Promise<
   }
 });
 
+router.get('/quotes', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const symbolsParam = String(req.query.symbols || '').trim();
+    if (!symbolsParam) {
+      res.json({ quotes: [] });
+      return;
+    }
+    const wanted = symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    const rows = await fetchNSEIndex('NIFTY 500');
+    const mapRow = (r: any): Quote => ({
+      symbol: String(r?.symbol || '').toUpperCase(),
+      regularMarketPrice: Number(r?.lastPrice || 0),
+      regularMarketChange: Number(r?.change || 0),
+      regularMarketChangePercent: Number(r?.pChange || 0),
+      regularMarketVolume: Number(r?.totalTradedVolume || 0),
+    });
+    const quotesAll: Quote[] = rows.map(mapRow);
+    const filtered = quotesAll.filter(q => wanted.includes(q.symbol)).map(q => ({
+      symbol: q.symbol,
+      price: q.regularMarketPrice,
+      changePct: q.regularMarketChangePercent,
+      exchange: 'NSE',
+    }));
+    res.json({ quotes: filtered });
+  } catch (e) {
+    res.status(500).json({ error: 'failed_to_fetch_quotes' });
+  }
+});
+
 // (SmartAPI F&O gainers/losers route can be added later with JWT auth)
 
 export default router;

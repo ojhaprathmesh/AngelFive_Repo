@@ -277,34 +277,6 @@ class MarketDataService {
     });
   }
 
-  async getInstrumentMaster(filter?: { exch?: string; type?: string }): Promise<InstrumentEntry[]> {
-    try {
-      if (this.instrumentCache && Date.now() - this.instrumentCacheTime < 10 * 60 * 1000) {
-        const data = this.instrumentCache;
-        return data.filter((i) =>
-          (!filter?.exch || (i.exch_seg?.toUpperCase() === filter.exch.toUpperCase())) &&
-          (!filter?.type || (i.instrumenttype?.toUpperCase() === filter.type.toUpperCase()))
-        );
-      }
-      const resp = await fetch('https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json');
-      if (!resp.ok) return [];
-      const instruments: Array<InstrumentEntry> = await resp.json();
-      this.instrumentCache = instruments;
-      this.instrumentCacheTime = Date.now();
-      return instruments.filter((i) =>
-        (!filter?.exch || (i.exch_seg?.toUpperCase() === filter.exch.toUpperCase())) &&
-        (!filter?.type || (i.instrumenttype?.toUpperCase() === filter.type.toUpperCase()))
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  async getTopEquityTokens(limit: number = 60): Promise<string[]> {
-    const equities = await this.getInstrumentMaster({ exch: 'NSE', type: 'EQ' });
-    return equities.slice(0, limit).map((e) => String(e.token));
-  }
-
   async getQuotesByTokens(exchange: string, tokens: string[]): Promise<MarketData[]> {
     if (tokens.length === 0) return [];
     // Chunk tokens to avoid API payload/limit issues
@@ -319,35 +291,6 @@ class MarketDataService {
       results.push(...part);
     }
     return results;
-  }
-
-  async getDiscoveryLists(): Promise<{
-    mostBought: MarketData[];
-    topGainers: MarketData[];
-    topLosers: MarketData[];
-    pocketFriendly: { under50: MarketData[]; under100: MarketData[]; under200: MarketData[] };
-  }> {
-    try {
-      const tokens = await this.getTopEquityTokens(200);
-      const quotes = await this.getQuotesByTokens('NSE', tokens);
-      const withDepth = quotes;
-
-      const mostBought = [...withDepth]
-        .sort((a, b) => (b.totBuyQuan || 0) - (a.totBuyQuan || 0))
-        .slice(0, 8);
-
-      const sortedByPct = [...quotes].sort((a, b) => b.changePercent - a.changePercent);
-      const topGainers = sortedByPct.slice(0, 8);
-      const topLosers = [...quotes].sort((a, b) => a.changePercent - b.changePercent).slice(0, 8);
-
-      const under50 = quotes.filter((q) => q.price < 50).slice(0, 8);
-      const under100 = quotes.filter((q) => q.price < 100).slice(0, 8);
-      const under200 = quotes.filter((q) => q.price < 200).slice(0, 8);
-
-      return { mostBought, topGainers, topLosers, pocketFriendly: { under50, under100, under200 } };
-    } catch {
-      return { mostBought: [], topGainers: [], topLosers: [], pocketFriendly: { under50: [], under100: [], under200: [] } };
-    }
   }
 
   async getCandleData(

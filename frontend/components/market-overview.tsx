@@ -59,14 +59,6 @@ export function MarketOverview() {
       changePercent: 0.79,
       isPositive: true,
     },
-    {
-      symbol: "MIDCPNIFTY",
-      name: "MIDCPNIFTY",
-      value: 13591.65,
-      change: 123.80,
-      changePercent: 0.92,
-      isPositive: true,
-    },
   ]);
 
   const [isLoading, setIsLoading] = useState(false);

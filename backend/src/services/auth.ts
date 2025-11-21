@@ -273,6 +273,26 @@ export class FirebaseAuthService {
       .collection(this.usersCollection)
       .doc(userRecord.uid)
       .set(userProfile);
+    const wlCol = firebaseFirestore.collection(this.usersCollection).doc(userRecord.uid).collection("watchlists");
+    const defDoc = wlCol.doc("default");
+    await defDoc.set({ name: "Default", createdAt: FieldValue.serverTimestamp() }, { merge: true });
+    const symCol = defDoc.collection("symbols");
+    const symSnap = await symCol.limit(1).get();
+    if (symSnap.empty) {
+      const samples = [
+        { symbol: "IDEA", exchange: "NSE", ltp: 9.97, changePct: -1.97 },
+        { symbol: "JIOFIN", exchange: "NSE", ltp: 253.4, changePct: 0.85 },
+        { symbol: "TATASTEEL", exchange: "NSE", ltp: 132.75, changePct: -0.62 },
+        { symbol: "TATAPOWER", exchange: "NSE", ltp: 108.9, changePct: 1.25 },
+        { symbol: "YESBANK", exchange: "NSE", ltp: 22.15, changePct: -0.35 },
+      ];
+      const batch = firebaseFirestore.batch();
+      samples.forEach((s) => {
+        const ref = symCol.doc(s.symbol);
+        batch.set(ref, { symbol: s.symbol, exchange: s.exchange, ltp: s.ltp, changePct: s.changePct, createdAt: FieldValue.serverTimestamp() }, { merge: true });
+      });
+      await batch.commit();
+    }
 
     return userProfile;
   }

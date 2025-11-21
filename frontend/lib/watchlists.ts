@@ -123,6 +123,30 @@ class WatchlistHttpService {
     const json = await res.json().catch(() => ({ counts: {} }));
     return (json?.counts as Record<string, number>) || {};
   }
+
+  async getSymbols(_uid: string, id: string): Promise<Array<{ id: string; symbol: string; exchange: string; ltp: number; changePct: number }>> {
+    const token = await auth.currentUser?.getIdToken(true);
+    const res = await fetch(`${this.baseUrl}/api/watchlists/${encodeURIComponent(id)}/symbols`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${String(token)}`,
+      },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.message || "Failed to load symbols");
+    }
+    const json = await res.json().catch(() => ({ symbols: [] }));
+    type ApiSymbol = { id?: string; symbol?: string; exchange?: string; ltp?: number; changePct?: number };
+    const symbols = (json?.symbols as Array<ApiSymbol>) || [];
+    return symbols.map((s) => ({
+      id: String(s.id || s.symbol || ""),
+      symbol: String(s.symbol || ""),
+      exchange: String(s.exchange || "NSE"),
+      ltp: typeof s.ltp === "number" ? s.ltp : 0,
+      changePct: typeof s.changePct === "number" ? s.changePct : 0,
+    }));
+  }
 }
 
 export const watchlistService = new WatchlistHttpService();

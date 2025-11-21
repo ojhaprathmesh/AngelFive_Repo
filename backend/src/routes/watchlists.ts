@@ -29,6 +29,23 @@ router.get("/stream", async (req: Request, res: Response): Promise<void> => {
         try {
           const defDoc = colRef.doc("default");
           await defDoc.set({ name: "Default", createdAt: FieldValue.serverTimestamp() }, { merge: true });
+          const symCol = defDoc.collection("symbols");
+          const symSnap = await symCol.limit(1).get();
+          if (symSnap.empty) {
+            const samples = [
+              { symbol: "IDEA", exchange: "NSE", ltp: 9.97, changePct: -1.97 },
+              { symbol: "JIOFIN", exchange: "NSE", ltp: 253.4, changePct: 0.85 },
+              { symbol: "TATASTEEL", exchange: "NSE", ltp: 132.75, changePct: -0.62 },
+              { symbol: "TATAPOWER", exchange: "NSE", ltp: 108.9, changePct: 1.25 },
+              { symbol: "YESBANK", exchange: "NSE", ltp: 22.15, changePct: -0.35 },
+            ];
+            const batch = firebaseFirestore.batch();
+            samples.forEach((s) => {
+              const ref = symCol.doc(s.symbol);
+              batch.set(ref, { symbol: s.symbol, exchange: s.exchange, ltp: s.ltp, changePct: s.changePct, createdAt: FieldValue.serverTimestamp() }, { merge: true });
+            });
+            await batch.commit();
+          }
         } catch {}
         return;
       }
@@ -65,10 +82,27 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
     const uid = await verifyToken(req);
     const colRef = firebaseFirestore.collection("users").doc(uid).collection("watchlists");
     const snap = await colRef.orderBy("createdAt", "asc").get();
-    if (snap.empty) {
-      const defDoc = colRef.doc("default");
-      await defDoc.set({ name: "Default", createdAt: FieldValue.serverTimestamp() }, { merge: true });
-      const refreshed = await colRef.orderBy("createdAt", "asc").get();
+  if (snap.empty) {
+    const defDoc = colRef.doc("default");
+    await defDoc.set({ name: "Default", createdAt: FieldValue.serverTimestamp() }, { merge: true });
+    const symCol = defDoc.collection("symbols");
+    const symSnap = await symCol.limit(1).get();
+    if (symSnap.empty) {
+      const samples = [
+        { symbol: "IDEA", exchange: "NSE", ltp: 9.97, changePct: -1.97 },
+        { symbol: "JIOFIN", exchange: "NSE", ltp: 253.4, changePct: 0.85 },
+        { symbol: "TATASTEEL", exchange: "NSE", ltp: 132.75, changePct: -0.62 },
+        { symbol: "TATAPOWER", exchange: "NSE", ltp: 108.9, changePct: 1.25 },
+        { symbol: "YESBANK", exchange: "NSE", ltp: 22.15, changePct: -0.35 },
+      ];
+      const batch = firebaseFirestore.batch();
+      samples.forEach((s) => {
+        const ref = symCol.doc(s.symbol);
+        batch.set(ref, { symbol: s.symbol, exchange: s.exchange, ltp: s.ltp, changePct: s.changePct, createdAt: FieldValue.serverTimestamp() }, { merge: true });
+      });
+      await batch.commit();
+    }
+    const refreshed = await colRef.orderBy("createdAt", "asc").get();
       const items = refreshed.docs.map((d) => {
         const data = d.data() as { name: string; createdAt?: Timestamp };
         return { id: d.id, name: data.name, createdAt: (data.createdAt as Timestamp) || Timestamp.now() };
@@ -206,6 +240,33 @@ router.get("/counts", async (req: Request, res: Response): Promise<void> => {
       })
     );
     res.json({ counts });
+  } catch (error: any) {
+    res.status(401).json({ status: "error", message: error.message || "Unauthorized" });
+  }
+});
+
+router.get("/:id/symbols", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uid = await verifyToken(req);
+    const id = String(req.params.id || "");
+    if (!id) {
+      res.status(400).json({ status: "error", message: "Invalid id" });
+      return;
+    }
+    const colRef = firebaseFirestore.collection("users").doc(uid).collection("watchlists").doc(id).collection("symbols");
+    const snap = await colRef.orderBy("createdAt", "asc").get();
+    const symbols = snap.docs.map((d) => {
+      const data = d.data() as { symbol: string; exchange?: string; ltp?: number; changePct?: number; createdAt?: Timestamp };
+      return {
+        id: d.id,
+        symbol: data.symbol,
+        exchange: data.exchange || "NSE",
+        ltp: typeof data.ltp === "number" ? data.ltp : 0,
+        changePct: typeof data.changePct === "number" ? data.changePct : 0,
+        createdAt: (data.createdAt as Timestamp) || Timestamp.now(),
+      };
+    });
+    res.json({ symbols });
   } catch (error: any) {
     res.status(401).json({ status: "error", message: error.message || "Unauthorized" });
   }

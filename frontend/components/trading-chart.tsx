@@ -51,7 +51,7 @@ interface ChartData {
 
 type TimeFrame = "1D" | "5D" | "1M" | "6M" | "1Y" | "5Y" | "Max";
 type ChartType = "Area" | "Candles";
-type IndexType = "SENSEX" | "NIFTY" | "BANKNIFTY" | "INDIAVIX" | "FINNIFTY" | "MIDCPNIFTY";
+type IndexType = "SENSEX" | "NIFTY" | "BANKNIFTY" | "INDIAVIX" | "FINNIFTY";
 
 interface IndexData {
   symbol: string;
@@ -81,8 +81,7 @@ export function TradingChart() {
     NIFTY: null,
     BANKNIFTY: null,
     INDIAVIX: null,
-    FINNIFTY: null,
-    MIDCPNIFTY: null,
+    FINNIFTY: null
   });
 
   // Persist chart type selection across sessions
@@ -109,32 +108,6 @@ export function TradingChart() {
   const toggleChartType = useCallback(() => {
     setChartType((prev) => (prev === "Area" ? "Candles" : "Area"));
   }, []);
-
-  // Sample data for all indices
-  const indexData: Record<IndexType, IndexData> = {
-    SENSEX: {
-      symbol: "SENSEX",
-      price: 83960.87,
-      change: 22.16,
-      changePercent: 0.03,
-      open: 83835.1,
-      high: 84127.0,
-      low: 83609.54,
-      close: 83938.71,
-      dayRange: { low: 83609.54, high: 84127.0 },
-    },
-    NIFTY: {
-      symbol: "NIFTY",
-      price: 25748.65,
-      change: 26.55,
-      changePercent: 0.1,
-      open: 25722.1,
-      high: 25789.1,
-      low: 25700.0,
-      close: 25748.65,
-      dayRange: { low: 25700.0, high: 25789.1 },
-    },
-  };
 
   const currentData = indexState[selectedIndex]
     ? {
@@ -391,12 +364,11 @@ export function TradingChart() {
       BANKNIFTY: "NSE:BANKNIFTY",
       INDIAVIX: "NSE:INDIAVIX",
       FINNIFTY: "NSE:FINNIFTY",
-      MIDCPNIFTY: "NSE:MIDCPNIFTY",
     };
     const load = async () => {
       try {
-        const keys: IndexType[] = ["SENSEX","NIFTY","BANKNIFTY","INDIAVIX","FINNIFTY","MIDCPNIFTY"];
-        const updates: Record<IndexType, LiveMarketData | null> = { SENSEX:null,NIFTY:null,BANKNIFTY:null,INDIAVIX:null,FINNIFTY:null,MIDCPNIFTY:null };
+        const keys: IndexType[] = ["SENSEX","NIFTY","BANKNIFTY","INDIAVIX","FINNIFTY"];
+        const updates: Record<IndexType, LiveMarketData | null> = { SENSEX:null,NIFTY:null,BANKNIFTY:null,INDIAVIX:null,FINNIFTY:null };
         for (const k of keys) {
           const r = await marketDataService.getMarketDataWithStatus(map[k]);
           updates[k] = r.data;
@@ -418,8 +390,7 @@ export function TradingChart() {
       BANKNIFTY: "NSE:BANKNIFTY",
       INDIAVIX: "NSE:INDIAVIX",
       FINNIFTY: "NSE:FINNIFTY",
-      MIDCPNIFTY: "NSE:MIDCPNIFTY",
-    };
+    };``
     const run = async () => {
       try {
         const symbol = map[selectedIndex];
@@ -484,7 +455,7 @@ export function TradingChart() {
   }, [selectedIndex, timeFrame, chartType]);
 
   const timeFrames: TimeFrame[] = ["1D", "5D", "1M", "6M", "1Y", "5Y", "Max"];
-  const indices: IndexType[] = ["SENSEX", "NIFTY", "BANKNIFTY", "INDIAVIX", "FINNIFTY", "MIDCPNIFTY"];
+  const indices: IndexType[] = ["SENSEX", "NIFTY", "BANKNIFTY", "INDIAVIX", "FINNIFTY"];
 
   if (error) {
     return (

@@ -226,9 +226,9 @@ export const handleFormSubmission = async (
         }
       );
 
-      // Redirect to dashboard after successful authentication
+      // Redirect to dashboard/market
       setTimeout(() => {
-        redirect("/dashboard");
+        redirect("/dashboard/market");
       }, 1500); // Small delay to show the success toast
 
       return true;

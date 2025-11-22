@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
         source: "/api/market/gainers-losers",
         destination: "http://localhost:5000/api/market/gainers-losers",
       },
+      {
+        source: "/api/dsfm/:path*",
+        destination: "http://localhost:5000/api/dsfm/:path*",
+      },
+      {
+        source: "/api/ml/:path*",
+        destination: "http://localhost:8000/:path*",
+      },
     ];
   },
 };

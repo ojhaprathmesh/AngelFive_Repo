@@ -787,7 +787,7 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
   try {
     const symbol = String(req.query.symbol || "");
     const timeframe = String(req.query.timeframe || "1M");
-  let maxLags = Number(req.query.maxLags || 20);
+    const maxLags = Number(req.query.maxLags || 20);
 
     if (!symbol) {
       res.status(400).json({ error: "Symbol is required" });
@@ -807,15 +807,11 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-  const logReturns = calculateLogReturns(prices);
-  // Ensure we have enough data; adapt lags dynamically to available length
-  const minRequired = 10;
-  if (logReturns.length < minRequired) {
-    res.status(400).json({ error: `Insufficient data for ACF/PACF calculation (need at least ${minRequired} returns)` });
-    return;
-  }
-  // Bound maxLags to half the series length to avoid over-requesting
-  maxLags = Math.min(maxLags, Math.floor(logReturns.length / 2));
+    const logReturns = calculateLogReturns(prices);
+    if (logReturns.length < maxLags + 10) {
+      res.status(400).json({ error: "Insufficient data for ACF/PACF calculation" });
+      return;
+    }
 
     // Try to use ML service for proper ACF/PACF
     try {
@@ -856,9 +852,9 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
     }
 
     const pacf: number[] = [1.0];
-    pacf.push(acf[1] || 0);
+    pacf.push(acf[1]);
     for (let lag = 2; lag <= maxLags; lag++) {
-      pacf.push((acf[lag] || 0) * 0.8);
+      pacf.push(acf[lag] * 0.8);
     }
 
     res.json({
@@ -1043,3 +1039,4 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
 });
 
 export default router;
+

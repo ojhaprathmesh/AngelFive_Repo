@@ -272,4 +272,66 @@ router.get("/:id/symbols", async (req: Request, res: Response): Promise<void> =>
   }
 });
 
+// Add symbol to watchlist
+router.post("/:id/symbols", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uid = await verifyToken(req);
+    const id = String(req.params.id || "");
+    const symbol = String(req.body?.symbol || "").trim().toUpperCase();
+    const exchange = String(req.body?.exchange || "NSE").trim().toUpperCase();
+    
+    if (!id) {
+      res.status(400).json({ status: "error", message: "Invalid watchlist id" });
+      return;
+    }
+    if (!symbol) {
+      res.status(400).json({ status: "error", message: "Symbol is required" });
+      return;
+    }
+    
+    const colRef = firebaseFirestore.collection("users").doc(uid).collection("watchlists").doc(id).collection("symbols");
+    
+    // Check if symbol already exists
+    const existing = await colRef.where("symbol", "==", symbol).limit(1).get();
+    if (!existing.empty) {
+      res.status(409).json({ status: "error", message: "Symbol already in watchlist" });
+      return;
+    }
+    
+    // Add symbol
+    await colRef.doc(symbol).set({
+      symbol,
+      exchange,
+      ltp: 0,
+      changePct: 0,
+      createdAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    
+    res.json({ status: "success", id: symbol });
+  } catch (error: any) {
+    res.status(401).json({ status: "error", message: error.message || "Unauthorized" });
+  }
+});
+
+// Remove symbol from watchlist
+router.delete("/:id/symbols/:symbolId", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uid = await verifyToken(req);
+    const id = String(req.params.id || "");
+    const symbolId = String(req.params.symbolId || "");
+    
+    if (!id || !symbolId) {
+      res.status(400).json({ status: "error", message: "Invalid id" });
+      return;
+    }
+    
+    const colRef = firebaseFirestore.collection("users").doc(uid).collection("watchlists").doc(id).collection("symbols");
+    await colRef.doc(symbolId).delete();
+    
+    res.json({ status: "success" });
+  } catch (error: any) {
+    res.status(401).json({ status: "error", message: error.message || "Unauthorized" });
+  }
+});
+
 export default router;

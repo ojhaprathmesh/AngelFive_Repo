@@ -629,21 +629,21 @@ export function PortfolioOptimization() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Efficient Frontier</CardTitle>
-                    <CardDescription>
+          <CardDescription>
                       Risk-Return trade-off curve showing optimal portfolios at different risk levels
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
                     {mptResult?.efficient_frontier && mptResult.efficient_frontier.length > 0 ? (
                       <div 
                         ref={efficientFrontierChartRef} 
                         className="w-full border rounded-lg bg-white dark:bg-gray-900 p-4" 
                         style={{ height: "400px", minHeight: "400px" }}
                       />
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
+          ) : (
+            <div className="text-center py-8 text-gray-500">
                         {mptResult ? 'No efficient frontier data available' : 'Run MPT Optimization first to see the Efficient Frontier'}
-                      </div>
+            </div>
                     )}
                   </CardContent>
                 </Card>

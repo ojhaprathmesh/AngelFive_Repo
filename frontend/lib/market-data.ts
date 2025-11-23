@@ -74,6 +74,7 @@ interface InstrumentEntry {
   token: string | number;
   symbol?: string;
   name?: string;
+  tradingsymbol?: string;
   instrumenttype?: string;
   exch_seg?: string;
 }
@@ -471,7 +472,37 @@ class MarketDataService {
             (i.exch_seg?.toUpperCase() === 'NSE')
           );
         } else {
-          found = instruments.find((i) => i.name?.toUpperCase() === symbol.toUpperCase());
+          // Try multiple matching strategies
+          const upperSymbol = symbol.toUpperCase();
+          found = instruments.find((i) => {
+            const candidates = [
+              i.symbol?.toUpperCase(),
+              i.name?.toUpperCase(),
+              i.tradingsymbol?.toUpperCase(),
+            ];
+            return candidates.some((candidate) => 
+              candidate === upperSymbol || 
+              candidate === `${upperSymbol}-EQ` ||
+              candidate?.startsWith(`${upperSymbol}-`)
+            );
+          });
+          
+          // If still not found, try with NSE exchange filter
+          if (!found) {
+            found = instruments.find((i) => {
+              if (i.exch_seg?.toUpperCase() !== 'NSE') return false;
+              const candidates = [
+                i.symbol?.toUpperCase(),
+                i.name?.toUpperCase(),
+                i.tradingsymbol?.toUpperCase(),
+              ];
+              return candidates.some((candidate) => 
+                candidate === upperSymbol || 
+                candidate === `${upperSymbol}-EQ` ||
+                candidate?.startsWith(`${upperSymbol}-`)
+              );
+            });
+          }
         }
         if (found && found.token) {
           const exch = found.exch_seg?.toUpperCase() || (symbol.includes(':') ? symbol.split(':')[0] : 'NSE');

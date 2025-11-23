@@ -473,16 +473,11 @@ router.get("/returns", async (req: Request, res: Response): Promise<void> => {
     }
     
     const candles = result.candles;
-    if (!candles || candles.length === 0) {
-      res.status(404).json({ error: `No historical data found for ${symbol}. The API returned empty data.` });
-      return;
-    }
-
-    const prices = candles.map((candle) => candle.close).filter((p: number) => isFinite(p) && p > 0);
+    const prices = candles.map((candle) => candle.close);
     const timestamps = candles.map((candle) => candle.time);
 
     if (prices.length === 0) {
-      res.status(404).json({ error: `No valid price data found for ${symbol}.` });
+      res.status(404).json({ error: `No historical data found for ${symbol}. The API returned empty data.` });
       return;
     }
 
@@ -494,36 +489,29 @@ router.get("/returns", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Filter out invalid returns
-    const validReturns = logReturns.filter((r: number) => isFinite(r) && !isNaN(r));
-    if (validReturns.length === 0) {
-      res.status(400).json({ error: "No valid returns calculated" });
-      return;
-    }
-
-    const stats = calculateStatistics(validReturns);
+    const stats = calculateStatistics(logReturns);
 
     // Calculate Sharpe ratio (assuming risk-free rate of 6% annually)
-    const tradingDays = validReturns.length;
-    const annualizedMean = stats.mean * (252 / Math.max(tradingDays, 1)); // Annualize
-    const annualizedStd = stats.std * Math.sqrt(252 / Math.max(tradingDays, 1)); // Annualize
+    const tradingDays = logReturns.length;
+    const annualizedMean = stats.mean * (252 / tradingDays); // Annualize
+    const annualizedStd = stats.std * Math.sqrt(252 / tradingDays); // Annualize
     const riskFreeRate = 0.06; // 6% annual risk-free rate
-    const sharpeRatio = annualizedStd > 0 && isFinite(annualizedStd) ? (annualizedMean - riskFreeRate) / annualizedStd : 0;
+    const sharpeRatio = annualizedStd > 0 ? (annualizedMean - riskFreeRate) / annualizedStd : 0;
 
     res.json({
       symbol,
-      meanReturn: isFinite(stats.mean) ? stats.mean : 0,
-      volatility: isFinite(stats.std) ? stats.std : 0,
+      meanReturn: stats.mean,
+      volatility: stats.std,
       sharpeRatio: isFinite(sharpeRatio) ? sharpeRatio : 0,
-      skewness: isFinite(stats.skewness) ? stats.skewness : 0,
-      kurtosis: isFinite(stats.kurtosis) ? stats.kurtosis : 0,
-      minReturn: isFinite(stats.min) ? stats.min : 0,
-      maxReturn: isFinite(stats.max) ? stats.max : 0,
-      logReturns: validReturns, // Return valid log returns for visualization
+      skewness: stats.skewness,
+      kurtosis: stats.kurtosis,
+      minReturn: stats.min,
+      maxReturn: stats.max,
+      logReturns: logReturns, // Return all log returns for visualization
       prices: prices, // Return all prices for visualization
-      timestamps: timestamps.slice(0, prices.length), // Return timestamps for chart x-axis
+      timestamps: timestamps, // Return timestamps for chart x-axis
       priceCount: prices.length,
-      returnCount: validReturns.length,
+      returnCount: logReturns.length,
       // Calculation explanations
       calculations: {
         meanReturn: {
@@ -554,28 +542,21 @@ router.get("/returns", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// Correlation Analysis endpoint with RMT
+// Correlation Analysis endpoint
 router.get("/correlation", async (req: Request, res: Response): Promise<void> => {
   try {
-    const timeframe = String(req.query.timeframe || "3M");
-    const applyRMT = String(req.query.rmt || "false") === "true";
-
-    // Use Nifty 50 stocks
-    const nifty50Stocks = [
-      "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR", "SBIN",
-      "BHARTIARTL", "ITC", "KOTAKBANK", "LT", "AXISBANK", "ASIANPAINT", "MARUTI",
-      "TITAN", "ULTRACEMCO", "NESTLEIND", "BAJFINANCE", "WIPRO", "ONGC", "TATAMOTORS",
-      "NTPC", "POWERGRID", "INDUSINDBK", "TECHM", "HCLTECH", "SUNPHARMA", "COALINDIA",
-      "JSWSTEEL", "TATASTEEL", "ADANIENT", "ADANIPORTS", "DIVISLAB", "DRREDDY", "CIPLA",
-      "GRASIM", "M&M", "BAJAJFINSV", "HEROMOTOCO", "EICHERMOT", "APOLLOHOSP", "BPCL",
-      "IOC", "VEDL", "HINDALCO", "PIDILITIND", "DABUR", "BRITANNIA", "GODREJCP"
-    ].slice(0, 20); // Limit to 20 for performance
+    // Get popular NSE stocks
+    const rows = await fetchNSEIndex("NIFTY 500");
+    const topStocks = rows
+      .slice(0, 15) // Limit to 15 for performance
+      .map((r: any) => String(r?.symbol || ""))
+      .filter((s) => s.length > 0);
 
     // Fetch returns for all stocks
     const stockReturns: { symbol: string; returns: number[] }[] = [];
     
-    for (const symbol of nifty50Stocks) {
-      const result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    for (const symbol of topStocks) {
+      const result = await fetchAngelHistoricalCandles(symbol, "3M");
       if (result.error) {
         console.warn(`Skipping ${symbol}: ${result.error}`);
         continue;
@@ -605,11 +586,10 @@ router.get("/correlation", async (req: Request, res: Response): Promise<void> =>
     // Calculate correlation matrix
     const correlationMatrix: number[][] = [];
     const symbols = alignedReturns.map((s) => s.symbol);
-    const n = symbols.length;
 
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < alignedReturns.length; i++) {
       const row: number[] = [];
-      for (let j = 0; j < n; j++) {
+      for (let j = 0; j < alignedReturns.length; j++) {
         if (i === j) {
           row.push(1.0);
         } else {
@@ -623,70 +603,9 @@ router.get("/correlation", async (req: Request, res: Response): Promise<void> =>
       correlationMatrix.push(row);
     }
 
-    // Calculate eigenvalues (simplified - using power iteration for largest)
-    let eigenvalues: number[] = [];
-    let rmtThreshold = 0;
-    let significantEigenvalues = 0;
-    
-    try {
-      eigenvalues = calculateEigenvalues(correlationMatrix);
-      rmtThreshold = calculateRMTThreshold(n, minLength);
-      significantEigenvalues = eigenvalues.filter((e: number) => e > rmtThreshold).length;
-    } catch (eigenError: any) {
-      console.warn("Eigenvalue calculation failed, using fallback:", eigenError.message);
-      // Fallback: simple eigenvalues based on trace
-      const trace = n; // Sum of diagonal (all 1s)
-      eigenvalues = [trace * 0.8, ...Array(n - 1).fill(0.2)];
-      rmtThreshold = 2.0;
-      significantEigenvalues = 1;
-    }
-
-    // Calculate average correlation
-    let sumCorr = 0;
-    let countCorr = 0;
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        sumCorr += correlationMatrix[i][j];
-        countCorr++;
-      }
-    }
-    const averageCorrelation = countCorr > 0 ? sumCorr / countCorr : 0;
-
-    // RMT-filtered matrix (simplified - keep only significant correlations)
-    let rmtFilteredMatrix = correlationMatrix;
-    if (applyRMT) {
-      rmtFilteredMatrix = correlationMatrix.map((row, i) =>
-        row.map((val, j) => {
-          if (i === j) return 1.0;
-          // Keep correlations above threshold, reduce others
-          return Math.abs(val) > 0.3 ? val : val * 0.3;
-        })
-      );
-    }
-
-    // Generate insights
-    const insights: string[] = [];
-    if (eigenvalues.length > 0 && eigenvalues[0] > 10) {
-      insights.push(`Strong market mode detected (λ₁ = ${eigenvalues[0].toFixed(2)}). High collective market movements.`);
-    }
-    if (significantEigenvalues > 3) {
-      insights.push(`${significantEigenvalues} significant eigenvalues found, indicating rich market structure beyond noise.`);
-    }
-    if (averageCorrelation > 0.5) {
-      insights.push(`High average correlation (${averageCorrelation.toFixed(2)}) suggests strong sectoral co-movement.`);
-    } else if (averageCorrelation < 0.2) {
-      insights.push(`Low average correlation (${averageCorrelation.toFixed(2)}) indicates diversified market behavior.`);
-    }
-
     res.json({
       symbols,
       correlationMatrix,
-      rmtFilteredMatrix: applyRMT ? rmtFilteredMatrix : null,
-      eigenvalues: eigenvalues.length > 0 ? eigenvalues.sort((a, b) => b - a) : [], // Sort descending
-      rmtThreshold,
-      significantEigenvalues,
-      averageCorrelation: Number(averageCorrelation.toFixed(3)),
-      insights,
       timestamp: new Date().toISOString(),
     });
   } catch (e) {
@@ -694,81 +613,6 @@ router.get("/correlation", async (req: Request, res: Response): Promise<void> =>
     res.status(500).json({ error: "failed_to_calculate_correlation" });
   }
 });
-
-// Helper function to calculate eigenvalues (simplified)
-function calculateEigenvalues(matrix: number[][]): number[] {
-  const n = matrix.length;
-  if (n === 0) return [];
-  
-  // Simplified eigenvalue calculation using power iteration for largest
-  // For full implementation, use a proper eigenvalue decomposition library
-  const eigenvalues: number[] = [];
-  
-  // Estimate eigenvalues (simplified approach)
-  // Trace gives sum of eigenvalues
-  let trace = 0;
-  for (let i = 0; i < n; i++) {
-    trace += matrix[i][i];
-  }
-  
-  // Estimate largest eigenvalue using power iteration
-  let v = new Array(n).fill(1 / Math.sqrt(n));
-  for (let iter = 0; iter < 50; iter++) {
-    const Av = new Array(n).fill(0);
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        Av[i] += matrix[i][j] * v[j];
-      }
-    }
-    const norm = Math.sqrt(Av.reduce((sum, val) => sum + val * val, 0));
-    if (norm < 1e-10 || !isFinite(norm)) break;
-    v = Av.map(val => val / norm);
-  }
-  
-  // Calculate largest eigenvalue
-  const Av = new Array(n).fill(0);
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      Av[i] += matrix[i][j] * v[j];
-    }
-  }
-  const lambda1 = v.reduce((sum, vi, i) => sum + vi * Av[i], 0);
-  
-  if (!isFinite(lambda1) || lambda1 <= 0) {
-    // Fallback: use trace-based estimate
-    eigenvalues.push(trace * 0.8);
-    for (let i = 1; i < n; i++) {
-      eigenvalues.push((trace * 0.2) / (n - 1));
-    }
-    return eigenvalues;
-  }
-  
-  eigenvalues.push(lambda1);
-  
-  // Estimate remaining eigenvalues (simplified)
-  const remaining = Math.max(0, trace - lambda1);
-  if (n > 1 && remaining > 0) {
-    const avgRemaining = remaining / (n - 1);
-    for (let i = 1; i < n; i++) {
-      eigenvalues.push(Math.max(0, avgRemaining * (1 - (i - 1) * 0.1))); // Decay pattern
-    }
-  } else {
-    for (let i = 1; i < n; i++) {
-      eigenvalues.push(0.1);
-    }
-  }
-  
-  return eigenvalues;
-}
-
-// Calculate RMT threshold (Marchenko-Pastur)
-function calculateRMTThreshold(n: number, t: number): number {
-  if (t <= 0 || n <= 0) return 2.0; // Default threshold
-  const q = n / t; // Ratio of dimensions
-  if (q >= 1) return 2.0; // Return default if q >= 1
-  const lambdaMax = Math.pow(1 + Math.sqrt(q), 2);
-  return isFinite(lambdaMax) ? lambdaMax : 2.0;
-}
 
 // Helper to calculate Pearson correlation
 function calculateCorrelation(x: number[], y: number[]): number {
@@ -943,7 +787,7 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
   try {
     const symbol = String(req.query.symbol || "");
     const timeframe = String(req.query.timeframe || "1M");
-  let maxLags = Number(req.query.maxLags || 20);
+    const maxLags = Number(req.query.maxLags || 20);
 
     if (!symbol) {
       res.status(400).json({ error: "Symbol is required" });
@@ -963,15 +807,11 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-  const logReturns = calculateLogReturns(prices);
-  // Ensure we have enough data; adapt lags dynamically to available length
-  const minRequired = 10;
-  if (logReturns.length < minRequired) {
-    res.status(400).json({ error: `Insufficient data for ACF/PACF calculation (need at least ${minRequired} returns)` });
-    return;
-  }
-  // Bound maxLags to half the series length to avoid over-requesting
-  maxLags = Math.min(maxLags, Math.floor(logReturns.length / 2));
+    const logReturns = calculateLogReturns(prices);
+    if (logReturns.length < maxLags + 10) {
+      res.status(400).json({ error: "Insufficient data for ACF/PACF calculation" });
+      return;
+    }
 
     // Try to use ML service for proper ACF/PACF
     try {
@@ -994,72 +834,36 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
         return;
       }
     } catch (mlError: any) {
-      console.warn("ML service not available for ACF/PACF, using fallback calculation:", mlError.message);
+      console.warn("ML service not available for ACF/PACF, using simplified calculation:", mlError.message);
     }
 
-    // Fallback: Proper ACF/PACF calculation
-    try {
-      const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
-      const variance = logReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / logReturns.length;
-      
-      if (!isFinite(mean) || !isFinite(variance) || variance <= 0) {
-        throw new Error("Invalid statistics calculated");
-      }
-      
-      // Calculate ACF
-      const acf: number[] = [1.0]; // Lag 0 is always 1
-      for (let lag = 1; lag <= maxLags; lag++) {
-        let numerator = 0;
-        const denominator = variance * (logReturns.length - lag);
-        if (denominator <= 0) {
-          acf.push(0);
-          continue;
-        }
-        for (let i = lag; i < logReturns.length; i++) {
-          numerator += (logReturns[i] - mean) * (logReturns[i - lag] - mean);
-        }
-        const correlation = numerator / denominator;
-        acf.push(isFinite(correlation) ? correlation : 0);
-      }
+    // Fallback: Simplified calculation
+    const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
+    const acf: number[] = [1.0];
+    const variance = logReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / logReturns.length;
 
-      // Calculate PACF using Yule-Walker equations (simplified)
-      const pacf: number[] = [1.0]; // Lag 0 is always 1
-      if (maxLags >= 1) {
-        pacf.push(isFinite(acf[1]) ? acf[1] : 0); // PACF(1) = ACF(1)
+    for (let lag = 1; lag <= maxLags; lag++) {
+      let numerator = 0;
+      for (let i = lag; i < logReturns.length; i++) {
+        numerator += (logReturns[i] - mean) * (logReturns[i - lag] - mean);
       }
-      
-      // For higher lags, use simplified PACF calculation
-      for (let lag = 2; lag <= maxLags; lag++) {
-        // Simplified: PACF decays faster than ACF
-        let pacfValue = isFinite(acf[lag]) ? acf[lag] : 0;
-        // Apply decay factor
-        for (let i = 1; i < lag; i++) {
-          const acfI = isFinite(acf[i]) ? acf[i] : 0;
-          const acfLagI = isFinite(acf[lag - i]) ? acf[lag - i] : 0;
-          pacfValue -= acfI * acfLagI * 0.5;
-        }
-        pacf.push(Math.max(-1, Math.min(1, isFinite(pacfValue) ? pacfValue : 0))); // Clamp to [-1, 1]
-      }
-
-      // Ensure arrays are the same length
-      const lags = Array.from({ length: maxLags + 1 }, (_, i) => i);
-      const acfFinal = acf.slice(0, maxLags + 1);
-      const pacfFinal = pacf.slice(0, maxLags + 1);
-
-      res.json({
-        symbol,
-        lags,
-        acf: acfFinal,
-        pacf: pacfFinal,
-        confidenceInterval: 1.96 / Math.sqrt(logReturns.length),
-      });
-    } catch (calcError: any) {
-      console.error("ACF/PACF calculation error:", calcError);
-      res.status(500).json({ 
-        error: "failed_to_calculate_acf_pacf",
-        message: calcError.message || "Calculation failed"
-      });
+      const correlation = variance > 0 ? numerator / (variance * logReturns.length) : 0;
+      acf.push(correlation);
     }
+
+    const pacf: number[] = [1.0];
+    pacf.push(acf[1]);
+    for (let lag = 2; lag <= maxLags; lag++) {
+      pacf.push(acf[lag] * 0.8);
+    }
+
+    res.json({
+      symbol,
+      lags: Array.from({ length: maxLags + 1 }, (_, i) => i),
+      acf: acf.slice(0, maxLags + 1),
+      pacf: pacf.slice(0, maxLags + 1),
+      confidenceInterval: 1.96 / Math.sqrt(logReturns.length),
+    });
   } catch (e) {
     console.error("Error calculating ACF/PACF:", e);
     res.status(500).json({ error: "failed_to_calculate_acf_pacf" });
@@ -1234,408 +1038,5 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// LSTM Model endpoint
-router.post("/lstm", async (req: Request, res: Response): Promise<void> => {
-  try {
-    let { symbol, timeframe = "1Y", lookback = 10, forecastSteps = 5 } = req.body || {};
-
-    if (!symbol) {
-      res.status(400).json({ error: "Symbol is required" });
-      return;
-    }
-
-    let result = await fetchAngelHistoricalCandles(symbol, timeframe);
-    if (result.error) {
-      res.status(404).json({ error: result.error });
-      return;
-    }
-    
-    let candles = result.candles;
-    let prices = candles.map((candle) => candle.close);
-    
-    if (prices.length < 30) {
-      result = await fetchAngelHistoricalCandles(symbol, "1Y");
-      if (!result.error) {
-        candles = result.candles;
-        prices = candles.map((candle) => candle.close);
-      }
-    }
-    
-    if (prices.length < 30) {
-      res.status(400).json({ 
-        error: `Insufficient data for LSTM model (need at least 30 candles, got ${prices.length})` 
-      });
-      return;
-    }
-
-    const logReturns = calculateLogReturns(prices);
-    if (logReturns.length < lookback + 5) {
-      res.status(400).json({ error: `Insufficient returns for LSTM model (need at least ${lookback + 5} returns)` });
-      return;
-    }
-
-    try {
-      const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
-      const mlResp = await fetch(`${mlServiceUrl}/dsfm/lstm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ returns: logReturns, lookback, forecast_steps: forecastSteps }),
-      });
-
-      if (mlResp.ok) {
-        const mlData: any = await mlResp.json();
-        res.json(mlData);
-        return;
-      } else {
-        const errorText = await mlResp.text();
-        console.warn(`ML service LSTM failed: ${mlResp.status} - ${errorText}`);
-      }
-    } catch (e: any) {
-      console.error("ML service LSTM error:", e.message);
-      res.status(503).json({ 
-        error: "ml_service_unavailable",
-        message: `ML service is not available. Error: ${e.message}. Please ensure the ML service is running on port 8000.`
-      });
-      return;
-    }
-
-    res.status(503).json({ 
-      error: "ml_service_unavailable",
-      message: "ML service is not available. Please ensure the ML service is running on port 8000."
-    });
-  } catch (e) {
-    console.error("Error in LSTM:", e);
-    res.status(500).json({ error: "failed_to_fit_lstm" });
-  }
-});
-
-// FinBERT Sentiment Analysis endpoint
-router.post("/sentiment/finbert", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { text } = req.body || {};
-
-    if (!text || typeof text !== 'string') {
-      res.status(400).json({ error: "Text is required for sentiment analysis" });
-      return;
-    }
-
-    try {
-      const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
-      const mlResp = await fetch(`${mlServiceUrl}/dsfm/sentiment/finbert`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      if (mlResp.ok) {
-        const mlData: any = await mlResp.json();
-        res.json(mlData);
-        return;
-      } else {
-        const errorText = await mlResp.text();
-        console.warn(`ML service FinBERT failed: ${mlResp.status} - ${errorText}`);
-      }
-    } catch (e: any) {
-      console.error("ML service FinBERT error:", e.message);
-      res.status(503).json({ 
-        error: "ml_service_unavailable",
-        message: `ML service is not available. Error: ${e.message}.`
-      });
-      return;
-    }
-
-    res.status(503).json({ 
-      error: "ml_service_unavailable",
-      message: "ML service is not available."
-    });
-  } catch (e) {
-    console.error("Error in FinBERT sentiment:", e);
-    res.status(500).json({ error: "failed_to_analyze_sentiment" });
-  }
-});
-
-// Rule-based Sentiment Analysis endpoint
-router.post("/sentiment/rule-based", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { text } = req.body || {};
-
-    if (!text || typeof text !== 'string') {
-      res.status(400).json({ error: "Text is required for sentiment analysis" });
-      return;
-    }
-
-    try {
-      const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
-      const mlResp = await fetch(`${mlServiceUrl}/dsfm/sentiment/rule-based`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      if (mlResp.ok) {
-        const mlData: any = await mlResp.json();
-        res.json(mlData);
-        return;
-      } else {
-        const errorText = await mlResp.text();
-        console.warn(`ML service rule-based sentiment failed: ${mlResp.status} - ${errorText}`);
-      }
-    } catch (e: any) {
-      console.error("ML service rule-based sentiment error:", e.message);
-      res.status(503).json({ 
-        error: "ml_service_unavailable",
-        message: `ML service is not available. Error: ${e.message}.`
-      });
-      return;
-    }
-
-    res.status(503).json({ 
-      error: "ml_service_unavailable",
-      message: "ML service is not available."
-    });
-  } catch (e) {
-    console.error("Error in rule-based sentiment:", e);
-    res.status(500).json({ error: "failed_to_analyze_sentiment" });
-  }
-});
-
-// Modern Portfolio Theory (MPT) endpoint
-router.post("/mpt", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { symbols, timeframe = "1Y", riskFreeRate = 0.06 } = req.body || {};
-
-    if (!symbols || !Array.isArray(symbols) || symbols.length < 2) {
-      res.status(400).json({ error: "At least 2 symbols are required for portfolio optimization" });
-      return;
-    }
-
-    // Fetch returns for all symbols
-    const stockReturns: { symbol: string; returns: number[] }[] = [];
-    
-    for (const symbol of symbols) {
-      const result = await fetchAngelHistoricalCandles(symbol, timeframe);
-      if (result.error) {
-        console.warn(`Skipping ${symbol}: ${result.error}`);
-        continue;
-      }
-      const candles = result.candles;
-      const prices = candles.map((candle) => candle.close);
-      if (prices.length > 20) {
-        const returns = calculateLogReturns(prices);
-        if (returns.length > 0) {
-          stockReturns.push({ symbol, returns });
-        }
-      }
-    }
-
-    if (stockReturns.length < 2) {
-      res.status(400).json({ error: "Insufficient data for portfolio optimization" });
-      return;
-    }
-
-    // Align returns to same length
-    const minLength = Math.min(...stockReturns.map((s) => s.returns.length));
-    const alignedReturns = stockReturns.map((s) => ({
-      symbol: s.symbol,
-      returns: s.returns.slice(-minLength),
-    }));
-
-    // Prepare returns matrix
-    const returnsMatrix = alignedReturns.map(s => s.returns);
-    const symbolsList = alignedReturns.map(s => s.symbol);
-
-    try {
-      const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
-      const mlResp = await fetch(`${mlServiceUrl}/dsfm/mpt`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          returns: returnsMatrix, 
-          symbols: symbolsList,
-          risk_free_rate: riskFreeRate 
-        }),
-      });
-
-      if (mlResp.ok) {
-        const mlData: any = await mlResp.json();
-        res.json(mlData);
-        return;
-      } else {
-        const errorText = await mlResp.text();
-        console.warn(`ML service MPT failed: ${mlResp.status} - ${errorText}`);
-      }
-    } catch (e: any) {
-      console.error("ML service MPT error:", e.message);
-      res.status(503).json({ 
-        error: "ml_service_unavailable",
-        message: `ML service is not available. Error: ${e.message}.`
-      });
-      return;
-    }
-
-    res.status(503).json({ 
-      error: "ml_service_unavailable",
-      message: "ML service is not available."
-    });
-  } catch (e) {
-    console.error("Error in MPT optimization:", e);
-    res.status(500).json({ error: "failed_to_optimize_portfolio" });
-  }
-});
-
-// Black-Litterman Model endpoint
-router.post("/black-litterman", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { symbols, timeframe = "1Y", views = {}, riskAversion = 3.0, tau = 0.05 } = req.body || {};
-
-    if (!symbols || !Array.isArray(symbols) || symbols.length < 2) {
-      res.status(400).json({ error: "At least 2 symbols are required for Black-Litterman optimization" });
-      return;
-    }
-
-    // Fetch returns for all symbols
-    const stockReturns: { symbol: string; returns: number[] }[] = [];
-    
-    for (const symbol of symbols) {
-      const result = await fetchAngelHistoricalCandles(symbol, timeframe);
-      if (result.error) {
-        console.warn(`Skipping ${symbol}: ${result.error}`);
-        continue;
-      }
-      const candles = result.candles;
-      const prices = candles.map((candle) => candle.close);
-      if (prices.length > 20) {
-        const returns = calculateLogReturns(prices);
-        if (returns.length > 0) {
-          stockReturns.push({ symbol, returns });
-        }
-      }
-    }
-
-    if (stockReturns.length < 2) {
-      res.status(400).json({ error: "Insufficient data for Black-Litterman optimization" });
-      return;
-    }
-
-    // Align returns to same length
-    const minLength = Math.min(...stockReturns.map((s) => s.returns.length));
-    const alignedReturns = stockReturns.map((s) => ({
-      symbol: s.symbol,
-      returns: s.returns.slice(-minLength),
-    }));
-
-    // Prepare returns matrix
-    const returnsMatrix = alignedReturns.map(s => s.returns);
-    const symbolsList = alignedReturns.map(s => s.symbol);
-
-    try {
-      const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
-      const mlResp = await fetch(`${mlServiceUrl}/dsfm/black-litterman`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          returns: returnsMatrix, 
-          symbols: symbolsList,
-          views,
-          risk_aversion: riskAversion,
-          tau
-        }),
-      });
-
-      if (mlResp.ok) {
-        const mlData: any = await mlResp.json();
-        res.json(mlData);
-        return;
-      } else {
-        const errorText = await mlResp.text();
-        console.warn(`ML service Black-Litterman failed: ${mlResp.status} - ${errorText}`);
-      }
-    } catch (e: any) {
-      console.error("ML service Black-Litterman error:", e.message);
-      res.status(503).json({ 
-        error: "ml_service_unavailable",
-        message: `ML service is not available. Error: ${e.message}.`
-      });
-      return;
-    }
-
-    res.status(503).json({ 
-      error: "ml_service_unavailable",
-      message: "ML service is not available."
-    });
-  } catch (e) {
-    console.error("Error in Black-Litterman:", e);
-    res.status(500).json({ error: "failed_to_optimize_portfolio" });
-  }
-});
-
-// Enhanced Sharpe Ratio endpoint
-router.post("/sharpe-ratio", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { symbol, timeframe = "1Y", riskFreeRate = 0.06, period = "daily" } = req.body || {};
-
-    if (!symbol) {
-      res.status(400).json({ error: "Symbol is required" });
-      return;
-    }
-
-    const result = await fetchAngelHistoricalCandles(symbol, timeframe);
-    if (result.error) {
-      res.status(404).json({ error: result.error });
-      return;
-    }
-    
-    const candles = result.candles;
-    const prices = candles.map((candle) => candle.close);
-    
-    if (prices.length === 0) {
-      res.status(404).json({ error: `No data found for ${symbol}` });
-      return;
-    }
-
-    const logReturns = calculateLogReturns(prices);
-    if (logReturns.length < 10) {
-      res.status(400).json({ error: "Insufficient data for Sharpe ratio calculation" });
-      return;
-    }
-
-    try {
-      const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
-      const mlResp = await fetch(`${mlServiceUrl}/dsfm/sharpe-ratio`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          returns: logReturns,
-          risk_free_rate: riskFreeRate,
-          period
-        }),
-      });
-
-      if (mlResp.ok) {
-        const mlData: any = await mlResp.json();
-        res.json(mlData);
-        return;
-      } else {
-        const errorText = await mlResp.text();
-        console.warn(`ML service Sharpe ratio failed: ${mlResp.status} - ${errorText}`);
-      }
-    } catch (e: any) {
-      console.error("ML service Sharpe ratio error:", e.message);
-      res.status(503).json({ 
-        error: "ml_service_unavailable",
-        message: `ML service is not available. Error: ${e.message}.`
-      });
-      return;
-    }
-
-    res.status(503).json({ 
-      error: "ml_service_unavailable",
-      message: "ML service is not available."
-    });
-  } catch (e) {
-    console.error("Error in Sharpe ratio:", e);
-    res.status(500).json({ error: "failed_to_calculate_sharpe_ratio" });
-  }
-});
-
 export default router;
+

@@ -69,7 +69,11 @@ interface Candle {
   close: number;
 }
 
-export default function ChartComponent() {
+interface ChartComponentProps {
+  symbol?: string;
+}
+
+export default function ChartComponent({ symbol = "YESBANK-EQ" }: ChartComponentProps = {}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area" | "Candlestick"> | null>(null);
@@ -232,10 +236,26 @@ export default function ChartComponent() {
   }, [kind]);
 
   const fetchCandles = async () => {
-    const now = new Date();
-    const toDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const tokenInfo = await marketDataService.getSymbolToken("YESBANK-EQ");
-    if (!tokenInfo) return [] as Candle[];
+    try {
+      const now = new Date();
+      const toDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      // Use symbol prop if provided, otherwise default to YESBANK-EQ
+      const symbolToUse = symbol || "YESBANK-EQ";
+      // Format symbol: 
+      // - If it has colon (NSE:TCS), use as is
+      // - If it has -EQ suffix, use as is
+      // - Otherwise, add -EQ for NSE stocks
+      let formattedSymbol = symbolToUse;
+      if (!symbolToUse.includes(":") && !symbolToUse.includes("-")) {
+        formattedSymbol = `${symbolToUse}-EQ`;
+      }
+      console.log("[ChartComponent] Fetching candles for symbol:", formattedSymbol);
+      const tokenInfo = await marketDataService.getSymbolToken(formattedSymbol);
+      if (!tokenInfo) {
+        console.warn("[ChartComponent] Token info not found for symbol:", formattedSymbol);
+        return [] as Candle[];
+      }
+      console.log("[ChartComponent] Token info:", tokenInfo);
     let baseInterval = "ONE_DAY";
     if (size === "1m") baseInterval = "ONE_MINUTE";
     if (size === "5m") baseInterval = "FIVE_MINUTE";
@@ -247,16 +267,23 @@ export default function ChartComponent() {
     else if (size === "1h" || size === "2h" || size === "3h" || size === "4h") from.setMonth(from.getMonth() - 1);
     else if (size === "1d") from.setFullYear(from.getFullYear() - 1);
     else if (size === "1wk" || size === "1month") from.setFullYear(from.getFullYear() - 5);
-    const fromDate = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")} ${String(from.getHours()).padStart(2, "0")}:${String(from.getMinutes()).padStart(2, "0")}`;
-    const raw = await marketDataService.getCandleData(tokenInfo.exchange, tokenInfo.token, baseInterval, fromDate, toDate);
-    const base = raw.map((c) => ({ time: Math.floor(new Date(c[0]).getTime() / 1000), open: c[1], high: c[2], low: c[3], close: c[4] }));
+      const fromDate = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")} ${String(from.getHours()).padStart(2, "0")}:${String(from.getMinutes()).padStart(2, "0")}`;
+      console.log("[ChartComponent] Fetching candle data:", { exchange: tokenInfo.exchange, token: tokenInfo.token, interval: baseInterval, fromDate, toDate });
+      const raw = await marketDataService.getCandleData(tokenInfo.exchange, tokenInfo.token, baseInterval, fromDate, toDate);
+      console.log("[ChartComponent] Received", raw.length, "candles");
+      const base = raw.map((c) => ({ time: Math.floor(new Date(c[0]).getTime() / 1000), open: c[1], high: c[2], low: c[3], close: c[4] }));
     if (size === "2h" || size === "3h" || size === "4h") {
       const group = size === "2h" ? 2 : size === "3h" ? 3 : 4;
       return aggregate(base, group * 3600);
     }
-    if (size === "1wk") return aggregate(base, 7 * 24 * 3600);
-    if (size === "1month") return aggregateMonthly(base);
-    return base;
+      if (size === "1wk") return aggregate(base, 7 * 24 * 3600);
+      if (size === "1month") return aggregateMonthly(base);
+      console.log("[ChartComponent] Returning", base.length, "processed candles");
+      return base;
+    } catch (error) {
+      console.error("[ChartComponent] Error fetching candles:", error);
+      return [] as Candle[];
+    }
   };
 
   const aggregate = (candles: Candle[], secs: number): Candle[] => {
@@ -305,24 +332,38 @@ export default function ChartComponent() {
   };
 
   const applySeriesData = async () => {
+    console.log("[ChartComponent] applySeriesData called, symbol:", symbol, "size:", size);
     const candles = await fetchCandles();
+    console.log("[ChartComponent] Got", candles.length, "candles");
     setData(candles);
-    if (!seriesRef.current) return;
-    if (kind === "Area") {
-      seriesRef.current.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close })));
-    } else {
-      seriesRef.current.setData(
-        candles.map((c) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close }))
-      );
+    if (!seriesRef.current) {
+      console.warn("[ChartComponent] Series ref is null, cannot set data");
+      return;
     }
-    chartRef.current?.timeScale().fitContent();
-    drawOverlay();
-    computeIndicators();
+    if (candles.length === 0) {
+      console.warn("[ChartComponent] No candles to display");
+      return;
+    }
+    try {
+      if (kind === "Area") {
+        seriesRef.current.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close })));
+      } else {
+        seriesRef.current.setData(
+          candles.map((c) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close }))
+        );
+      }
+      chartRef.current?.timeScale().fitContent();
+      drawOverlay();
+      computeIndicators();
+      console.log("[ChartComponent] Chart data applied successfully");
+    } catch (error) {
+      console.error("[ChartComponent] Error applying series data:", error);
+    }
   };
 
   useEffect(() => {
     applySeriesData();
-  }, [size]);
+  }, [size, symbol]);
 
   useEffect(() => {
     computeIndicators();
@@ -690,8 +731,8 @@ export default function ChartComponent() {
             </DropdownMenu>
           </div>
 
-          <div className="flex-1 relative rounded-md border bg-gray-50 dark:bg-gray-900 overflow-hidden min-h-0">
-            <div ref={rootRef} className="absolute inset-0 overflow-hidden" aria-label="Chart" />
+          <div className="flex-1 relative rounded-md border bg-gray-50 dark:bg-gray-900 overflow-hidden min-h-[400px]">
+            <div ref={rootRef} className="absolute inset-0 overflow-hidden" style={{ minHeight: '400px' }} aria-label="Chart" />
           </div>
         </div>
       </div>

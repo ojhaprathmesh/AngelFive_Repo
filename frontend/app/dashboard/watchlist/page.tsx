@@ -23,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TrendingUp, TrendingDown } from "lucide-react";
-import ChartComponent from "@/components/chart-component";
+import { WatchlistChart } from "@/components/watchlist-chart";
 import { MarketOverview } from "@/components/market-overview";
 import { TradingChart } from "@/components/trading-chart";
 
@@ -61,6 +61,8 @@ export default function WatchlistPage() {
   const [mainTab, setMainTab] = useState<"Chart" | "Overview">("Chart");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [selectedExchange, setSelectedExchange] = useState<string>("NSE");
+  const [chartKey, setChartKey] = useState<number>(0);
   const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
   const [showAddStockModal, setShowAddStockModal] = useState<boolean>(false);
   const [newStockSymbol, setNewStockSymbol] = useState<string>("");
@@ -229,8 +231,10 @@ export default function WatchlistPage() {
           }));
           setSymbols(mapped);
           // Auto-select the newly added symbol
-          if (mapped.length > 0) {
-            setSelectedSymbol(symbol);
+          const addedStock = mapped.find(s => s.symbol === symbol);
+          if (addedStock) {
+            setSelectedSymbol(addedStock.symbol);
+            setSelectedExchange(addedStock.exchange);
           }
         }
       }
@@ -259,7 +263,22 @@ export default function WatchlistPage() {
     return (
       <div 
         className={`flex items-center justify-between px-3 py-2.5 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${selectedSymbol === item.symbol ? bgColor : ''}`}
-        onClick={() => setSelectedSymbol(item.symbol)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log("[WatchlistPage] 🔵 Stock clicked:", item.symbol, item.exchange);
+          console.log("[WatchlistPage] Current selectedSymbol:", selectedSymbol);
+          console.log("[WatchlistPage] Current chartKey:", chartKey);
+          
+          // ALWAYS update, even if same symbol (to force refresh)
+          setSelectedSymbol(item.symbol);
+          setSelectedExchange(item.exchange);
+          setChartKey(prev => {
+            const newKey = prev + 1;
+            console.log("[WatchlistPage] ✅ State updated - new selectedSymbol:", item.symbol, "chartKey:", newKey);
+            return newKey;
+          });
+        }}
       >
         <div className="flex flex-col flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
@@ -291,9 +310,11 @@ export default function WatchlistPage() {
   useEffect(() => {
     if (!uid || !selectedId) return;
     
-    const fetchSymbols = async () => {
+    const fetchSymbols = async (showLoading = true) => {
       try {
-        setLoadingSymbols(true);
+        if (showLoading) {
+          setLoadingSymbols(true);
+        }
         const listSymbols = await watchlistService.getSymbols(uid, selectedId);
         const names = listSymbols.map((s) => s.symbol).filter(Boolean);
         if (names.length > 0) {
@@ -317,27 +338,44 @@ export default function WatchlistPage() {
               price: Number(x.price || 0),
               changePct: Number(x.changePct || 0),
             }));
-            setSymbols(mapped);
+            // Update prices without showing loading
+            setSymbols((prev) => {
+              // Preserve selection and update prices
+              return mapped.map((newItem) => {
+                const existing = prev.find((p) => p.symbol === newItem.symbol);
+                return existing ? { ...existing, ...newItem } : newItem;
+              });
+            });
             // Auto-select first symbol if none selected
             if (!selectedSymbol && mapped.length > 0) {
               setSelectedSymbol(mapped[0].symbol);
+              setSelectedExchange(mapped[0].exchange);
             }
           } else {
-            setSymbols([]);
+            if (showLoading) {
+              setSymbols([]);
+            }
           }
         } else {
-          setSymbols([]);
+          if (showLoading) {
+            setSymbols([]);
+          }
         }
       } catch {
-        setSymbols([]);
+        if (showLoading) {
+          setSymbols([]);
+        }
       } finally {
-        setLoadingSymbols(false);
+        if (showLoading) {
+          setLoadingSymbols(false);
+        }
       }
     };
 
-    fetchSymbols();
-    // Poll for updates every 10 seconds
-    const interval = setInterval(fetchSymbols, 10000);
+    // Initial load with loading
+    fetchSymbols(true);
+    // Poll for updates every 10 seconds without loading
+    const interval = setInterval(() => fetchSymbols(false), 10000);
     return () => clearInterval(interval);
   }, [uid, selectedId]);
 
@@ -813,9 +851,11 @@ export default function WatchlistPage() {
           <div className="flex-1 min-h-0 overflow-hidden">
             {mainTab === "Chart" ? (
               selectedSymbol ? (
-                <div className="h-full">
-                  <ChartComponent />
-                </div>
+                <WatchlistChart 
+                  key={`${selectedSymbol}-${selectedExchange}-${chartKey}`} 
+                  symbol={selectedSymbol} 
+                  exchange={selectedExchange} 
+                />
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-gray-500 dark:text-gray-400">

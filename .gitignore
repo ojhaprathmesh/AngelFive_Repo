@@ -45,3 +45,6 @@ next-env.d.ts
 scripts/
 *_live_data.csv*
 **/dist/
+
+
+DSFM_ENDTERM_REPORT himanshi.pdf

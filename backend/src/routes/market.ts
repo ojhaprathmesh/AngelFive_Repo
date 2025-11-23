@@ -329,7 +329,206 @@ router.get('/quotes', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// Get symbol token for a given symbol
+router.get('/symbol-token', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const symbol = String(req.query.symbol || '').trim().toUpperCase();
+    const exchange = String(req.query.exchange || 'NSE').toUpperCase();
+    
+    if (!symbol) {
+      res.status(400).json({ error: 'symbol parameter required' });
+      return;
+    }
+
+    // Try to get token from instrument master
+    const instruments = await loadInstrumentMaster();
+    console.log(`[symbol-token] Looking for ${symbol} on ${exchange}, total instruments: ${instruments.length}`);
+    
+    // Try multiple matching strategies
+    let match = instruments.find((item) => {
+      if (item.exch_seg?.toUpperCase() !== exchange) return false;
+      const candidates = [
+        item.symbol?.toUpperCase(),
+        item.name?.toUpperCase(),
+        item.tradingsymbol?.toUpperCase(),
+      ];
+      const symbolUpper = symbol.toUpperCase();
+      return candidates.some((candidate) => 
+        candidate === symbolUpper || 
+        candidate === `${symbolUpper}-EQ` ||
+        (candidate && candidate.startsWith(`${symbolUpper}-`))
+      );
+    });
+    
+    // If not found, try without exchange filter (broader search)
+    if (!match) {
+      console.log(`[symbol-token] Not found with exchange filter, trying without...`);
+      match = instruments.find((item) => {
+        const candidates = [
+          item.symbol?.toUpperCase(),
+          item.name?.toUpperCase(),
+          item.tradingsymbol?.toUpperCase(),
+        ];
+        const symbolUpper = symbol.toUpperCase();
+        return candidates.some((candidate) => 
+          candidate === symbolUpper || 
+          candidate === `${symbolUpper}-EQ` ||
+          (candidate && candidate.startsWith(`${symbolUpper}-`))
+        );
+      });
+      if (match) {
+        console.log(`[symbol-token] Found without exchange filter, using exchange: ${match.exch_seg}`);
+      }
+    }
+    
+    // If still not found, try partial matching
+    if (!match) {
+      console.log(`[symbol-token] Trying partial match...`);
+      const symbolUpper = symbol.toUpperCase();
+      match = instruments.find((item) => {
+        const candidates = [
+          item.symbol?.toUpperCase(),
+          item.name?.toUpperCase(),
+          item.tradingsymbol?.toUpperCase(),
+        ];
+        return candidates.some((candidate) => 
+          candidate && (
+            candidate.includes(symbolUpper) || 
+            symbolUpper.includes(candidate?.replace(/-EQ$/, '') || '')
+          )
+        );
+      });
+    }
+
+    if (match && match.token) {
+      res.json({ 
+        exchange: match.exch_seg?.toUpperCase() || exchange,
+        token: String(match.token),
+        symbol: match.symbol || match.name || symbol
+      });
+      return;
+    }
+
+    res.status(404).json({ error: 'Token not found', symbol, exchange });
+  } catch (e) {
+    console.error('Error getting symbol token:', e);
+    res.status(500).json({ error: 'failed_to_get_symbol_token' });
+  }
+});
+
+async function loadInstrumentMaster(): Promise<any[]> {
+  try {
+    const resp = await fetch('https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json');
+    if (resp.ok) {
+      const data = await resp.json();
+      return Array.isArray(data) ? data : [];
+    }
+  } catch (e) {
+    console.error('Failed to load instrument master:', e);
+  }
+  return [];
+}
+
 // (SmartAPI F&O gainers/losers route can be added later with JWT auth)
+
+// Yahoo Finance proxy endpoint to avoid CORS
+router.get('/yahoo-finance', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const symbol = String(req.query.symbol || '').trim().toUpperCase();
+    if (!symbol) {
+      res.status(400).json({ error: 'Symbol is required' });
+      return;
+    }
+
+    // Try multiple symbol formats
+    const symbolFormats = [
+      `${symbol}.NS`,  // NSE
+      `${symbol}.BO`,  // BSE
+      symbol,  // Direct
+    ];
+
+    // Calculate date range (1 year)
+    const to = Math.floor(Date.now() / 1000);
+    const from = to - (365 * 24 * 60 * 60);
+
+    for (const yahooSymbol of symbolFormats) {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?period1=${from}&period2=${to}&interval=1d&events=history`;
+        
+        console.log(`[Yahoo Finance] Trying: ${yahooSymbol}`);
+        
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          console.warn(`[Yahoo Finance] Error for ${yahooSymbol}: ${response.status}`);
+          continue;
+        }
+
+        const data: any = await response.json();
+        
+        if (data.chart?.error) {
+          console.warn(`[Yahoo Finance] API error for ${yahooSymbol}:`, data.chart.error);
+          continue;
+        }
+        
+        const result = data.chart?.result?.[0];
+        
+        if (!result || !result.timestamp || !result.indicators?.quote?.[0]) {
+          console.warn(`[Yahoo Finance] Invalid response for ${yahooSymbol}`);
+          continue;
+        }
+
+        const timestamps = result.timestamp;
+        const quote = result.indicators.quote[0];
+        const opens = quote.open || [];
+        const highs = quote.high || [];
+        const lows = quote.low || [];
+        const closes = quote.close || [];
+        const volumes = quote.volume || [];
+
+        const candles: Array<[string, number, number, number, number, number]> = [];
+        
+        for (let i = 0; i < timestamps.length; i++) {
+          const timestamp = timestamps[i];
+          const open = opens[i];
+          const high = highs[i];
+          const low = lows[i];
+          const close = closes[i];
+          const volume = volumes[i] || 0;
+
+          if (open == null || high == null || low == null || close == null) {
+            continue;
+          }
+
+          const date = new Date(timestamp * 1000);
+          const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+          
+          candles.push([dateStr, open, high, low, close, volume]);
+        }
+
+        if (candles.length > 0) {
+          console.log(`[Yahoo Finance] ✅ Success for ${yahooSymbol}: ${candles.length} candles`);
+          res.json({ candles, symbol: yahooSymbol });
+          return;
+        }
+      } catch (e: any) {
+        console.warn(`[Yahoo Finance] Error trying ${yahooSymbol}:`, e.message);
+        continue;
+      }
+    }
+
+    console.error(`[Yahoo Finance] ❌ All formats failed for: ${symbol}`);
+    res.status(404).json({ error: `Unable to fetch data for ${symbol}` });
+  } catch (e: any) {
+    console.error('[Yahoo Finance] Error:', e);
+    res.status(500).json({ error: e.message || 'Failed to fetch Yahoo Finance data' });
+  }
+});
 
 export default router;
 router.post('/gainers-losers', async (req: Request, res: Response) => {

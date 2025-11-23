@@ -1,27 +1,71 @@
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+"use client";
+
+import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ReturnsAnalysis } from "@/components/dsfm/returns-analysis";
+import { CorrelationAnalysis } from "@/components/dsfm/correlation-analysis";
+import { PortfolioOptimization } from "@/components/dsfm/portfolio-optimization";
+import { PCAAnalysis } from "@/components/dsfm/pca-analysis";
+import { NetworkAnalysis } from "@/components/dsfm/network-analysis";
+import { BarChart3, TrendingUp, Network, Layers, PieChart } from "lucide-react";
 
 export default function DSFMPage() {
   return (
-    <div className="flex justify-center p-2 min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="w-full max-w-5xl">
-        <div className="mb-4">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">DSFM</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Analytics and models module</p>
-        </div>
-        <div className="rounded-lg border bg-white dark:bg-gray-900 p-6">
-          <Alert>
-            <AlertDescription className="text-sm">
-              This section is a placeholder. Configure data pipelines, analytics, and dashboards here.
-            </AlertDescription>
-          </Alert>
-          <div className="mt-4">
-            <Button variant="outline" disabled>
-              Configure module
-            </Button>
-          </div>
-        </div>
+    <div className="container mx-auto p-4 space-y-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          Data Science in Financial Markets
+        </h1>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Advanced analytics, statistical modeling, and portfolio optimization tools
+        </p>
       </div>
+
+      <Tabs defaultValue="returns" className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="returns" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Returns Analysis
+          </TabsTrigger>
+          <TabsTrigger value="correlation" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Correlation
+          </TabsTrigger>
+          <TabsTrigger value="portfolio" className="flex items-center gap-2">
+            <PieChart className="h-4 w-4" />
+            Portfolio Optimization
+          </TabsTrigger>
+          <TabsTrigger value="pca" className="flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            PCA Analysis
+          </TabsTrigger>
+          <TabsTrigger value="network" className="flex items-center gap-2">
+            <Network className="h-4 w-4" />
+            Network Analysis
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="returns" className="mt-6">
+          <ReturnsAnalysis />
+        </TabsContent>
+
+        <TabsContent value="correlation" className="mt-6">
+          <CorrelationAnalysis />
+        </TabsContent>
+
+        <TabsContent value="portfolio" className="mt-6">
+           <PortfolioOptimization />
+        </TabsContent>
+
+        <TabsContent value="pca" className="mt-6">
+          <PCAAnalysis />
+        </TabsContent>
+
+        <TabsContent value="network" className="mt-6">
+          <NetworkAnalysis />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { Express } from "express";
 import authRoutes from "./routes/auth";
 import marketRoutes from "./routes/market";
 import watchlistRoutes from "./routes/watchlists";
+import dsfmRoutes from "./routes/dsfm";
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
@@ -28,6 +29,7 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 app.use("/api/auth", authRoutes);
 app.use("/api/market", marketRoutes);
 app.use("/api/watchlists", watchlistRoutes);
+app.use("/api/dsfm", dsfmRoutes);
 
 // Basic routes
 app.get("/", (req, res) => {
@@ -103,6 +105,25 @@ app.listen(PORT, () => {
   console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`🌐 Health check: http://localhost:${PORT}/health`);
   console.log(`📡 API test: http://localhost:${PORT}/api/test`);
+  
+  // Check for required environment variables for SmartAPI
+  // JWT token is generated dynamically, so we don't need SMARTAPI_JWT_TOKEN
+  const hasSmartApiKey = !!process.env.SMARTAPI_API_KEY;
+  const hasClientCode = !!process.env.SMARTAPI_CLIENT_CODE;
+  const hasPassword = !!process.env.SMARTAPI_PASSWORD;
+  const hasTotpSecret = !!process.env.SMARTAPI_TOTP_SECRET;
+  
+  if (!hasSmartApiKey || !hasClientCode || !hasPassword || !hasTotpSecret) {
+    console.warn(`⚠️  WARNING: SmartAPI credentials not found!`);
+    console.warn(`   SMARTAPI_API_KEY: ${hasSmartApiKey ? '✓' : '✗'}`);
+    console.warn(`   SMARTAPI_CLIENT_CODE: ${hasClientCode ? '✓' : '✗'}`);
+    console.warn(`   SMARTAPI_PASSWORD: ${hasPassword ? '✓' : '✗'}`);
+    console.warn(`   SMARTAPI_TOTP_SECRET: ${hasTotpSecret ? '✓' : '✗'}`);
+    console.warn(`   Please add these to backend/.env.local and restart the server`);
+    console.warn(`   Note: JWT token will be generated automatically on first API call`);
+  } else {
+    console.log(`✅ SmartAPI credentials loaded (JWT will be generated automatically)`);
+  }
 });
 
 export default app;

@@ -22,7 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={jetbrainsMono.variable}>
-      <body className="font-mono antialiased">
+      <body className="font-mono antialiased" suppressHydrationWarning>
         <AuthProvider>
           {children}
           <Toaster 

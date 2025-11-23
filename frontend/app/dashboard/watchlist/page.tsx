@@ -24,8 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { WatchlistChart } from "@/components/watchlist-chart";
-import { MarketOverview } from "@/components/market-overview";
-import { TradingChart } from "@/components/trading-chart";
+import { StockOverviewPanel } from "@/components/watchlist-stock-overview";
 
 interface MarketIndex {
   name: string;
@@ -118,6 +117,7 @@ export default function WatchlistPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [selectedExchange, setSelectedExchange] = useState<string>("NSE");
+  const selectedSymbolRef = useRef<string | null>(null);
   const [chartKey, setChartKey] = useState<number>(0);
   const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
   const [showAddStockModal, setShowAddStockModal] = useState<boolean>(false);
@@ -343,7 +343,7 @@ export default function WatchlistPage() {
               });
             });
             // Auto-select first symbol if none selected
-            if (!selectedSymbol && mapped.length > 0) {
+            if (!selectedSymbolRef.current && mapped.length > 0) {
               setSelectedSymbol(mapped[0].symbol);
               setSelectedExchange(mapped[0].exchange);
             }
@@ -374,6 +374,10 @@ export default function WatchlistPage() {
     const interval = setInterval(() => fetchSymbols(false), 10000);
     return () => clearInterval(interval);
   }, [uid, selectedId]);
+
+  useEffect(() => {
+    selectedSymbolRef.current = selectedSymbol;
+  }, [selectedSymbol]);
 
   // Filter symbols based on search
   const filteredSymbols = useMemo(() => {
@@ -408,7 +412,7 @@ export default function WatchlistPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-gray-50 dark:bg-gray-900">
       {/* Market Indices Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-6">
@@ -814,20 +818,6 @@ export default function WatchlistPage() {
                 )}
               </div>
 
-              {/* Options Quick List Button */}
-              <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-700">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => {
-                    // Options quick list functionality
-                    alert("Options Quick List feature coming soon!");
-                  }}
-                >
-                  OPTIONS QUICK LIST
-                </Button>
-              </div>
             </div>
           )}
         </aside>
@@ -870,7 +860,15 @@ export default function WatchlistPage() {
                 </div>
               )
             ) : (
-              <MarketOverview />
+              selectedSymbol ? (
+                <StockOverviewPanel symbol={selectedSymbol} exchange={selectedExchange} />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Select a stock from watchlist to view overview
+                  </p>
+                </div>
+              )
             )}
           </div>
         </main>

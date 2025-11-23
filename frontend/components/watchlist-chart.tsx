@@ -35,7 +35,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const resizeHandlerRef = useRef<(() => void) | null>(null);
-  const dotRef = useRef<HTMLDivElement | null>(null);
+  const toolCleanupRef = useRef<(() => void) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allChartData, setAllChartData] = useState<any[]>([]);
@@ -523,6 +523,83 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
     }
   }, [showEMA, emaPeriod, allChartData, timeframe, filterDataByTimeframe, updateEMA]);
 
+  // Handle tool mode changes
+  useEffect(() => {
+    if (!chartRef.current || !chartContainerRef.current) return;
+
+    // Cleanup previous tool
+    if (toolCleanupRef.current) {
+      toolCleanupRef.current();
+      toolCleanupRef.current = null;
+    }
+
+    const chart = chartRef.current;
+    const container = chartContainerRef.current;
+
+    if (toolMode === "cross") {
+      chart.applyOptions({
+        crosshair: {
+          mode: CrosshairMode.Normal,
+          vertLine: { visible: true, labelVisible: true },
+          horzLine: { visible: true, labelVisible: true },
+        },
+      });
+      container.style.cursor = "crosshair";
+    } else if (toolMode === "dot") {
+      chart.applyOptions({
+        crosshair: {
+          mode: CrosshairMode.Normal,
+          vertLine: { visible: false, labelVisible: false },
+          horzLine: { visible: false, labelVisible: false },
+        },
+      });
+      container.style.cursor = "none";
+
+      const el = document.createElement("div");
+      el.style.position = "absolute";
+      el.style.width = "6px";
+      el.style.height = "6px";
+      el.style.backgroundColor = "#3b82f6";
+      el.style.borderRadius = "50%";
+      el.style.pointerEvents = "none";
+      el.style.zIndex = "50";
+      el.style.transform = "translate(-50%, -50%)";
+      el.style.display = "none"; // Hide initially
+      container.appendChild(el);
+
+      const handleMove = (e: MouseEvent) => {
+        const rect = container.getBoundingClientRect();
+        el.style.left = `${e.clientX - rect.left}px`;
+        el.style.top = `${e.clientY - rect.top}px`;
+        el.style.display = "block";
+      };
+
+      const handleLeave = () => {
+        el.style.display = "none";
+      };
+
+      container.addEventListener("mousemove", handleMove);
+      container.addEventListener("mouseleave", handleLeave);
+
+      toolCleanupRef.current = () => {
+        container.removeEventListener("mousemove", handleMove);
+        container.removeEventListener("mouseleave", handleLeave);
+        el.remove();
+        container.style.cursor = "default";
+      };
+    } else {
+      // Pointer
+      chart.applyOptions({
+        crosshair: {
+          mode: CrosshairMode.Magnet,
+          vertLine: { visible: false, labelVisible: false },
+          horzLine: { visible: false, labelVisible: false },
+        },
+      });
+      container.style.cursor = "default";
+    }
+  }, [toolMode, isLoading]); // Re-apply when tool changes or chart re-loads
+
   // Update dark mode
   useEffect(() => {
     if (chartRef.current) {
@@ -564,25 +641,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
           variant={toolMode === "pointer" ? "default" : "ghost"}
           size="sm"
           className="w-8 h-8 p-0"
-          onClick={() => {
-            setToolMode("pointer");
-            if (chartRef.current) {
-              chartRef.current.applyOptions({
-                crosshair: {
-                  mode: CrosshairMode.Magnet,
-                  vertLine: { visible: false },
-                  horzLine: { visible: false },
-                },
-              });
-            }
-            if (chartContainerRef.current) {
-              chartContainerRef.current.style.cursor = "default";
-            }
-            if (dotRef.current) {
-              dotRef.current.remove();
-              dotRef.current = null;
-            }
-          }}
+          onClick={() => setToolMode("pointer")}
           title="Pointer (Default Cursor)"
         >
           <MousePointer2 className="h-4 w-4" />
@@ -593,25 +652,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
           variant={toolMode === "cross" ? "default" : "ghost"}
           size="sm"
           className="w-8 h-8 p-0"
-          onClick={() => {
-            setToolMode("cross");
-            if (chartRef.current) {
-              chartRef.current.applyOptions({
-                crosshair: {
-                  mode: CrosshairMode.Normal,
-                  vertLine: { visible: true, labelVisible: true },
-                  horzLine: { visible: true, labelVisible: true },
-                },
-              });
-            }
-            if (chartContainerRef.current) {
-              chartContainerRef.current.style.cursor = "crosshair";
-            }
-            if (dotRef.current) {
-              dotRef.current.remove();
-              dotRef.current = null;
-            }
-          }}
+          onClick={() => setToolMode("cross")}
           title="Crosshair (Cross)"
         >
           <Move className="h-4 w-4" />
@@ -622,45 +663,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
           variant={toolMode === "dot" ? "default" : "ghost"}
           size="sm"
           className="w-8 h-8 p-0"
-          onClick={() => {
-            setToolMode("dot");
-            if (chartRef.current) {
-              chartRef.current.applyOptions({
-                crosshair: {
-                  mode: CrosshairMode.Normal,
-                  vertLine: { visible: false },
-                  horzLine: { visible: false },
-                },
-              });
-            }
-            if (chartContainerRef.current) {
-              chartContainerRef.current.style.cursor = "default";
-              if (!dotRef.current) {
-                const el = document.createElement("div");
-                el.style.position = "absolute";
-                el.style.width = "6px";
-                el.style.height = "6px";
-                el.style.borderRadius = "50%";
-                el.style.background = "#3b82f6";
-                el.style.pointerEvents = "none";
-                el.style.transform = "translate(-3px, -3px)";
-                chartContainerRef.current.appendChild(el);
-                dotRef.current = el;
-                const move = (e: MouseEvent) => {
-                  const rect = chartContainerRef.current!.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const y = e.clientY - rect.top;
-                  el.style.left = `${x}px`;
-                  el.style.top = `${y}px`;
-                };
-                chartContainerRef.current.addEventListener("mousemove", move);
-                chartContainerRef.current.addEventListener("mouseleave", () => {
-                  el.style.left = "-1000px";
-                  el.style.top = "-1000px";
-                });
-              }
-            }
-          }}
+          onClick={() => setToolMode("dot")}
           title="Dot"
         >
           <Circle className="h-4 w-4" />

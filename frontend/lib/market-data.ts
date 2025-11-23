@@ -254,7 +254,8 @@ class MarketDataService {
         const data: SmartAPIQuoteResponse = await response.json();
         
         if (!data.status || !data.data?.fetched) {
-          throw new Error(data.message || 'Invalid API response format');
+          console.warn('SmartAPI quote response invalid:', data.message);
+          return [];
         }
 
         return data.data.fetched.map(quote => ({

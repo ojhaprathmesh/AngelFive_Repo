@@ -35,7 +35,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const resizeHandlerRef = useRef<(() => void) | null>(null);
-  const dotRef = useRef<HTMLDivElement | null>(null);
+  const toolCleanupRef = useRef<(() => void) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allChartData, setAllChartData] = useState<any[]>([]);
@@ -259,17 +259,25 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
       chartRef.current = chart;
       seriesRef.current = candlestickSeries;
 
-      const handleResize = () => {
-        if (chartContainerRef.current && chartRef.current) {
-          chartRef.current.applyOptions({
-            width: chartContainerRef.current.clientWidth || 800,
-            height: chartContainerRef.current.clientHeight || 400,
-          });
-        }
+      const handleResize = (entries: ResizeObserverEntry[]) => {
+        if (!chartRef.current || entries.length === 0) return;
+        
+        const entry = entries[0];
+        const { width, height } = entry.contentRect;
+        
+        // Ensure we have valid dimensions
+        if (width === 0 || height === 0) return;
+
+        console.log("[WatchlistChart] Resizing to:", width, "x", height);
+        chartRef.current.applyOptions({ width, height });
+        chartRef.current.timeScale().fitContent();
       };
 
-      window.addEventListener("resize", handleResize);
-      resizeHandlerRef.current = handleResize;
+      const resizeObserver = new ResizeObserver(handleResize);
+      resizeObserver.observe(chartContainerRef.current);
+      
+      // Store cleanup function
+      resizeHandlerRef.current = () => resizeObserver.disconnect();
 
       console.log("[WatchlistChart] Chart initialized successfully");
       return true;
@@ -328,7 +336,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
             emaSeriesRef.current = null;
           }
           if (resizeHandlerRef.current) {
-            window.removeEventListener("resize", resizeHandlerRef.current);
+            (resizeHandlerRef.current as () => void)();
             resizeHandlerRef.current = null;
           }
           chartRef.current.remove();
@@ -495,11 +503,9 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
     return () => {
       console.log("[WatchlistChart] Cleanup function called for symbol:", symbol);
       if (resizeHandlerRef.current) {
-        window.removeEventListener("resize", resizeHandlerRef.current);
+        (resizeHandlerRef.current as () => void)();
         resizeHandlerRef.current = null;
       }
-      // Don't cleanup chart here - let the new effect handle it
-      // This prevents race conditions
     };
   }, [symbol, exchange, initializeChart, setChartData, fetchYahooFinanceData, filterDataByTimeframe, timeframe, showEMA, updateEMA]);
 
@@ -522,6 +528,83 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
       }
     }
   }, [showEMA, emaPeriod, allChartData, timeframe, filterDataByTimeframe, updateEMA]);
+
+  // Handle tool mode changes
+  useEffect(() => {
+    if (!chartRef.current || !chartContainerRef.current) return;
+
+    // Cleanup previous tool
+    if (toolCleanupRef.current) {
+      toolCleanupRef.current();
+      toolCleanupRef.current = null;
+    }
+
+    const chart = chartRef.current;
+    const container = chartContainerRef.current;
+
+    if (toolMode === "cross") {
+      chart.applyOptions({
+        crosshair: {
+          mode: CrosshairMode.Normal,
+          vertLine: { visible: true, labelVisible: true },
+          horzLine: { visible: true, labelVisible: true },
+        },
+      });
+      container.style.cursor = "crosshair";
+    } else if (toolMode === "dot") {
+      chart.applyOptions({
+        crosshair: {
+          mode: CrosshairMode.Normal,
+          vertLine: { visible: false, labelVisible: false },
+          horzLine: { visible: false, labelVisible: false },
+        },
+      });
+      container.style.cursor = "none";
+
+      const el = document.createElement("div");
+      el.style.position = "absolute";
+      el.style.width = "6px";
+      el.style.height = "6px";
+      el.style.backgroundColor = "#3b82f6";
+      el.style.borderRadius = "50%";
+      el.style.pointerEvents = "none";
+      el.style.zIndex = "50";
+      el.style.transform = "translate(-50%, -50%)";
+      el.style.display = "none"; // Hide initially
+      container.appendChild(el);
+
+      const handleMove = (e: MouseEvent) => {
+        const rect = container.getBoundingClientRect();
+        el.style.left = `${e.clientX - rect.left}px`;
+        el.style.top = `${e.clientY - rect.top}px`;
+        el.style.display = "block";
+      };
+
+      const handleLeave = () => {
+        el.style.display = "none";
+      };
+
+      container.addEventListener("mousemove", handleMove);
+      container.addEventListener("mouseleave", handleLeave);
+
+      toolCleanupRef.current = () => {
+        container.removeEventListener("mousemove", handleMove);
+        container.removeEventListener("mouseleave", handleLeave);
+        el.remove();
+        container.style.cursor = "default";
+      };
+    } else {
+      // Pointer
+      chart.applyOptions({
+        crosshair: {
+          mode: CrosshairMode.Magnet,
+          vertLine: { visible: false, labelVisible: false },
+          horzLine: { visible: false, labelVisible: false },
+        },
+      });
+      container.style.cursor = "default";
+    }
+  }, [toolMode, isLoading]); // Re-apply when tool changes or chart re-loads
 
   // Update dark mode
   useEffect(() => {
@@ -553,9 +636,9 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
   }
 
   return (
-    <div className="w-full h-full flex flex-row">
+    <div className="w-full h-full flex flex-row overflow-hidden">
       {/* Simple Vertical Toolbar */}
-      <div className="flex flex-col items-center gap-2 p-2 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 w-12">
+      <div className="flex flex-col items-center gap-2 p-2 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 w-12 flex-shrink-0">
         <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 mb-2">Chart</div>
         <div className="w-full border-t border-gray-200 dark:border-gray-700 mb-2"></div>
         
@@ -564,25 +647,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
           variant={toolMode === "pointer" ? "default" : "ghost"}
           size="sm"
           className="w-8 h-8 p-0"
-          onClick={() => {
-            setToolMode("pointer");
-            if (chartRef.current) {
-              chartRef.current.applyOptions({
-                crosshair: {
-                  mode: CrosshairMode.Magnet,
-                  vertLine: { visible: false },
-                  horzLine: { visible: false },
-                },
-              });
-            }
-            if (chartContainerRef.current) {
-              chartContainerRef.current.style.cursor = "default";
-            }
-            if (dotRef.current) {
-              dotRef.current.remove();
-              dotRef.current = null;
-            }
-          }}
+          onClick={() => setToolMode("pointer")}
           title="Pointer (Default Cursor)"
         >
           <MousePointer2 className="h-4 w-4" />
@@ -593,25 +658,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
           variant={toolMode === "cross" ? "default" : "ghost"}
           size="sm"
           className="w-8 h-8 p-0"
-          onClick={() => {
-            setToolMode("cross");
-            if (chartRef.current) {
-              chartRef.current.applyOptions({
-                crosshair: {
-                  mode: CrosshairMode.Normal,
-                  vertLine: { visible: true, labelVisible: true },
-                  horzLine: { visible: true, labelVisible: true },
-                },
-              });
-            }
-            if (chartContainerRef.current) {
-              chartContainerRef.current.style.cursor = "crosshair";
-            }
-            if (dotRef.current) {
-              dotRef.current.remove();
-              dotRef.current = null;
-            }
-          }}
+          onClick={() => setToolMode("cross")}
           title="Crosshair (Cross)"
         >
           <Move className="h-4 w-4" />
@@ -622,45 +669,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
           variant={toolMode === "dot" ? "default" : "ghost"}
           size="sm"
           className="w-8 h-8 p-0"
-          onClick={() => {
-            setToolMode("dot");
-            if (chartRef.current) {
-              chartRef.current.applyOptions({
-                crosshair: {
-                  mode: CrosshairMode.Normal,
-                  vertLine: { visible: false },
-                  horzLine: { visible: false },
-                },
-              });
-            }
-            if (chartContainerRef.current) {
-              chartContainerRef.current.style.cursor = "default";
-              if (!dotRef.current) {
-                const el = document.createElement("div");
-                el.style.position = "absolute";
-                el.style.width = "6px";
-                el.style.height = "6px";
-                el.style.borderRadius = "50%";
-                el.style.background = "#3b82f6";
-                el.style.pointerEvents = "none";
-                el.style.transform = "translate(-3px, -3px)";
-                chartContainerRef.current.appendChild(el);
-                dotRef.current = el;
-                const move = (e: MouseEvent) => {
-                  const rect = chartContainerRef.current!.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const y = e.clientY - rect.top;
-                  el.style.left = `${x}px`;
-                  el.style.top = `${y}px`;
-                };
-                chartContainerRef.current.addEventListener("mousemove", move);
-                chartContainerRef.current.addEventListener("mouseleave", () => {
-                  el.style.left = "-1000px";
-                  el.style.top = "-1000px";
-                });
-              }
-            }
-          }}
+          onClick={() => setToolMode("dot")}
           title="Dot"
         >
           <Circle className="h-4 w-4" />
@@ -706,9 +715,9 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
       </div>
       
       {/* Main Chart Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Toolbar */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
           <div className="flex items-center gap-2">
             {(["1D", "5D", "1M", "3M", "6M", "1Y"] as const).map((tf) => (
               <Button
@@ -746,7 +755,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
         </div>
 
         {/* Chart Container */}
-        <div className="flex-1 relative min-h-0 flex flex-col">
+        <div className="flex-1 relative min-h-0 overflow-hidden">
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-800/80 z-10">
               <Skeleton className="w-full h-full" />
@@ -754,14 +763,12 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
           )}
           <div
             ref={chartContainerRef}
-            className="w-full flex-1"
+            className="w-full h-full"
             style={{ 
-              minHeight: "0", // Allow shrinking
-              minWidth: "0",  // Allow shrinking
               width: "100%",
               height: "100%",
               position: "relative",
-              backgroundColor: "transparent",
+              overflow: "hidden",
             }}
           />
         </div>

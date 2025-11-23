@@ -329,6 +329,86 @@ router.get('/quotes', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+router.get('/stock-overview', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const symbol = String(req.query.symbol || '').trim().toUpperCase();
+    if (!symbol) {
+      res.status(400).json({ error: 'symbol_required' });
+      return;
+    }
+
+    const cookie = await getNSECookie();
+    const url = `https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(symbol)}`;
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json,text/plain,*/*',
+        'Referer': `https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(symbol)}`,
+        'Cookie': cookie,
+      },
+    });
+
+    if (!resp.ok) {
+      console.error(`[stock-overview] NSE response ${resp.status} for ${symbol}`);
+      res.status(resp.status).json({ error: 'failed_to_fetch_stock_overview' });
+      return;
+    }
+
+    const json: any = await resp.json();
+    const info = json?.info || {};
+    const priceInfo = json?.priceInfo || {};
+    const securityInfo = json?.securityInfo || {};
+    const metadata = json?.metadata || {};
+    const industryInfo = json?.industryInfo || {};
+
+    const intraDay = priceInfo?.intraDayHighLow || priceInfo?.dayHighLow || {};
+    const weekHighLow = priceInfo?.weekHighLow || {};
+    const priceBand = securityInfo?.priceBand || {};
+
+    const data = {
+      symbol: info?.symbol || symbol,
+      companyName: info?.companyName || info?.longName || symbol,
+      industry: info?.industry || industryInfo?.industry || metadata?.industry || null,
+      lastPrice: priceInfo?.lastPrice ?? null,
+      change: priceInfo?.change ?? null,
+      pChange: priceInfo?.pChange ?? null,
+      open: priceInfo?.open ?? null,
+      dayHigh: intraDay?.max ?? priceInfo?.dayHigh ?? null,
+      dayLow: intraDay?.min ?? priceInfo?.dayLow ?? null,
+      previousClose: priceInfo?.prevClose ?? priceInfo?.close ?? null,
+      averagePrice: priceInfo?.vwap ?? null,
+      totalTradedVolume: priceInfo?.totalTradedVolume ?? null,
+      totalTradedValue: priceInfo?.totalTradedValue ?? null,
+      bid: priceInfo?.bid ?? null,
+      ask: priceInfo?.ask ?? null,
+      upperCircuit: priceInfo?.upperCP ?? priceBand?.upper ?? null,
+      lowerCircuit: priceInfo?.lowerCP ?? priceBand?.lower ?? null,
+      weekHigh: weekHighLow?.max ?? null,
+      weekHighDate: weekHighLow?.maxDate ?? null,
+      weekLow: weekHighLow?.min ?? null,
+      weekLowDate: weekHighLow?.minDate ?? null,
+      faceValue: securityInfo?.faceValue ?? null,
+      isin: securityInfo?.isin ?? null,
+      marketCap: securityInfo?.issuedSize && priceInfo?.lastPrice
+        ? Number(securityInfo.issuedSize) * Number(priceInfo.lastPrice)
+        : securityInfo?.marketCap ?? null,
+      pe: metadata?.pdSymbolPe ?? metadata?.pe ?? null,
+      pb: metadata?.pb ?? null,
+      eps: metadata?.eps ?? null,
+      dividendYield: metadata?.dividendYield ?? null,
+      roe: metadata?.roe ?? null,
+      beta: metadata?.beta ?? null,
+      sectorPe: metadata?.pdSectorPe ?? null,
+      lastUpdateTime: priceInfo?.lastUpdateTime ?? null,
+    };
+
+    res.json({ data });
+  } catch (e) {
+    console.error('[stock-overview] Error:', e);
+    res.status(500).json({ error: 'failed_to_fetch_stock_overview' });
+  }
+});
+
 // Get symbol token for a given symbol
 router.get('/symbol-token', async (req: Request, res: Response): Promise<void> => {
   try {

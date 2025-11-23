@@ -61,6 +61,15 @@ export function ReturnsAnalysis() {
   const [error, setError] = useState<string | null>(null);
   const [arimaResult, setArimaResult] = useState<any>(null);
   const [garchResult, setGarchResult] = useState<any>(null);
+  const [lstmResult, setLstmResult] = useState<any>(null);
+  const [loadingLSTM, setLoadingLSTM] = useState(false);
+  const [finbertResult, setFinbertResult] = useState<any>(null);
+  const [loadingFinBERT, setLoadingFinBERT] = useState(false);
+  const [ruleSentimentResult, setRuleSentimentResult] = useState<any>(null);
+  const [loadingRuleSentiment, setLoadingRuleSentiment] = useState(false);
+  const [enhancedSharpe, setEnhancedSharpe] = useState<any>(null);
+  const [loadingSharpe, setLoadingSharpe] = useState(false);
+  const [sentimentText, setSentimentText] = useState<string>("");
   
   const priceChartRef = useRef<HTMLDivElement>(null);
   const returnsChartRef = useRef<HTMLDivElement>(null);
@@ -68,6 +77,8 @@ export function ReturnsAnalysis() {
   const pacfChartRef = useRef<HTMLDivElement>(null);
   const arimaChartRef = useRef<HTMLDivElement>(null);
   const garchVolChartRef = useRef<HTMLDivElement>(null);
+  const lstmChartRef = useRef<HTMLDivElement>(null);
+  const mptChartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const popularStocks = [
@@ -127,6 +138,12 @@ export function ReturnsAnalysis() {
     }
   }, [garchResult]);
 
+  useEffect(() => {
+    if (lstmResult && Array.isArray(lstmResult.forecast)) {
+      setTimeout(() => renderLstmChart(lstmResult.forecast), 100);
+    }
+  }, [lstmResult]);
+
   const fetchReturnsData = async () => {
     if (!selectedSymbol) return;
     setLoading(true);
@@ -169,8 +186,15 @@ export function ReturnsAnalysis() {
         } catch (e) {
           console.error("Failed to parse error response:", e);
         }
+        // Check if it's a SmartAPI credential error
+        if (errorMessage.includes("SmartAPI") || errorMessage.includes("JWT token") || errorMessage.includes("SMARTAPI")) {
+          errorMessage = "SmartAPI credentials not configured";
+        }
         setError(errorMessage);
-        console.error("API Error:", errorMessage, "Status:", resp.status);
+        // Only log to console, don't show technical errors to user
+        if (!errorMessage.includes("SmartAPI credentials not configured")) {
+          console.error("API Error:", errorMessage, "Status:", resp.status);
+        }
       }
     } catch (e: any) {
       const errorMessage = e.message || "Network error. Make sure backend is running on port 5000.";
@@ -191,10 +215,17 @@ export function ReturnsAnalysis() {
         setAdfResult(data);
       } else {
         const errorData = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
-        console.error("ADF test error:", errorData.error || errorData.message);
+        const errorMsg = errorData.error || errorData.message || 'Unknown error';
+        // Only log SmartAPI errors silently, don't spam console
+        if (!errorMsg.includes("SmartAPI") && !errorMsg.includes("JWT token")) {
+          console.error("ADF test error:", errorMsg);
+        }
       }
     } catch (e: any) {
-      console.error("Failed to fetch ADF test:", e);
+      // Only log non-network errors
+      if (!e.message?.includes("Network")) {
+        console.error("Failed to fetch ADF test:", e);
+      }
     } finally {
       setLoadingADF(false);
     }
@@ -228,11 +259,22 @@ export function ReturnsAnalysis() {
         }, 500);
       } else {
         const errorData = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
-        console.error("ACF/PACF error:", errorData.error || errorData.message);
+        const errorMsg = errorData.error || errorData.message || 'Unknown error';
+        // Don't log SmartAPI errors
+        if (!errorMsg.includes("SmartAPI") && !errorMsg.includes("JWT token")) {
+          console.error("ACF/PACF error:", errorMsg);
+        }
+        // Try to show error to user if it's not a credential issue
+        if (!errorMsg.includes("SmartAPI") && !errorMsg.includes("JWT token")) {
+          setError(`ACF/PACF: ${errorMsg}`);
+        }
         setAcfPacfData(null);
       }
     } catch (e: any) {
-      console.error("Failed to fetch ACF/PACF:", e);
+      // Only log non-network errors
+      if (!e.message?.includes("Network") && !e.message?.includes("SmartAPI")) {
+        console.error("Failed to fetch ACF/PACF:", e);
+      }
       setAcfPacfData(null);
     } finally {
       setLoadingACF(false);
@@ -259,7 +301,7 @@ export function ReturnsAnalysis() {
     // Use actual timestamps if available, otherwise use index
     const useTimestamps = !!timestamps && timestamps.length === prices.length;
     if (!useTimestamps) {
-      chart.applyOptions({ timeScale: { tickMarkFormatter: (t) => `${typeof t === 'number' ? t : ''}` } });
+      chart.applyOptions({ timeScale: { tickMarkFormatter: (t: Time | number) => `${typeof t === 'number' ? t : ''}` } });
     }
 
     const chartData = prices.map((price, index) => {
@@ -301,7 +343,7 @@ export function ReturnsAnalysis() {
     // Use actual timestamps if available (skip first timestamp since returns start from index 1)
     const useTimestamps = !!timestamps && timestamps.length >= returns.length + 1;
     if (!useTimestamps) {
-      chart.applyOptions({ timeScale: { tickMarkFormatter: (t) => `${typeof t === 'number' ? t : ''}` } });
+      chart.applyOptions({ timeScale: { tickMarkFormatter: (t: Time | number) => `${typeof t === 'number' ? t : ''}` } });
     }
 
     const chartData = returns.map((ret, index) => {
@@ -345,7 +387,7 @@ export function ReturnsAnalysis() {
       height: 300,
       grid: { vertLines: { color: "#e5e7eb" }, horzLines: { color: "#e5e7eb" } },
     });
-    chart.applyOptions({ timeScale: { tickMarkFormatter: (t) => `${typeof t === 'number' ? t : ''}` } });
+    chart.applyOptions({ timeScale: { tickMarkFormatter: (t: Time | number) => `${typeof t === 'number' ? t : ''}` } });
 
     const series = chart.addSeries(HistogramSeries, {
       color: "#3b82f6",
@@ -404,7 +446,7 @@ export function ReturnsAnalysis() {
       height: 300,
       grid: { vertLines: { color: "#e5e7eb" }, horzLines: { color: "#e5e7eb" } },
     });
-    chart.applyOptions({ timeScale: { tickMarkFormatter: (t) => `${typeof t === 'number' ? t : ''}` } });
+    chart.applyOptions({ timeScale: { tickMarkFormatter: (t: Time | number) => `${typeof t === 'number' ? t : ''}` } });
 
     const series = chart.addSeries(HistogramSeries, {
       color: "#8b5cf6",
@@ -458,7 +500,7 @@ export function ReturnsAnalysis() {
     chart.applyOptions({
       timeScale: {
         timeVisible: true,
-        tickMarkFormatter: (t) => {
+        tickMarkFormatter: (t: Time | number) => {
           const ts = typeof t === 'number' ? t : 0;
           const idx = ts ? Math.max(0, Math.round((ts - baseTs) / 86400)) : 0;
           return `Step ${idx}`;
@@ -489,7 +531,7 @@ export function ReturnsAnalysis() {
     chart.applyOptions({
       timeScale: {
         timeVisible: true,
-        tickMarkFormatter: (t) => {
+        tickMarkFormatter: (t: Time | number) => {
           const ts = typeof t === 'number' ? t : 0;
           const idx = ts ? Math.max(0, Math.round((ts - baseTs) / 86400)) : 0;
           return `Step ${idx}`;
@@ -505,6 +547,37 @@ export function ReturnsAnalysis() {
       const lineData = forecast.map((v, i) => ({ time: (baseTs + (vols.length + i) * 86400) as Time, value: v }));
       line.setData(lineData);
     }
+    chart.timeScale().fitContent();
+  };
+
+  const renderLstmChart = (forecast: number[]) => {
+    if (!lstmChartRef.current || !forecast || forecast.length === 0) return;
+    lstmChartRef.current.innerHTML = '';
+    if (lstmChartRef.current.clientWidth === 0) {
+      setTimeout(() => renderLstmChart(forecast), 100);
+      return;
+    }
+    const chart = createChart(lstmChartRef.current, {
+      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "#374151" },
+      width: lstmChartRef.current.clientWidth,
+      height: 240,
+      grid: { vertLines: { color: "#e5e7eb" }, horzLines: { color: "#e5e7eb" } },
+    });
+    const baseTs = Math.floor(new Date('2000-01-01T00:00:00Z').getTime() / 1000);
+    chart.applyOptions({
+      timeScale: {
+        timeVisible: true,
+        tickMarkFormatter: (t: Time | number) => {
+          const ts = typeof t === 'number' ? t : 0;
+          const idx = ts ? Math.max(0, Math.round((ts - baseTs) / 86400)) : 0;
+          return `Step ${idx}`;
+        },
+      },
+      localization: { timeFormatter: () => '' },
+    });
+    const series = chart.addSeries(LineSeries, { color: "#8b5cf6", lineWidth: 2, priceScaleId: '' });
+    const chartData = forecast.map((v, i) => ({ time: (baseTs + i * 86400) as Time, value: v }));
+    series.setData(chartData);
     chart.timeScale().fitContent();
   };
 
@@ -690,11 +763,13 @@ export function ReturnsAnalysis() {
               )}
 
               <Tabs defaultValue="charts" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="charts">Price & Returns Charts</TabsTrigger>
-                  <TabsTrigger value="stationarity">Stationarity (ADF Test)</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-6">
+                  <TabsTrigger value="charts">Charts</TabsTrigger>
+                  <TabsTrigger value="stationarity">ADF Test</TabsTrigger>
                   <TabsTrigger value="acf-pacf">ACF/PACF</TabsTrigger>
-                  <TabsTrigger value="models">AR/MA/ARIMA/GARCH</TabsTrigger>
+                  <TabsTrigger value="models">ARIMA/GARCH</TabsTrigger>
+                  <TabsTrigger value="lstm">LSTM</TabsTrigger>
+                  <TabsTrigger value="sentiment">Sentiment</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="charts" className="space-y-4">
@@ -1004,19 +1079,262 @@ export function ReturnsAnalysis() {
                     </CardContent>
                   </Card>
                 </TabsContent>
+
+                <TabsContent value="lstm" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>LSTM (Long Short-Term Memory) Forecasting</CardTitle>
+                      <CardDescription>
+                        Deep learning model for time series forecasting using recurrent neural networks
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-600 dark:text-gray-400">Lookback Period</label>
+                          <input type="number" min="5" max="30" defaultValue="10" className="w-full px-2 py-1 border rounded text-sm" id="lstm-lookback" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600 dark:text-gray-400">Forecast Steps</label>
+                          <input type="number" min="1" max="30" defaultValue="5" className="w-full px-2 py-1 border rounded text-sm" id="lstm-steps" />
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={async () => {
+                          const lookback = parseInt((document.getElementById('lstm-lookback') as HTMLInputElement)?.value || '10');
+                          const steps = parseInt((document.getElementById('lstm-steps') as HTMLInputElement)?.value || '5');
+                          setLoadingLSTM(true);
+                          setLstmResult(null);
+                          try {
+                            const resp = await fetch('/api/dsfm/lstm', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ symbol: selectedSymbol, timeframe: '1Y', lookback, forecastSteps: steps }),
+                            });
+                            if (resp.ok) {
+                              const data = await resp.json();
+                              setLstmResult(data);
+                            } else {
+                              const errorData = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
+                              alert(`LSTM Error: ${errorData.error || errorData.message || 'Unknown error'}`);
+                            }
+                          } catch (e: any) {
+                            alert(`LSTM Error: ${e.message || 'Network error'}`);
+                          } finally {
+                            setLoadingLSTM(false);
+                          }
+                        }}
+                        disabled={loadingLSTM}
+                      >
+                        {loadingLSTM ? 'Training Model...' : 'Run LSTM Forecast'}
+                      </Button>
+                      {lstmResult && (
+                        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg space-y-2">
+                          <p className="font-semibold text-blue-800 dark:text-blue-200">LSTM Forecast Results</p>
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <span className="text-gray-600 dark:text-gray-400">RMSE:</span>
+                              <span className="ml-2 font-mono font-bold">{lstmResult.rmse?.toFixed(4)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600 dark:text-gray-400">R² Score:</span>
+                              <span className="ml-2 font-mono font-bold">{lstmResult.r2_score?.toFixed(3)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600 dark:text-gray-400">Training Loss:</span>
+                              <span className="ml-2 font-mono font-bold">{lstmResult.training_loss?.toFixed(4)}</span>
+                            </div>
+                          </div>
+                          {lstmResult.forecast && (
+                            <div className="mt-2">
+                              <p className="text-xs text-gray-600 dark:text-gray-400">Forecast:</p>
+                              <p className="text-xs font-mono">{lstmResult.forecast.map((f: number) => f.toFixed(4)).join(', ')}</p>
+                              <div ref={lstmChartRef} className="w-full mt-2" style={{ height: "240px" }} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="sentiment" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Sentiment Analysis</CardTitle>
+                      <CardDescription>
+                        Analyze financial sentiment using FinBERT and rule-based methods
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Enter Text for Analysis</label>
+                        <textarea
+                          value={sentimentText}
+                          onChange={(e) => setSentimentText(e.target.value)}
+                          placeholder="Enter financial news, analysis, or commentary..."
+                          className="w-full px-3 py-2 border rounded text-sm min-h-[100px]"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={async () => {
+                            if (!sentimentText.trim()) {
+                              alert('Please enter some text for analysis');
+                              return;
+                            }
+                            setLoadingFinBERT(true);
+                            setFinbertResult(null);
+                            try {
+                              const resp = await fetch('/api/dsfm/sentiment/finbert', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ text: sentimentText }),
+                              });
+                              if (resp.ok) {
+                                const data = await resp.json();
+                                setFinbertResult(data);
+                              } else {
+                                const errorData = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
+                                alert(`FinBERT Error: ${errorData.error || errorData.message || 'Unknown error'}`);
+                              }
+                            } catch (e: any) {
+                              alert(`FinBERT Error: ${e.message || 'Network error'}`);
+                            } finally {
+                              setLoadingFinBERT(false);
+                            }
+                          }}
+                          disabled={loadingFinBERT || !sentimentText.trim()}
+                        >
+                          {loadingFinBERT ? 'Analyzing...' : 'FinBERT Analysis'}
+                        </Button>
+                        <Button 
+                          onClick={async () => {
+                            if (!sentimentText.trim()) {
+                              alert('Please enter some text for analysis');
+                              return;
+                            }
+                            setLoadingRuleSentiment(true);
+                            setRuleSentimentResult(null);
+                            try {
+                              const resp = await fetch('/api/dsfm/sentiment/rule-based', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ text: sentimentText }),
+                              });
+                              if (resp.ok) {
+                                const data = await resp.json();
+                                setRuleSentimentResult(data);
+                              } else {
+                                const errorData = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
+                                alert(`Rule-based Error: ${errorData.error || errorData.message || 'Unknown error'}`);
+                              }
+                            } catch (e: any) {
+                              alert(`Rule-based Error: ${e.message || 'Network error'}`);
+                            } finally {
+                              setLoadingRuleSentiment(false);
+                            }
+                          }}
+                          disabled={loadingRuleSentiment || !sentimentText.trim()}
+                          variant="outline"
+                        >
+                          {loadingRuleSentiment ? 'Analyzing...' : 'Rule-Based Analysis'}
+                        </Button>
+                      </div>
+                      {finbertResult && (
+                        <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                          <p className="font-semibold text-green-800 dark:text-green-200 mb-2">FinBERT Results</p>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span>Sentiment:</span>
+                              <Badge className={finbertResult.sentiment === 'positive' ? 'bg-green-500' : finbertResult.sentiment === 'negative' ? 'bg-red-500' : 'bg-gray-500'}>
+                                {finbertResult.sentiment}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Score:</span>
+                              <span className="font-mono">{finbertResult.score?.toFixed(3)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Confidence:</span>
+                              <span className="font-mono">{(finbertResult.confidence * 100)?.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {ruleSentimentResult && (
+                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                          <p className="font-semibold text-purple-800 dark:text-purple-200 mb-2">Rule-Based Results</p>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span>Sentiment:</span>
+                              <Badge className={ruleSentimentResult.sentiment === 'bullish' ? 'bg-green-500' : ruleSentimentResult.sentiment === 'bearish' ? 'bg-red-500' : 'bg-gray-500'}>
+                                {ruleSentimentResult.sentiment}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Bullish Signals:</span>
+                              <span>{ruleSentimentResult.bullish_signals}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Bearish Signals:</span>
+                              <span>{ruleSentimentResult.bearish_signals}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Confidence:</span>
+                              <span className="font-mono">{(ruleSentimentResult.confidence * 100)?.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
               </Tabs>
             </>
           ) : !loading ? (
             <div className="text-center py-8">
               {error ? (
-                <div className="space-y-2">
-                  <p className="text-red-600 dark:text-red-400 font-semibold">Error loading data</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{error}</p>
-                  {error.includes("port 5000") || error.includes("Network error") ? (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Make sure the backend server is running on port 5000
-                    </p>
-                  ) : null}
+                <div className="space-y-4">
+                  {error.includes("SmartAPI credentials not configured") ? (
+                    <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
+                      <CardHeader>
+                        <CardTitle className="text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
+                          <Info className="h-5 w-5" />
+                          SmartAPI Credentials Required
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-left space-y-3">
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                          To fetch real-time stock data, you need to configure your Angel One SmartAPI credentials.
+                        </p>
+                        <div className="bg-white dark:bg-gray-800 p-3 rounded text-xs font-mono space-y-1">
+                          <p className="font-semibold mb-2">Add these to <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">backend/.env.local</code>:</p>
+                          <p>SMARTAPI_API_KEY=your_api_key</p>
+                          <p>SMARTAPI_CLIENT_CODE=your_client_code</p>
+                          <p>SMARTAPI_PASSWORD=your_password</p>
+                          <p>SMARTAPI_TOTP_SECRET=your_totp_secret</p>
+                        </div>
+                        <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                          After adding credentials, restart the backend server.
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Get your credentials from: <a href="https://smartapi.angelone.in/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Angel One SmartAPI</a>
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-red-600 dark:text-red-400 font-semibold">Error loading data</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">{error}</p>
+                      {error.includes("port 5000") || error.includes("Network error") ? (
+                        <p className="text-xs text-gray-500 mt-2">
+                          Make sure the backend server is running on port 5000
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               ) : selectedSymbol ? (
                 <p className="text-gray-500">No data available for {selectedSymbol}</p>

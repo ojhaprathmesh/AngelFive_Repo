@@ -147,6 +147,36 @@ class WatchlistHttpService {
       changePct: typeof s.changePct === "number" ? s.changePct : 0,
     }));
   }
+
+  async addSymbol(_uid: string, watchlistId: string, symbol: string, exchange: string = "NSE"): Promise<void> {
+    const token = await auth.currentUser?.getIdToken(true);
+    const res = await fetch(`${this.baseUrl}/api/watchlists/${encodeURIComponent(watchlistId)}/symbols`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${String(token)}`,
+      },
+      body: JSON.stringify({ symbol: symbol.trim().toUpperCase(), exchange: exchange.trim().toUpperCase() }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.message || "Failed to add symbol");
+    }
+  }
+
+  async removeSymbol(_uid: string, watchlistId: string, symbolId: string): Promise<void> {
+    const token = await auth.currentUser?.getIdToken(true);
+    const res = await fetch(`${this.baseUrl}/api/watchlists/${encodeURIComponent(watchlistId)}/symbols/${encodeURIComponent(symbolId)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${String(token)}`,
+      },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.message || "Failed to remove symbol");
+    }
+  }
 }
 
 export const watchlistService = new WatchlistHttpService();

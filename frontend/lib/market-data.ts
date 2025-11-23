@@ -456,13 +456,26 @@ class MarketDataService {
       const resp = await fetch('https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json');
       if (resp.ok) {
         const instruments: Array<InstrumentEntry> = await resp.json();
-        const found = instruments.find((i) =>
-          (i.name?.toUpperCase() === symbol.split(':')[1]?.toUpperCase()) &&
-          (i.instrumenttype?.toUpperCase() === 'AMXIDX') &&
-          (i.exch_seg?.toUpperCase() === symbol.split(':')[0]?.toUpperCase())
-        );
+        let found: InstrumentEntry | undefined;
+        if (symbol.includes(':')) {
+          const [exch, name] = symbol.split(':');
+          found = instruments.find((i) =>
+            (i.name?.toUpperCase() === name?.toUpperCase()) &&
+            (i.exch_seg?.toUpperCase() === exch?.toUpperCase())
+          );
+        } else if (symbol.endsWith('-EQ')) {
+          const base = symbol.replace('-EQ', '');
+          found = instruments.find((i) =>
+            (i.symbol?.toUpperCase() === symbol.toUpperCase() || i.name?.toUpperCase() === base.toUpperCase()) &&
+            (i.instrumenttype?.toUpperCase() === 'EQ') &&
+            (i.exch_seg?.toUpperCase() === 'NSE')
+          );
+        } else {
+          found = instruments.find((i) => i.name?.toUpperCase() === symbol.toUpperCase());
+        }
         if (found && found.token) {
-          return { exchange: symbol.split(':')[0], token: String(found.token) } as { exchange: string; token: string };
+          const exch = found.exch_seg?.toUpperCase() || (symbol.includes(':') ? symbol.split(':')[0] : 'NSE');
+          return { exchange: exch, token: String(found.token) } as { exchange: string; token: string };
         }
       }
     } catch {}

@@ -20,6 +20,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TrendingUp, TrendingDown } from "lucide-react";
+import ChartComponent from "@/components/chart-component";
+import { MarketOverview } from "@/components/market-overview";
 
 export default function WatchlistPage() {
   const { firebaseUser } = useAuth();
@@ -44,6 +46,7 @@ export default function WatchlistPage() {
   const [panelSaving, setPanelSaving] = useState<boolean>(false);
   const [symbols, setSymbols] = useState<StockItem[]>([]);
   const [loadingSymbols, setLoadingSymbols] = useState<boolean>(false);
+  const [mainTab, setMainTab] = useState<"Chart" | "Overview">("Chart");
 
   useEffect(() => {
     if (!uid) return;
@@ -458,7 +461,11 @@ export default function WatchlistPage() {
           </div>
         )}
 
-        <div className={`flex-1 rounded-md border bg-gray-50 dark:bg-gray-900 transition-all ${symbols.length === 0 ? "p-3" : ""}`}>
+        <div
+          className={`flex-1 rounded-md border bg-gray-50 dark:bg-gray-900 transition-all ${
+            symbols.length === 0 ? "p-3" : ""
+          }`}
+        >
           {selectedId ? (
             <div className="space-y-2">
               <div className="w-full max-w-md">
@@ -467,12 +474,13 @@ export default function WatchlistPage() {
                     <span className="animate-pulse">Loading…</span>
                   </div>
                 )}
-                {!loadingSymbols && symbols.length > 0 &&
-                  symbols.map((s) => (
-                    <StockCard key={s.symbol} item={s} />
-                  ))}
+                {!loadingSymbols &&
+                  symbols.length > 0 &&
+                  symbols.map((s) => <StockCard key={s.symbol} item={s} />)}
                 {!loadingSymbols && symbols.length === 0 && (
-                  <div className="text-xs text-muted-foreground">No stocks in this watchlist</div>
+                  <div className="text-xs text-muted-foreground">
+                    No stocks in this watchlist
+                  </div>
                 )}
               </div>
             </div>
@@ -549,7 +557,29 @@ export default function WatchlistPage() {
         )}
       </aside>
 
-      <main className="flex-3 lg:flex-[3] space-y-6 h-full w-full p-4 bg-white dark:bg-gray-800 rounded-sm shadow-[2px] border"></main>
+      <main className="flex-3 lg:flex-[3] h-full w-full p-4 bg-white dark:bg-gray-800 rounded-sm shadow-[2px] border flex flex-col gap-4">
+        <div className="flex items-center gap-6 border-b pb-0 mb-4">
+          {(["Chart", "Overview"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setMainTab(t)}
+              className={`relative -mb-px pb-2 text-sm font-medium ${
+                mainTab === t ? "text-blue-600" : "text-foreground"
+              }`}
+              role="tab"
+              aria-selected={mainTab === t}
+            >
+              {t}
+              {mainTab === t && (
+                <span className="absolute left-0 right-0 bottom-[-2px] h-[2px] bg-blue-600" />
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1 min-h-0">
+          {mainTab === "Chart" ? <ChartComponent /> : <MarketOverview />}
+        </div>
+      </main>
     </div>
   );
 }

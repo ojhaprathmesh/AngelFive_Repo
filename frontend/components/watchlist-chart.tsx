@@ -10,6 +10,7 @@ import {
   ColorType,
   BusinessDay,
   Time,
+  CrosshairMode,
 } from "lightweight-charts";
 import { marketDataService } from "@/lib/market-data";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +35,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const resizeHandlerRef = useRef<(() => void) | null>(null);
+  const dotRef = useRef<HTMLDivElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allChartData, setAllChartData] = useState<any[]>([]);
@@ -175,12 +177,12 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
       console.log("[WatchlistChart] Using default width:", width);
     }
     if (height === 0 || height < 100) {
-      height = 600; // Increased to accommodate X-axis
+      height = 400; // Default height if container is not ready
       console.log("[WatchlistChart] Using default height:", height);
     }
     
-    // Reserve space for X-axis (minimum 600px total height)
-    height = Math.max(height, 600);
+    // Reserve space for X-axis
+    // height = Math.max(height, 600); // Removed fixed minimum height to allow fitting in container
 
     console.log("[WatchlistChart] Initializing with dimensions:", width, "x", height);
 
@@ -215,7 +217,7 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
           rightBarStaysOnScroll: true,
           allowBoldLabels: true,
           shiftVisibleRangeOnNewBar: true,
-          minimumHeight: 80, // Increased for better visibility
+          minimumHeight: 80,
           tickMarkFormatter: (time: Time) => {
             try {
               let date: Date;
@@ -227,7 +229,8 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
               }
               const month = date.toLocaleDateString('en-US', { month: 'short' });
               const day = date.getDate();
-              return `${day} ${month}`;
+              const year = date.getFullYear();
+              return `${day} ${month} ${year}`;
             } catch (e) {
               return '';
             }
@@ -435,8 +438,8 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
               setTimeout(() => {
                 if (chartRef.current && chartContainerRef.current) {
                   const container = chartContainerRef.current;
-                  const newHeight = Math.max(container.clientHeight || 600, 600);
-                  const newWidth = container.clientWidth || 800;
+                  const newHeight = container.clientHeight || 400;
+                  const newWidth = container.clientWidth || 600;
                   
                   // Force resize
                   chartRef.current.applyOptions({
@@ -565,8 +568,19 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
             setToolMode("pointer");
             if (chartRef.current) {
               chartRef.current.applyOptions({
-                crosshair: { mode: 1 },
+                crosshair: {
+                  mode: CrosshairMode.Magnet,
+                  vertLine: { visible: false },
+                  horzLine: { visible: false },
+                },
               });
+            }
+            if (chartContainerRef.current) {
+              chartContainerRef.current.style.cursor = "default";
+            }
+            if (dotRef.current) {
+              dotRef.current.remove();
+              dotRef.current = null;
             }
           }}
           title="Pointer (Default Cursor)"
@@ -583,8 +597,19 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
             setToolMode("cross");
             if (chartRef.current) {
               chartRef.current.applyOptions({
-                crosshair: { mode: 0 }, // Normal crosshair
+                crosshair: {
+                  mode: CrosshairMode.Normal,
+                  vertLine: { visible: true, labelVisible: true },
+                  horzLine: { visible: true, labelVisible: true },
+                },
               });
+            }
+            if (chartContainerRef.current) {
+              chartContainerRef.current.style.cursor = "crosshair";
+            }
+            if (dotRef.current) {
+              dotRef.current.remove();
+              dotRef.current = null;
             }
           }}
           title="Crosshair (Cross)"
@@ -601,8 +626,39 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
             setToolMode("dot");
             if (chartRef.current) {
               chartRef.current.applyOptions({
-                crosshair: { mode: 2 }, // Hidden crosshair (dot mode)
+                crosshair: {
+                  mode: CrosshairMode.Normal,
+                  vertLine: { visible: false },
+                  horzLine: { visible: false },
+                },
               });
+            }
+            if (chartContainerRef.current) {
+              chartContainerRef.current.style.cursor = "default";
+              if (!dotRef.current) {
+                const el = document.createElement("div");
+                el.style.position = "absolute";
+                el.style.width = "6px";
+                el.style.height = "6px";
+                el.style.borderRadius = "50%";
+                el.style.background = "#3b82f6";
+                el.style.pointerEvents = "none";
+                el.style.transform = "translate(-3px, -3px)";
+                chartContainerRef.current.appendChild(el);
+                dotRef.current = el;
+                const move = (e: MouseEvent) => {
+                  const rect = chartContainerRef.current!.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const y = e.clientY - rect.top;
+                  el.style.left = `${x}px`;
+                  el.style.top = `${y}px`;
+                };
+                chartContainerRef.current.addEventListener("mousemove", move);
+                chartContainerRef.current.addEventListener("mouseleave", () => {
+                  el.style.left = "-1000px";
+                  el.style.top = "-1000px";
+                });
+              }
             }
           }}
           title="Dot"
@@ -700,13 +756,12 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
             ref={chartContainerRef}
             className="w-full flex-1"
             style={{ 
-              minHeight: "600px",
-              minWidth: "800px",
+              minHeight: "0", // Allow shrinking
+              minWidth: "0",  // Allow shrinking
               width: "100%",
               height: "100%",
               position: "relative",
               backgroundColor: "transparent",
-              marginBottom: "0px" // Ensure X-axis has space
             }}
           />
         </div>

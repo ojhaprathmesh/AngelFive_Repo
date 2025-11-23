@@ -35,6 +35,62 @@ interface MarketIndex {
   isPositive: boolean;
 }
 
+type StockItem = {
+  symbol: string;
+  exchange: string;
+  price: number;
+  changePct: number;
+  change?: number;
+};
+
+interface StockCardProps {
+  item: StockItem;
+  isSelected: boolean;
+  onSelect: (item: StockItem) => void;
+}
+
+function StockCard({ item, isSelected, onSelect }: StockCardProps) {
+  const positive = item.changePct >= 0;
+  const PriceIcon = positive ? TrendingUp : TrendingDown;
+  const color = positive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+  const bgColor = positive ? "bg-green-50 dark:bg-green-900/20" : "bg-red-50 dark:bg-red-900/20";
+  const change = item.change || (item.price * item.changePct / 100);
+
+  return (
+    <div 
+      className={`flex items-center justify-between px-3 py-2.5 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${isSelected ? bgColor : ''}`}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onSelect(item);
+      }}
+    >
+      <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{item.symbol}</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {item.exchange}
+          </span>
+        </div>
+      </div>
+      <div className={`flex flex-col items-end ${color}`}>
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold">
+            ₹{item.price.toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </span>
+          <PriceIcon className="h-3.5 w-3.5" />
+        </div>
+        <div className="text-xs font-medium">
+          {change >= 0 ? '+' : ''}{change.toFixed(2)} ({change >= 0 ? '+' : ''}{item.changePct.toFixed(2)}%)
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function WatchlistPage() {
   const { firebaseUser } = useAuth();
   const uid = firebaseUser?.uid || null;
@@ -245,66 +301,6 @@ export default function WatchlistPage() {
     }
   };
 
-  type StockItem = {
-    symbol: string;
-    exchange: string;
-    price: number;
-    changePct: number;
-    change?: number;
-  };
-
-  function StockCard({ item }: { item: StockItem }) {
-    const positive = item.changePct >= 0;
-    const PriceIcon = positive ? TrendingUp : TrendingDown;
-    const color = positive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
-    const bgColor = positive ? "bg-green-50 dark:bg-green-900/20" : "bg-red-50 dark:bg-red-900/20";
-    const change = item.change || (item.price * item.changePct / 100);
-
-    return (
-      <div 
-        className={`flex items-center justify-between px-3 py-2.5 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${selectedSymbol === item.symbol ? bgColor : ''}`}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log("[WatchlistPage] 🔵 Stock clicked:", item.symbol, item.exchange);
-          console.log("[WatchlistPage] Current selectedSymbol:", selectedSymbol);
-          console.log("[WatchlistPage] Current chartKey:", chartKey);
-          
-          // ALWAYS update, even if same symbol (to force refresh)
-          setSelectedSymbol(item.symbol);
-          setSelectedExchange(item.exchange);
-          setChartKey(prev => {
-            const newKey = prev + 1;
-            console.log("[WatchlistPage] ✅ State updated - new selectedSymbol:", item.symbol, "chartKey:", newKey);
-            return newKey;
-          });
-        }}
-      >
-        <div className="flex flex-col flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{item.symbol}</span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {item.exchange}
-            </span>
-          </div>
-        </div>
-        <div className={`flex flex-col items-end ${color}`}>
-          <div className="flex items-center gap-1">
-            <span className="text-sm font-semibold">
-              ₹{item.price.toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
-            <PriceIcon className="h-3.5 w-3.5" />
-          </div>
-          <div className="text-xs font-medium">
-            {change >= 0 ? '+' : ''}{change.toFixed(2)} ({change >= 0 ? '+' : ''}{item.changePct.toFixed(2)}%)
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Fetch and update stock prices
   useEffect(() => {
@@ -776,7 +772,17 @@ export default function WatchlistPage() {
                 {!loadingSymbols && filteredSymbols.length > 0 && (
                   <div>
                     {filteredSymbols.map((s) => (
-                      <StockCard key={s.symbol} item={s} />
+                      <StockCard
+                        key={s.symbol}
+                        item={s}
+                        isSelected={selectedSymbol === s.symbol}
+                        onSelect={(item) => {
+                          console.log("[WatchlistPage] 🔵 Stock clicked:", item.symbol, item.exchange);
+                          setSelectedSymbol(item.symbol);
+                          setSelectedExchange(item.exchange);
+                          setChartKey((prev) => prev + 1);
+                        }}
+                      />
                     ))}
                   </div>
                 )}

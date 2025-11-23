@@ -177,12 +177,12 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
       console.log("[WatchlistChart] Using default width:", width);
     }
     if (height === 0 || height < 100) {
-      height = 600; // Increased to accommodate X-axis
+      height = 400; // Default height if container is not ready
       console.log("[WatchlistChart] Using default height:", height);
     }
     
-    // Reserve space for X-axis (minimum 600px total height)
-    height = Math.max(height, 600);
+    // Reserve space for X-axis
+    // height = Math.max(height, 600); // Removed fixed minimum height to allow fitting in container
 
     console.log("[WatchlistChart] Initializing with dimensions:", width, "x", height);
 
@@ -438,8 +438,8 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
               setTimeout(() => {
                 if (chartRef.current && chartContainerRef.current) {
                   const container = chartContainerRef.current;
-                  const newHeight = Math.max(container.clientHeight || 600, 600);
-                  const newWidth = container.clientWidth || 800;
+                  const newHeight = container.clientHeight || 400;
+                  const newWidth = container.clientWidth || 600;
                   
                   // Force resize
                   chartRef.current.applyOptions({
@@ -756,13 +756,12 @@ export function WatchlistChart({ symbol, exchange = "NSE" }: WatchlistChartProps
             ref={chartContainerRef}
             className="w-full flex-1"
             style={{ 
-              minHeight: "600px",
-              minWidth: "800px",
+              minHeight: "0", // Allow shrinking
+              minWidth: "0",  // Allow shrinking
               width: "100%",
               height: "100%",
               position: "relative",
               backgroundColor: "transparent",
-              marginBottom: "0px" // Ensure X-axis has space
             }}
           />
         </div>

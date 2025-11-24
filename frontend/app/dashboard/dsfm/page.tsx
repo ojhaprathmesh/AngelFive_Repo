@@ -1,14 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReturnsAnalysis } from "@/components/dsfm/returns-analysis";
 import { CorrelationAnalysis } from "@/components/dsfm/correlation-analysis";
 import { PortfolioOptimization } from "@/components/dsfm/portfolio-optimization";
-import { PCAAnalysis } from "@/components/dsfm/pca-analysis";
-import { NetworkAnalysis } from "@/components/dsfm/network-analysis";
-import { BarChart3, TrendingUp, Network, Layers, PieChart } from "lucide-react";
+import { BarChart3, TrendingUp, PieChart } from "lucide-react";
 
 export default function DSFMPage() {
   return (
@@ -23,7 +19,7 @@ export default function DSFMPage() {
       </div>
 
       <Tabs defaultValue="returns" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="returns" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Returns Analysis
@@ -35,14 +31,6 @@ export default function DSFMPage() {
           <TabsTrigger value="portfolio" className="flex items-center gap-2">
             <PieChart className="h-4 w-4" />
             Portfolio Optimization
-          </TabsTrigger>
-          <TabsTrigger value="pca" className="flex items-center gap-2">
-            <Layers className="h-4 w-4" />
-            PCA Analysis
-          </TabsTrigger>
-          <TabsTrigger value="network" className="flex items-center gap-2">
-            <Network className="h-4 w-4" />
-            Network Analysis
           </TabsTrigger>
         </TabsList>
 
@@ -56,14 +44,6 @@ export default function DSFMPage() {
 
         <TabsContent value="portfolio" className="mt-6">
            <PortfolioOptimization />
-        </TabsContent>
-
-        <TabsContent value="pca" className="mt-6">
-          <PCAAnalysis />
-        </TabsContent>
-
-        <TabsContent value="network" className="mt-6">
-          <NetworkAnalysis />
         </TabsContent>
       </Tabs>
     </div>

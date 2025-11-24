@@ -395,8 +395,8 @@ export function PortfolioOptimization() {
                 }}
               >
                 <SelectValue />
-                <SelectItem value="nifty50">Nifty 50 ({NIFTY_50_STOCKS.length} stocks)</SelectItem>
-                <SelectItem value="sensex">Sensex ({SENSEX_STOCKS.length} stocks)</SelectItem>
+                <SelectItem value="nifty50">Nifty 50</SelectItem>
+                <SelectItem value="sensex">Sensex</SelectItem>
               </Select>
             </div>
             <div>

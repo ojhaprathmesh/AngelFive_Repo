@@ -51,10 +51,8 @@ export function ReturnsAnalysis() {
   const [symbols, setSymbols] = useState<string[]>([]);
   const [returnsData, setReturnsData] = useState<ReturnsData | null>(null);
   const [adfResult, setAdfResult] = useState<ADFTestResult | null>(null);
-  const [acfPacfData, setAcfPacfData] = useState<ACFPACFData | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingADF, setLoadingADF] = useState(false);
-  const [loadingACF, setLoadingACF] = useState(false);
   const [loadingARIMA, setLoadingARIMA] = useState(false);
   const [loadingGARCH, setLoadingGARCH] = useState(false);
   const [timeframe, setTimeframe] = useState<string>("1M");
@@ -73,8 +71,6 @@ export function ReturnsAnalysis() {
   
   const priceChartRef = useRef<HTMLDivElement>(null);
   const returnsChartRef = useRef<HTMLDivElement>(null);
-  const acfChartRef = useRef<HTMLDivElement>(null);
-  const pacfChartRef = useRef<HTMLDivElement>(null);
   const arimaChartRef = useRef<HTMLDivElement>(null);
   const garchVolChartRef = useRef<HTMLDivElement>(null);
   const lstmChartRef = useRef<HTMLDivElement>(null);
@@ -97,34 +93,10 @@ export function ReturnsAnalysis() {
     if (selectedSymbol) {
       fetchReturnsData();
       fetchADFTest();
-      fetchACFPACF();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSymbol, timeframe]);
 
-  // Re-render ACF/PACF charts when data changes or tabs become visible
-  useEffect(() => {
-    if (acfPacfData && acfPacfData.lags && acfPacfData.acf && acfPacfData.pacf) {
-      // Wait a bit for tab to become visible
-      const timer = setTimeout(() => {
-        if (acfChartRef.current && pacfChartRef.current) {
-          if (acfChartRef.current.clientWidth > 0 && pacfChartRef.current.clientWidth > 0) {
-            console.log("Re-rendering ACF/PACF charts with data:", {
-              lagsCount: acfPacfData.lags?.length,
-              acfCount: acfPacfData.acf?.length,
-              pacfCount: acfPacfData.pacf?.length
-            });
-            renderACFChart(acfPacfData);
-            renderPACFChart(acfPacfData);
-          } else {
-            console.warn("Chart containers not visible yet, will retry...");
-          }
-        }
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acfPacfData]);
 
   useEffect(() => {
     if (arimaResult && Array.isArray(arimaResult.forecast)) {
@@ -231,55 +203,6 @@ export function ReturnsAnalysis() {
     }
   };
 
-  const fetchACFPACF = async () => {
-    if (!selectedSymbol) return;
-    setLoadingACF(true);
-    setAcfPacfData(null);
-    try {
-      const resp = await fetch(`/api/dsfm/acf-pacf?symbol=${selectedSymbol}&timeframe=${timeframe}&maxLags=20`);
-      if (resp.ok) {
-        const data = await resp.json();
-        console.log("ACF/PACF data received:", data);
-        setAcfPacfData(data);
-        // Clear previous charts before rendering new ones
-        if (acfChartRef.current) {
-          acfChartRef.current.innerHTML = '';
-        }
-        if (pacfChartRef.current) {
-          pacfChartRef.current.innerHTML = '';
-        }
-        // Render charts after a short delay to ensure DOM is ready
-        setTimeout(() => {
-          if (data.lags && data.acf && data.pacf && acfChartRef.current && pacfChartRef.current) {
-            renderACFChart(data);
-            renderPACFChart(data);
-          } else {
-            setAcfPacfData(null);
-          }
-        }, 500);
-      } else {
-        const errorData = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
-        const errorMsg = errorData.error || errorData.message || 'Unknown error';
-        // Don't log SmartAPI errors
-        if (!errorMsg.includes("SmartAPI") && !errorMsg.includes("JWT token")) {
-          console.error("ACF/PACF error:", errorMsg);
-        }
-        // Try to show error to user if it's not a credential issue
-        if (!errorMsg.includes("SmartAPI") && !errorMsg.includes("JWT token")) {
-          setError(`ACF/PACF: ${errorMsg}`);
-        }
-        setAcfPacfData(null);
-      }
-    } catch (e: any) {
-      // Only log non-network errors
-      if (!e.message?.includes("Network") && !e.message?.includes("SmartAPI")) {
-        console.error("Failed to fetch ACF/PACF:", e);
-      }
-      setAcfPacfData(null);
-    } finally {
-      setLoadingACF(false);
-    }
-  };
 
   const renderPriceChart = (prices: number[], timestamps?: string[]) => {
     if (!priceChartRef.current || prices.length === 0) return;
@@ -365,123 +288,6 @@ export function ReturnsAnalysis() {
     chart.timeScale().fitContent();
   };
 
-  const renderACFChart = (data: ACFPACFData) => {
-    if (!acfChartRef.current || !data.lags || !data.acf) {
-      console.error("Cannot render ACF chart: missing data or ref", { lags: data.lags, acf: data.acf });
-      return;
-    }
-    
-    // Clear previous chart
-    acfChartRef.current.innerHTML = '';
-    
-    // Wait for container to have width
-    if (acfChartRef.current.clientWidth === 0) {
-      console.warn("ACF chart container has no width, retrying...");
-      setTimeout(() => renderACFChart(data), 100);
-      return;
-    }
-    
-    const chart = createChart(acfChartRef.current, {
-      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "#374151" },
-      width: acfChartRef.current.clientWidth,
-      height: 300,
-      grid: { vertLines: { color: "#e5e7eb" }, horzLines: { color: "#e5e7eb" } },
-    });
-    chart.applyOptions({ timeScale: { tickMarkFormatter: (t: Time | number) => `${typeof t === 'number' ? t : ''}` } });
-
-    const series = chart.addSeries(HistogramSeries, {
-      color: "#3b82f6",
-      priceFormat: { type: 'volume' },
-      priceScaleId: '',
-    });
-    
-    // Convert lags to proper Time format (use sequential index, not lag value)
-    const chartData = data.lags.map((lag, i) => ({
-      time: i as Time,
-      value: data.acf[i] || 0,
-    }));
-    series.setData(chartData);
-    
-    // Add confidence interval lines
-    const ci = data.confidenceInterval || (1.96 / Math.sqrt(data.lags.length));
-    const upperCI = chart.addSeries(LineSeries, {
-      color: "#ef4444",
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      priceScaleId: '',
-    });
-    const lowerCI = chart.addSeries(LineSeries, {
-      color: "#ef4444",
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      priceScaleId: '',
-    });
-    const ciData = data.lags.map((_, i) => ({ time: i as Time, value: ci }));
-    const negCIData = data.lags.map((_, i) => ({ time: i as Time, value: -ci }));
-    upperCI.setData(ciData);
-    lowerCI.setData(negCIData);
-    
-    chart.timeScale().fitContent();
-  };
-
-  const renderPACFChart = (data: ACFPACFData) => {
-    if (!pacfChartRef.current || !data.lags || !data.pacf) {
-      console.error("Cannot render PACF chart: missing data or ref", { lags: data.lags, pacf: data.pacf });
-      return;
-    }
-    
-    // Clear previous chart
-    pacfChartRef.current.innerHTML = '';
-    
-    // Wait for container to have width
-    if (pacfChartRef.current.clientWidth === 0) {
-      console.warn("PACF chart container has no width, retrying...");
-      setTimeout(() => renderPACFChart(data), 100);
-      return;
-    }
-    
-    const chart = createChart(pacfChartRef.current, {
-      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "#374151" },
-      width: pacfChartRef.current.clientWidth,
-      height: 300,
-      grid: { vertLines: { color: "#e5e7eb" }, horzLines: { color: "#e5e7eb" } },
-    });
-    chart.applyOptions({ timeScale: { tickMarkFormatter: (t: Time | number) => `${typeof t === 'number' ? t : ''}` } });
-
-    const series = chart.addSeries(HistogramSeries, {
-      color: "#8b5cf6",
-      priceFormat: { type: 'volume' },
-      priceScaleId: '',
-    });
-    
-    // Convert lags to proper Time format (use sequential index, not lag value)
-    const chartData = data.lags.map((lag, i) => ({
-      time: i as Time,
-      value: data.pacf[i] || 0,
-    }));
-    series.setData(chartData);
-    
-    // Add confidence interval lines
-    const ci = data.confidenceInterval || (1.96 / Math.sqrt(data.lags.length));
-    const upperCI = chart.addSeries(LineSeries, {
-      color: "#ef4444",
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      priceScaleId: '',
-    });
-    const lowerCI = chart.addSeries(LineSeries, {
-      color: "#ef4444",
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      priceScaleId: '',
-    });
-    const ciData = data.lags.map((_, i) => ({ time: i as Time, value: ci }));
-    const negCIData = data.lags.map((_, i) => ({ time: i as Time, value: -ci }));
-    upperCI.setData(ciData);
-    lowerCI.setData(negCIData);
-    
-    chart.timeScale().fitContent();
-  };
 
   const renderArimaChart = (forecast: number[]) => {
     if (!arimaChartRef.current || !forecast || forecast.length === 0) return;
@@ -603,14 +409,18 @@ export function ReturnsAnalysis() {
                 ))}
               </Select>
             </div>
-            <div className="w-32">
+            <div className="w-40">
               <label className="text-sm font-medium mb-2 block">Timeframe</label>
               <Select value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
                 <SelectValue />
                 <SelectItem value="1W">1 Week</SelectItem>
                 <SelectItem value="1M">1 Month</SelectItem>
                 <SelectItem value="3M">3 Months</SelectItem>
+                <SelectItem value="6M">6 Months</SelectItem>
                 <SelectItem value="1Y">1 Year</SelectItem>
+                <SelectItem value="2Y">2 Years</SelectItem>
+                <SelectItem value="3Y">3 Years</SelectItem>
+                <SelectItem value="5Y">5 Years</SelectItem>
               </Select>
             </div>
           </div>
@@ -763,10 +573,9 @@ export function ReturnsAnalysis() {
               )}
 
               <Tabs defaultValue="charts" className="w-full">
-                <TabsList className="grid w-full grid-cols-6">
+                <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="charts">Charts</TabsTrigger>
                   <TabsTrigger value="stationarity">ADF Test</TabsTrigger>
-                  <TabsTrigger value="acf-pacf">ACF/PACF</TabsTrigger>
                   <TabsTrigger value="models">ARIMA/GARCH</TabsTrigger>
                   <TabsTrigger value="lstm">LSTM</TabsTrigger>
                   <TabsTrigger value="sentiment">Sentiment</TabsTrigger>
@@ -797,7 +606,7 @@ export function ReturnsAnalysis() {
                     <CardHeader>
                       <CardTitle>Augmented Dickey-Fuller (ADF) Test</CardTitle>
                       <CardDescription>
-                        Tests for stationarity. Null hypothesis: series has a unit root (non-stationary)
+                        Tests for stationarity of log returns. Null hypothesis: series has a unit root (non-stationary)
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -863,46 +672,6 @@ export function ReturnsAnalysis() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="acf-pacf" className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>ACF (Autocorrelation Function)</CardTitle>
-                      <CardDescription>
-                        Measures correlation between returns and lagged returns
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {loadingACF ? (
-                        <Skeleton className="h-64 w-full" />
-                      ) : acfPacfData && acfPacfData.lags && acfPacfData.acf ? (
-                        <div ref={acfChartRef} className="w-full" style={{ height: "300px" }} />
-                      ) : (
-                        <p className="text-sm text-gray-500">
-                          {selectedSymbol ? "No ACF data available. Try selecting a different timeframe or symbol." : "Select a stock to view ACF data"}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>PACF (Partial Autocorrelation Function)</CardTitle>
-                      <CardDescription>
-                        Measures direct correlation after removing indirect effects
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {loadingACF ? (
-                        <Skeleton className="h-64 w-full" />
-                      ) : acfPacfData && acfPacfData.lags && acfPacfData.pacf ? (
-                        <div ref={pacfChartRef} className="w-full" style={{ height: "300px", minHeight: "300px" }} />
-                      ) : (
-                        <p className="text-sm text-gray-500">
-                          {selectedSymbol ? "No PACF data available. Try selecting a different timeframe or symbol." : "Select a stock to view PACF data"}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
 
                 <TabsContent value="models" className="space-y-4">
                   <Card>
@@ -1166,17 +935,17 @@ export function ReturnsAnalysis() {
                         Analyze financial sentiment using FinBERT and rule-based methods
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-6">
                       <div>
-                        <label className="text-sm font-medium mb-2 block">Enter Text for Analysis</label>
+                        <label className="text-sm font-semibold mb-3 block text-gray-700 dark:text-gray-300">Enter Text for Analysis</label>
                         <textarea
                           value={sentimentText}
                           onChange={(e) => setSentimentText(e.target.value)}
                           placeholder="Enter financial news, analysis, or commentary..."
-                          className="w-full px-3 py-2 border rounded text-sm min-h-[100px]"
+                          className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg text-sm min-h-[120px] focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-all resize-none bg-white dark:bg-gray-800"
                         />
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-3">
                         <Button 
                           onClick={async () => {
                             if (!sentimentText.trim()) {
@@ -1205,6 +974,7 @@ export function ReturnsAnalysis() {
                             }
                           }}
                           disabled={loadingFinBERT || !sentimentText.trim()}
+                          className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
                         >
                           {loadingFinBERT ? 'Analyzing...' : 'FinBERT Analysis'}
                         </Button>
@@ -1237,56 +1007,75 @@ export function ReturnsAnalysis() {
                           }}
                           disabled={loadingRuleSentiment || !sentimentText.trim()}
                           variant="outline"
+                          className="flex-1 border-2"
                         >
                           {loadingRuleSentiment ? 'Analyzing...' : 'Rule-Based Analysis'}
                         </Button>
                       </div>
-                      {finbertResult && (
-                        <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                          <p className="font-semibold text-green-800 dark:text-green-200 mb-2">FinBERT Results</p>
-                          <div className="space-y-1 text-sm">
-                            <div className="flex justify-between">
-                              <span>Sentiment:</span>
-                              <Badge className={finbertResult.sentiment === 'positive' ? 'bg-green-500' : finbertResult.sentiment === 'negative' ? 'bg-red-500' : 'bg-gray-500'}>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {finbertResult && (
+                          <div className="rounded-xl border-2 border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-900 p-5 shadow-sm">
+                            <div className="flex items-center justify-between mb-4">
+                              <p className="font-bold text-lg text-blue-900 dark:text-blue-200">FinBERT Results</p>
+                              <Badge className={`text-xs px-3 py-1 ${finbertResult.sentiment === 'positive' ? 'bg-green-500 hover:bg-green-600' : finbertResult.sentiment === 'negative' ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-500 hover:bg-gray-600'}`}>
                                 {finbertResult.sentiment}
                               </Badge>
                             </div>
-                            <div className="flex justify-between">
-                              <span>Score:</span>
-                              <span className="font-mono">{finbertResult.score?.toFixed(3)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Confidence:</span>
-                              <span className="font-mono">{(finbertResult.confidence * 100)?.toFixed(1)}%</span>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Score</span>
+                                <span className="text-lg font-bold font-mono text-gray-900 dark:text-white">{finbertResult.score?.toFixed(3)}</span>
+                              </div>
+                              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Confidence</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all"
+                                      style={{ width: `${(finbertResult.confidence * 100)}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-lg font-bold font-mono text-gray-900 dark:text-white">{(finbertResult.confidence * 100)?.toFixed(1)}%</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                      {ruleSentimentResult && (
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                          <p className="font-semibold text-purple-800 dark:text-purple-200 mb-2">Rule-Based Results</p>
-                          <div className="space-y-1 text-sm">
-                            <div className="flex justify-between">
-                              <span>Sentiment:</span>
-                              <Badge className={ruleSentimentResult.sentiment === 'bullish' ? 'bg-green-500' : ruleSentimentResult.sentiment === 'bearish' ? 'bg-red-500' : 'bg-gray-500'}>
+                        )}
+                        
+                        {ruleSentimentResult && (
+                          <div className="rounded-xl border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/20 dark:to-gray-900 p-5 shadow-sm">
+                            <div className="flex items-center justify-between mb-4">
+                              <p className="font-bold text-lg text-purple-900 dark:text-purple-200">Rule-Based Results</p>
+                              <Badge className={`text-xs px-3 py-1 ${ruleSentimentResult.sentiment === 'bullish' ? 'bg-green-500 hover:bg-green-600' : ruleSentimentResult.sentiment === 'bearish' ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-500 hover:bg-gray-600'}`}>
                                 {ruleSentimentResult.sentiment}
                               </Badge>
                             </div>
-                            <div className="flex justify-between">
-                              <span>Bullish Signals:</span>
-                              <span>{ruleSentimentResult.bullish_signals}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Bearish Signals:</span>
-                              <span>{ruleSentimentResult.bearish_signals}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Confidence:</span>
-                              <span className="font-mono">{(ruleSentimentResult.confidence * 100)?.toFixed(1)}%</span>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Bullish Signals</span>
+                                <span className="text-lg font-bold text-green-600 dark:text-green-400">{ruleSentimentResult.bullish_signals}</span>
+                              </div>
+                              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Bearish Signals</span>
+                                <span className="text-lg font-bold text-red-600 dark:text-red-400">{ruleSentimentResult.bearish_signals}</span>
+                              </div>
+                              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Confidence</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all"
+                                      style={{ width: `${(ruleSentimentResult.confidence * 100)}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-lg font-bold font-mono text-gray-900 dark:text-white">{(ruleSentimentResult.confidence * 100)?.toFixed(1)}%</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>

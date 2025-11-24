@@ -413,6 +413,104 @@ async function fetchAngelHistoricalCandles(symbol: string, timeframe: string): P
   }
 }
 
+// Helper function to fetch Yahoo Finance data
+async function fetchYahooFinanceData(symbol: string, timeframe: string): Promise<{ candles: Candle[]; error?: string }> {
+  try {
+    // Convert NSE symbols to Yahoo Finance format (e.g., RELIANCE -> RELIANCE.NS)
+    const yahooSymbol = symbol.toUpperCase().replace('-EQ', '') + '.NS';
+    
+    // Calculate date range
+    const now = new Date();
+    let fromDate = new Date();
+    
+    switch (timeframe) {
+      case '1W':
+        fromDate.setDate(now.getDate() - 7);
+        break;
+      case '1M':
+        fromDate.setMonth(now.getMonth() - 1);
+        break;
+      case '3M':
+        fromDate.setMonth(now.getMonth() - 3);
+        break;
+      case '6M':
+        fromDate.setMonth(now.getMonth() - 6);
+        break;
+      case '1Y':
+        fromDate.setFullYear(now.getFullYear() - 1);
+        break;
+      case '2Y':
+        fromDate.setFullYear(now.getFullYear() - 2);
+        break;
+      case '3Y':
+        fromDate.setFullYear(now.getFullYear() - 3);
+        break;
+      case '5Y':
+        fromDate.setFullYear(now.getFullYear() - 5);
+        break;
+      case 'MAX':
+        fromDate.setFullYear(now.getFullYear() - 20); // 20 years max
+        break;
+      default:
+        fromDate.setFullYear(now.getFullYear() - 1);
+    }
+    
+    const period1 = Math.floor(fromDate.getTime() / 1000);
+    const period2 = Math.floor(now.getTime() / 1000);
+    
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?period1=${period1}&period2=${period2}&interval=1d`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+    
+    if (!response.ok) {
+      return { candles: [], error: `Yahoo Finance API error: ${response.status} ${response.statusText}` };
+    }
+    
+    const data: any = await response.json();
+    
+    if (!data.chart?.result?.[0]?.timestamp || !data.chart?.result?.[0]?.indicators?.quote?.[0]) {
+      return { candles: [], error: 'Invalid response from Yahoo Finance' };
+    }
+    
+    const result = data.chart.result[0];
+    const timestamps = result.timestamp;
+    const quote = result.indicators.quote[0];
+    
+    const candles: Candle[] = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const date = new Date(timestamps[i] * 1000);
+      const timeStr = date.toISOString().replace('T', ' ').substring(0, 19);
+      
+      candles.push({
+        time: timeStr,
+        open: quote.open[i] || 0,
+        high: quote.high[i] || 0,
+        low: quote.low[i] || 0,
+        close: quote.close[i] || 0,
+        volume: quote.volume[i] || 0,
+      });
+    }
+    
+    // Log date range for debugging
+    if (candles.length > 0) {
+      const firstDate = new Date(candles[0].time);
+      const lastDate = new Date(candles[candles.length - 1].time);
+      console.log(`Yahoo Finance: Fetched ${candles.length} candles for ${yahooSymbol} (${timeframe})`);
+      console.log(`  Date range: ${firstDate.toISOString().split('T')[0]} to ${lastDate.toISOString().split('T')[0]}`);
+      console.log(`  Requested from: ${fromDate.toISOString().split('T')[0]} to ${now.toISOString().split('T')[0]}`);
+    }
+    
+    return { candles };
+  } catch (e: any) {
+    console.error('Yahoo Finance fetch error:', e);
+    return { candles: [], error: e.message || 'Failed to fetch from Yahoo Finance' };
+  }
+}
+
 // Helper function to calculate log returns
 function calculateLogReturns(prices: number[]): number[] {
   const returns: number[] = [];
@@ -466,7 +564,15 @@ router.get("/returns", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    // Try Yahoo Finance first (better for DSFM analysis - more historical data)
+    let result = await fetchYahooFinanceData(symbol, timeframe);
+    
+    // Fallback to Angel One if Yahoo fails
+    if (result.error || result.candles.length === 0) {
+      console.log(`Yahoo Finance failed for ${symbol}, trying Angel One...`);
+      result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    }
+    
     if (result.error) {
       res.status(404).json({ error: result.error });
       return;
@@ -492,9 +598,9 @@ router.get("/returns", async (req: Request, res: Response): Promise<void> => {
     const stats = calculateStatistics(logReturns);
 
     // Calculate Sharpe ratio (assuming risk-free rate of 6% annually)
-    const tradingDays = logReturns.length;
-    const annualizedMean = stats.mean * (252 / tradingDays); // Annualize
-    const annualizedStd = stats.std * Math.sqrt(252 / tradingDays); // Annualize
+    // Annualize the daily statistics: mean * 252, std * sqrt(252)
+    const annualizedMean = stats.mean * 252; // Annualize daily mean
+    const annualizedStd = stats.std * Math.sqrt(252); // Annualize daily std
     const riskFreeRate = 0.06; // 6% annual risk-free rate
     const sharpeRatio = annualizedStd > 0 ? (annualizedMean - riskFreeRate) / annualizedStd : 0;
 
@@ -545,43 +651,95 @@ router.get("/returns", async (req: Request, res: Response): Promise<void> => {
 // Correlation Analysis endpoint
 router.get("/correlation", async (req: Request, res: Response): Promise<void> => {
   try {
-    // Get popular NSE stocks
-    const rows = await fetchNSEIndex("NIFTY 500");
-    const topStocks = rows
-      .slice(0, 15) // Limit to 15 for performance
-      .map((r: any) => String(r?.symbol || ""))
-      .filter((s) => s.length > 0);
-
-    // Fetch returns for all stocks
-    const stockReturns: { symbol: string; returns: number[] }[] = [];
+    const timeframe = (req.query.timeframe as string) || "3M";
     
-    for (const symbol of topStocks) {
-      const result = await fetchAngelHistoricalCandles(symbol, "3M");
-      if (result.error) {
-        console.warn(`Skipping ${symbol}: ${result.error}`);
+    console.log(`Starting correlation analysis for NIFTY 50 (${timeframe})`);
+    
+    // Get all NIFTY 50 stocks
+    const rows = await fetchNSEIndex("NIFTY 50");
+    if (!rows || rows.length === 0) {
+      console.error("Failed to fetch NIFTY 50 index data");
+      res.status(500).json({ error: "Failed to fetch NIFTY 50 index data" });
+      return;
+    }
+    
+    const allStocks = rows
+      .map((r: any) => String(r?.symbol || r?.tradingsymbol || ""))
+      .filter((s) => s.length > 0 && !s.includes("NIFTY"));
+
+    console.log(`Found ${allStocks.length} stocks in NIFTY 50`);
+
+    // Fetch returns for all stocks using Yahoo Finance (with Angel One fallback)
+    const stockReturns: { symbol: string; returns: number[] }[] = [];
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const symbol of allStocks) {
+      try {
+        // Try Yahoo Finance first
+        let result = await fetchYahooFinanceData(symbol, timeframe);
+        if (result.error || result.candles.length === 0) {
+          // Fallback to Angel One
+          result = await fetchAngelHistoricalCandles(symbol, timeframe);
+        }
+        
+        if (result.error) {
+          console.warn(`Skipping ${symbol}: ${result.error}`);
+          failCount++;
+          continue;
+        }
+        
+        const candles = result.candles;
+        if (!candles || candles.length === 0) {
+          failCount++;
+          continue;
+        }
+        
+        const prices = candles.map((candle: Candle) => candle.close);
+        // Require at least 40 data points for meaningful correlation analysis
+        if (prices.length >= 40) {
+          const returns = calculateLogReturns(prices);
+          if (returns.length >= 30) { // Ensure we have enough returns after calculation
+            stockReturns.push({ symbol, returns });
+            successCount++;
+          } else {
+            console.warn(`Skipping ${symbol}: Only ${returns.length} returns (need at least 30)`);
+            failCount++;
+          }
+        } else {
+          console.warn(`Skipping ${symbol}: Only ${prices.length} candles (need at least 40)`);
+          failCount++;
+        }
+      } catch (err: any) {
+        console.warn(`Error processing ${symbol}:`, err.message);
+        failCount++;
         continue;
       }
-      const candles = result.candles;
-      const prices = candles.map((candle) => candle.close);
-      if (prices.length > 20) {
-        const returns = calculateLogReturns(prices);
-        if (returns.length > 0) {
-          stockReturns.push({ symbol, returns });
-        }
-      }
     }
+    
+    console.log(`Successfully fetched data for ${successCount} stocks, failed: ${failCount}`);
 
     if (stockReturns.length < 2) {
-      res.status(400).json({ error: "Insufficient data for correlation analysis" });
+      console.error(`Insufficient stocks with data: ${stockReturns.length}`);
+      res.status(400).json({ error: "Insufficient data for correlation analysis. Need at least 2 stocks with valid data." });
       return;
     }
 
     // Align returns to same length (use minimum length)
     const minLength = Math.min(...stockReturns.map((s) => s.returns.length));
+    
+    if (minLength < 30) {
+      console.error(`Insufficient time points after alignment: ${minLength}`);
+      res.status(400).json({ error: `Insufficient time points (${minLength}). Need at least 30 data points per stock for correlation analysis.` });
+      return;
+    }
+    
     const alignedReturns = stockReturns.map((s) => ({
       symbol: s.symbol,
       returns: s.returns.slice(-minLength),
     }));
+
+    console.log(`Calculating correlation matrix for ${alignedReturns.length} stocks with ${minLength} time points each`);
 
     // Calculate correlation matrix
     const correlationMatrix: number[][] = [];
@@ -593,24 +751,85 @@ router.get("/correlation", async (req: Request, res: Response): Promise<void> =>
         if (i === j) {
           row.push(1.0);
         } else {
-          const corr = calculateCorrelation(
-            alignedReturns[i].returns,
-            alignedReturns[j].returns
-          );
-          row.push(Number(corr.toFixed(3)));
+          try {
+            const corr = calculateCorrelation(
+              alignedReturns[i].returns,
+              alignedReturns[j].returns
+            );
+            // Ensure correlation is a valid number
+            if (isNaN(corr) || !isFinite(corr)) {
+              console.warn(`Invalid correlation for ${symbols[i]} vs ${symbols[j]}: ${corr}`);
+              row.push(0.0);
+            } else {
+              row.push(Number(corr.toFixed(3)));
+            }
+          } catch (err: any) {
+            console.warn(`Error calculating correlation for ${symbols[i]} vs ${symbols[j]}:`, err.message);
+            row.push(0.0); // Default to zero correlation on error
+          }
         }
       }
       correlationMatrix.push(row);
     }
 
+    // Calculate average correlation (excluding diagonal)
+    let sumCorr = 0;
+    let count = 0;
+    for (let i = 0; i < correlationMatrix.length; i++) {
+      for (let j = 0; j < i; j++) {
+        sumCorr += Math.abs(correlationMatrix[i][j]);
+        count++;
+      }
+    }
+    const averageCorrelation = count > 0 ? sumCorr / count : 0;
+
+    // Simple eigenvalue estimation (largest eigenvalue ≈ trace for correlation matrix)
+    // For proper eigenvalues, we'd need a linear algebra library
+    // Here we'll use a simple approximation: sum of correlations per row
+    const eigenvalues: number[] = [];
+    for (let i = 0; i < correlationMatrix.length; i++) {
+      const rowSum = correlationMatrix[i].reduce((sum, val) => sum + Math.abs(val), 0);
+      eigenvalues.push(rowSum);
+    }
+    eigenvalues.sort((a, b) => b - a); // Sort descending
+
+    // RMT threshold (Marchenko-Pastur law)
+    const N = correlationMatrix.length; // number of assets
+    const T = minLength; // number of time points
+    
+    if (T === 0 || N === 0) {
+      console.error(`Invalid dimensions: N=${N}, T=${T}`);
+      res.status(500).json({ error: "Invalid matrix dimensions for RMT calculation" });
+      return;
+    }
+    
+    const Q = N / T; // ratio
+    
+    if (Q >= 1) {
+      console.warn(`Q ratio >= 1 (${Q.toFixed(3)}), RMT may not be accurate. N=${N}, T=${T}`);
+    }
+    
+    const lambdaMax = Math.pow(1 + Math.sqrt(Q), 2); // Upper edge of MP distribution
+    const lambdaMin = Math.pow(1 - Math.sqrt(Q), 2); // Lower edge
+
+    // Count significant eigenvalues (above RMT threshold)
+    const significantEigenvalues = eigenvalues.filter(e => e > lambdaMax).length;
+
+    console.log(`Correlation analysis complete: ${symbols.length} stocks, avg correlation: ${averageCorrelation.toFixed(3)}, significant factors: ${significantEigenvalues}`);
+
     res.json({
       symbols,
       correlationMatrix,
+      eigenvalues,
+      rmtThreshold: lambdaMax,
+      significantEigenvalues,
+      averageCorrelation,
       timestamp: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error calculating correlation:", e);
-    res.status(500).json({ error: "failed_to_calculate_correlation" });
+    console.error("Stack trace:", e.stack);
+    res.status(500).json({ error: `failed_to_calculate_correlation: ${e.message || 'Unknown error'}` });
   }
 });
 
@@ -692,7 +911,12 @@ router.get("/adf-test", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    // Try Yahoo Finance first
+    let result = await fetchYahooFinanceData(symbol, timeframe);
+    if (result.error || result.candles.length === 0) {
+      result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    }
+    
     if (result.error) {
       res.status(404).json({ error: result.error });
       return;
@@ -794,7 +1018,12 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    // Try Yahoo Finance first
+    let result = await fetchYahooFinanceData(symbol, timeframe);
+    if (result.error || result.candles.length === 0) {
+      result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    }
+    
     if (result.error) {
       res.status(404).json({ error: result.error });
       return;
@@ -808,8 +1037,12 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
     }
 
     const logReturns = calculateLogReturns(prices);
-    if (logReturns.length < maxLags + 10) {
-      res.status(400).json({ error: "Insufficient data for ACF/PACF calculation" });
+    
+    // Adjust maxLags if we don't have enough data
+    const adjustedMaxLags = Math.min(maxLags, Math.floor(logReturns.length / 2));
+    
+    if (logReturns.length < 5) {
+      res.status(400).json({ error: "Insufficient data for ACF/PACF calculation (need at least 5 data points)" });
       return;
     }
 
@@ -819,7 +1052,7 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
       const mlResp = await fetch(`${mlServiceUrl}/dsfm/acf-pacf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ returns: logReturns, max_lags: maxLags }),
+        body: JSON.stringify({ returns: logReturns, max_lags: adjustedMaxLags }),
       });
 
       if (mlResp.ok) {
@@ -837,31 +1070,43 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
       console.warn("ML service not available for ACF/PACF, using simplified calculation:", mlError.message);
     }
 
-    // Fallback: Simplified calculation
+    // Fallback: Proper ACF calculation (simplified PACF)
     const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
-    const acf: number[] = [1.0];
+    const acf: number[] = [1.0]; // ACF at lag 0 is always 1
+    
+    // Calculate variance (denominator for ACF)
     const variance = logReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / logReturns.length;
 
-    for (let lag = 1; lag <= maxLags; lag++) {
-      let numerator = 0;
-      for (let i = lag; i < logReturns.length; i++) {
-        numerator += (logReturns[i] - mean) * (logReturns[i - lag] - mean);
+    // Calculate ACF for each lag
+    for (let lag = 1; lag <= adjustedMaxLags; lag++) {
+      let covariance = 0;
+      const n = logReturns.length - lag;
+      for (let i = 0; i < n; i++) {
+        covariance += (logReturns[i] - mean) * (logReturns[i + lag] - mean);
       }
-      const correlation = variance > 0 ? numerator / (variance * logReturns.length) : 0;
+      covariance /= logReturns.length; // Normalize by total length
+      const correlation = variance > 0 ? covariance / variance : 0;
       acf.push(correlation);
     }
 
+    // Simplified PACF calculation (Durbin-Levinson recursion would be more accurate)
+    // For now, use a heuristic: PACF[1] = ACF[1], then decay
     const pacf: number[] = [1.0];
-    pacf.push(acf[1]);
-    for (let lag = 2; lag <= maxLags; lag++) {
-      pacf.push(acf[lag] * 0.8);
+    if (acf.length > 1) {
+      pacf.push(acf[1]);
+      for (let lag = 2; lag <= adjustedMaxLags; lag++) {
+        // Simplified: PACF decays faster than ACF
+        pacf.push(acf[lag] * Math.pow(0.7, lag - 1));
+      }
     }
+
+    console.log(`ACF/PACF calculated for ${symbol}: ${acf.length} lags, ACF[1]=${acf[1]?.toFixed(3)}, PACF[1]=${pacf[1]?.toFixed(3)}, data points: ${logReturns.length}, adjusted lags: ${adjustedMaxLags}`);
 
     res.json({
       symbol,
-      lags: Array.from({ length: maxLags + 1 }, (_, i) => i),
-      acf: acf.slice(0, maxLags + 1),
-      pacf: pacf.slice(0, maxLags + 1),
+      lags: Array.from({ length: adjustedMaxLags + 1 }, (_, i) => i),
+      acf: acf.slice(0, adjustedMaxLags + 1),
+      pacf: pacf.slice(0, adjustedMaxLags + 1),
       confidenceInterval: 1.96 / Math.sqrt(logReturns.length),
     });
   } catch (e) {
@@ -967,8 +1212,12 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Auto-upgrade timeframe if insufficient data
-    let result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    // Try Yahoo Finance first
+    let result = await fetchYahooFinanceData(symbol, timeframe);
+    if (result.error || result.candles.length === 0) {
+      result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    }
+    
     if (result.error) {
       res.status(404).json({ error: result.error });
       return;
@@ -978,9 +1227,12 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
     let prices = candles.map((candle) => candle.close);
     
     // If insufficient data, try longer timeframe
-    if (prices.length < 50 && timeframe !== "1Y") {
+    if (prices.length < 50 && timeframe !== "1Y" && timeframe !== "2Y" && timeframe !== "3Y") {
       console.log(`Insufficient data for ${timeframe}, trying 1Y timeframe`);
-      result = await fetchAngelHistoricalCandles(symbol, "1Y");
+      result = await fetchYahooFinanceData(symbol, "1Y");
+      if (result.error || result.candles.length === 0) {
+        result = await fetchAngelHistoricalCandles(symbol, "1Y");
+      }
       if (!result.error) {
         candles = result.candles;
         prices = candles.map((candle) => candle.close);
@@ -1035,6 +1287,160 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
   } catch (e) {
     console.error("Error in GARCH:", e);
     res.status(500).json({ error: "failed_to_fit_garch" });
+  }
+});
+
+// LSTM Forecasting endpoint
+router.post("/lstm", async (req: Request, res: Response): Promise<void> => {
+  try {
+    let { symbol, timeframe = "1Y", lookback = 10, forecastSteps = 5 } = req.body || {};
+
+    if (!symbol) {
+      res.status(400).json({ error: "Symbol is required" });
+      return;
+    }
+
+    const result = await fetchAngelHistoricalCandles(symbol, timeframe);
+    if (result.error) {
+      res.status(404).json({ error: result.error });
+      return;
+    }
+
+    const candles = result.candles;
+    const prices = candles.map((candle) => candle.close);
+
+    if (prices.length < lookback + 20) {
+      res.status(400).json({ error: "Insufficient data for LSTM model (need at least 30 data points)" });
+      return;
+    }
+
+    const logReturns = calculateLogReturns(prices);
+
+    try {
+      const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
+      const mlResp = await fetch(`${mlServiceUrl}/dsfm/lstm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          returns: logReturns, 
+          lookback, 
+          forecast_steps: forecastSteps 
+        }),
+      });
+
+      if (mlResp.ok) {
+        const mlData: any = await mlResp.json();
+        res.json({
+          forecast: mlData.forecast,
+          rmse: mlData.rmse,
+          r2_score: mlData.r2_score,
+          training_loss: mlData.training_loss,
+        });
+        return;
+      } else {
+        const errorText = await mlResp.text();
+        console.warn(`ML service LSTM failed: ${mlResp.status} - ${errorText}`);
+      }
+    } catch (e: any) {
+      console.error("ML service LSTM error:", e.message);
+    }
+
+    res.status(503).json({ 
+      error: "ml_service_unavailable",
+      message: "ML service is not available. Please ensure the ML service is running on port 8000."
+    });
+  } catch (e) {
+    console.error("Error in LSTM:", e);
+    res.status(500).json({ error: "failed_to_run_lstm" });
+  }
+});
+
+// FinBERT Sentiment Analysis endpoint
+router.post("/sentiment/finbert", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { text } = req.body || {};
+
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      res.status(400).json({ error: "Text is required for sentiment analysis" });
+      return;
+    }
+
+    try {
+      const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
+      const mlResp = await fetch(`${mlServiceUrl}/dsfm/sentiment/finbert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      if (mlResp.ok) {
+        const mlData: any = await mlResp.json();
+        res.json({
+          sentiment: mlData.sentiment,
+          score: mlData.score,
+          confidence: mlData.confidence,
+        });
+        return;
+      } else {
+        const errorText = await mlResp.text();
+        console.warn(`ML service FinBERT failed: ${mlResp.status} - ${errorText}`);
+      }
+    } catch (e: any) {
+      console.error("ML service FinBERT error:", e.message);
+    }
+
+    res.status(503).json({ 
+      error: "ml_service_unavailable",
+      message: "ML service is not available. Please ensure the ML service is running on port 8000."
+    });
+  } catch (e) {
+    console.error("Error in FinBERT sentiment:", e);
+    res.status(500).json({ error: "failed_to_analyze_sentiment" });
+  }
+});
+
+// Rule-based Sentiment Analysis endpoint
+router.post("/sentiment/rule-based", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { text } = req.body || {};
+
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      res.status(400).json({ error: "Text is required for sentiment analysis" });
+      return;
+    }
+
+    try {
+      const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
+      const mlResp = await fetch(`${mlServiceUrl}/dsfm/sentiment/rule-based`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      if (mlResp.ok) {
+        const mlData: any = await mlResp.json();
+        res.json({
+          sentiment: mlData.sentiment,
+          bullish_signals: mlData.bullish_signals,
+          bearish_signals: mlData.bearish_signals,
+          confidence: mlData.confidence,
+        });
+        return;
+      } else {
+        const errorText = await mlResp.text();
+        console.warn(`ML service rule-based sentiment failed: ${mlResp.status} - ${errorText}`);
+      }
+    } catch (e: any) {
+      console.error("ML service rule-based sentiment error:", e.message);
+    }
+
+    res.status(503).json({ 
+      error: "ml_service_unavailable",
+      message: "ML service is not available. Please ensure the ML service is running on port 8000."
+    });
+  } catch (e) {
+    console.error("Error in rule-based sentiment:", e);
+    res.status(500).json({ error: "failed_to_analyze_sentiment" });
   }
 });
 

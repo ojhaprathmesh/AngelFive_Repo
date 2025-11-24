@@ -857,17 +857,219 @@ function calculateCorrelation(x: number[], y: number[]): number {
   return denominator === 0 ? 0 : numerator / denominator;
 }
 
-// Portfolio Optimization endpoint
-router.get("/portfolio-optimization", async (req: Request, res: Response): Promise<void> => {
+// MPT (Modern Portfolio Theory) Optimization endpoint
+router.post("/mpt", async (req: Request, res: Response): Promise<void> => {
   try {
-    res.json({
-      message: "Portfolio optimization endpoint - implementation in progress",
-      efficientFrontier: [],
-      optimalPortfolio: null,
+    const { symbols, timeframe, riskFreeRate } = req.body || {};
+    
+    if (!symbols || !Array.isArray(symbols) || symbols.length < 2) {
+      res.status(400).json({ error: "At least 2 symbols required for portfolio optimization" });
+      return;
+    }
+
+    const tf = timeframe || "1Y";
+    const rf = riskFreeRate || 0.06;
+
+    console.log(`MPT optimization for ${symbols.length} stocks (${tf})`);
+
+    // Fetch historical data for all symbols
+    const stockReturns: { symbol: string; returns: number[] }[] = [];
+    
+    for (const symbol of symbols) {
+      try {
+        // Try Yahoo Finance first
+        let result = await fetchYahooFinanceData(symbol, tf);
+        if (result.error || result.candles.length === 0) {
+          result = await fetchAngelHistoricalCandles(symbol, tf);
+        }
+        
+        if (result.error) {
+          console.warn(`Skipping ${symbol}: ${result.error}`);
+          continue;
+        }
+        
+        const candles = result.candles;
+        if (!candles || candles.length === 0) continue;
+        
+        const prices = candles.map((candle: Candle) => candle.close);
+        if (prices.length >= 30) {
+          const returns = calculateLogReturns(prices);
+          if (returns.length >= 20) {
+            stockReturns.push({ symbol, returns });
+          }
+        }
+      } catch (err: any) {
+        console.warn(`Error processing ${symbol}:`, err.message);
+        continue;
+      }
+    }
+
+    if (stockReturns.length < 2) {
+      res.status(400).json({ error: "Insufficient data. Need at least 2 stocks with valid historical data." });
+      return;
+    }
+
+    // Align returns to same length
+    const minLength = Math.min(...stockReturns.map((s) => s.returns.length));
+    const alignedReturns = stockReturns.map((s) => ({
+      symbol: s.symbol,
+      returns: s.returns.slice(-minLength),
+    }));
+
+    // Build returns matrix: each row is an asset, each column is a time period
+    // Filter out any NaN, Infinity, or null values
+    const returnsMatrix: number[][] = alignedReturns.map(s => 
+      s.returns.map(r => {
+        if (r === null || r === undefined || !isFinite(r) || isNaN(r)) {
+          return 0;
+        }
+        return r;
+      })
+    );
+    const returnSymbols = alignedReturns.map(s => s.symbol);
+
+    console.log(`Sending MPT request to ML service: ${returnSymbols.length} assets, ${minLength} time periods`);
+
+    // Call ML service
+    const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
+    const mlResp = await fetch(`${mlServiceUrl}/dsfm/mpt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        returns: returnsMatrix,
+        symbols: returnSymbols,
+        risk_free_rate: Number(rf), // Ensure it's a number, not undefined
+      }),
     });
-  } catch (e) {
-    console.error("Error in portfolio optimization:", e);
-    res.status(500).json({ error: "failed_to_optimize_portfolio" });
+
+    if (mlResp.ok) {
+      const mlData: any = await mlResp.json();
+      res.json({
+        symbols: returnSymbols,
+        optimal_portfolio: mlData.optimal_portfolio,
+        efficient_frontier: mlData.efficient_frontier || [],
+      });
+    } else {
+      const errorText = await mlResp.text();
+      console.error(`ML service MPT failed: ${mlResp.status} - ${errorText}`);
+      res.status(mlResp.status).json({ 
+        error: "ml_service_error",
+        message: errorText || "ML service error"
+      });
+    }
+  } catch (e: any) {
+    console.error("Error in MPT optimization:", e);
+    res.status(500).json({ error: `failed_to_optimize_portfolio: ${e.message || 'Unknown error'}` });
+  }
+});
+
+// Black-Litterman Optimization endpoint
+router.post("/black-litterman", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { symbols, timeframe, riskAversion, tau } = req.body || {};
+    
+    if (!symbols || !Array.isArray(symbols) || symbols.length < 2) {
+      res.status(400).json({ error: "At least 2 symbols required for portfolio optimization" });
+      return;
+    }
+
+    const tf = timeframe || "1Y";
+    const lambda = riskAversion || 3.0;
+    const tauVal = tau || 0.05;
+
+    console.log(`Black-Litterman optimization for ${symbols.length} stocks (${tf})`);
+
+    // Fetch historical data for all symbols
+    const stockReturns: { symbol: string; returns: number[] }[] = [];
+    
+    for (const symbol of symbols) {
+      try {
+        // Try Yahoo Finance first
+        let result = await fetchYahooFinanceData(symbol, tf);
+        if (result.error || result.candles.length === 0) {
+          result = await fetchAngelHistoricalCandles(symbol, tf);
+        }
+        
+        if (result.error) {
+          console.warn(`Skipping ${symbol}: ${result.error}`);
+          continue;
+        }
+        
+        const candles = result.candles;
+        if (!candles || candles.length === 0) continue;
+        
+        const prices = candles.map((candle: Candle) => candle.close);
+        if (prices.length >= 30) {
+          const returns = calculateLogReturns(prices);
+          if (returns.length >= 20) {
+            stockReturns.push({ symbol, returns });
+          }
+        }
+      } catch (err: any) {
+        console.warn(`Error processing ${symbol}:`, err.message);
+        continue;
+      }
+    }
+
+    if (stockReturns.length < 2) {
+      res.status(400).json({ error: "Insufficient data. Need at least 2 stocks with valid historical data." });
+      return;
+    }
+
+    // Align returns to same length
+    const minLength = Math.min(...stockReturns.map((s) => s.returns.length));
+    const alignedReturns = stockReturns.map((s) => ({
+      symbol: s.symbol,
+      returns: s.returns.slice(-minLength),
+    }));
+
+    // Build returns matrix
+    // Filter out any NaN, Infinity, or null values
+    const returnsMatrix: number[][] = alignedReturns.map(s => 
+      s.returns.map(r => {
+        if (r === null || r === undefined || !isFinite(r) || isNaN(r)) {
+          return 0;
+        }
+        return r;
+      })
+    );
+    const returnSymbols = alignedReturns.map(s => s.symbol);
+
+    console.log(`Sending Black-Litterman request to ML service: ${returnSymbols.length} assets, ${minLength} time periods`);
+
+    // Call ML service
+    const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
+    const mlResp = await fetch(`${mlServiceUrl}/dsfm/black-litterman`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        returns: returnsMatrix,
+        symbols: returnSymbols,
+        risk_aversion: Number(lambda), // Ensure it's a number
+        tau: Number(tauVal), // Ensure it's a number
+      }),
+    });
+
+    if (mlResp.ok) {
+      const mlData: any = await mlResp.json();
+      res.json({
+        symbols: returnSymbols,
+        optimal_weights: mlData.optimal_weights || [],
+        expected_return: mlData.expected_return || 0,
+        volatility: mlData.volatility || 0,
+        sharpe_ratio: mlData.sharpe_ratio || 0,
+      });
+    } else {
+      const errorText = await mlResp.text();
+      console.error(`ML service Black-Litterman failed: ${mlResp.status} - ${errorText}`);
+      res.status(mlResp.status).json({ 
+        error: "ml_service_error",
+        message: errorText || "ML service error"
+      });
+    }
+  } catch (e: any) {
+    console.error("Error in Black-Litterman optimization:", e);
+    res.status(500).json({ error: `failed_to_optimize_portfolio: ${e.message || 'Unknown error'}` });
   }
 });
 

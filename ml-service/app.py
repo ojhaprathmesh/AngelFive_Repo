@@ -667,7 +667,16 @@ def mpt_optimization():
         
         returns_matrix = np.array(data['returns'])  # Shape: (n_assets, n_periods)
         symbols = data['symbols']
-        risk_free_rate = data.get('risk_free_rate', 0.06)  # 6% annual
+        risk_free_rate = data.get('risk_free_rate') or data.get('riskFreeRate') or 0.06  # 6% annual
+        
+        # Ensure risk_free_rate is a valid number
+        if risk_free_rate is None or not isinstance(risk_free_rate, (int, float)):
+            risk_free_rate = 0.06
+        risk_free_rate = float(risk_free_rate)
+        
+        # Validate returns matrix - replace None/NaN with 0
+        if np.any(np.isnan(returns_matrix)) or np.any(np.isinf(returns_matrix)):
+            returns_matrix = np.nan_to_num(returns_matrix, nan=0.0, posinf=0.0, neginf=0.0)
         
         if returns_matrix.shape[0] != len(symbols):
             return jsonify({'error': 'Number of symbols must match number of assets'}), 400
@@ -729,7 +738,7 @@ def mpt_optimization():
                     
                     # Only add if volatility is positive and reasonable
                     if portfolio_std > 0 and portfolio_std < 10:  # Reasonable volatility limit
-                        sharpe = (portfolio_return - risk_free_rate) / portfolio_std if portfolio_std > 0 else 0
+                        sharpe = (portfolio_return - float(risk_free_rate)) / portfolio_std if portfolio_std > 0 else 0
                         
                         efficient_portfolios.append({
                             'weights': weights.tolist(),
@@ -823,7 +832,7 @@ def mpt_optimization():
                         portfolio_std = np.sqrt(weights.T @ cov_matrix_annual @ weights)
                         
                         if portfolio_std > 0 and portfolio_std < 10:
-                            sharpe = (portfolio_return - risk_free_rate) / portfolio_std if portfolio_std > 0 else 0
+                            sharpe = (portfolio_return - float(risk_free_rate)) / portfolio_std if portfolio_std > 0 else 0
                             efficient_portfolios.append({
                                 'weights': weights.tolist(),
                                 'expected_return': float(portfolio_return),
@@ -857,7 +866,7 @@ def mpt_optimization():
             equal_weights = np.array([1.0 / n_assets] * n_assets)
             portfolio_return = equal_weights.T @ expected_returns_annual
             portfolio_std = np.sqrt(equal_weights.T @ cov_matrix_annual @ equal_weights)
-            sharpe = (portfolio_return - risk_free_rate) / portfolio_std if portfolio_std > 0 else 0
+            sharpe = (portfolio_return - float(risk_free_rate)) / portfolio_std if portfolio_std > 0 else 0
             optimal = {
                 'weights': equal_weights.tolist(),
                 'expected_return': float(portfolio_return),
@@ -904,8 +913,21 @@ def black_litterman():
         returns_matrix = np.array(data['returns'])
         symbols = data['symbols']
         views = data.get('views', {})  # Optional: investor views
-        risk_aversion = data.get('risk_aversion', 3.0)
+        risk_aversion = data.get('risk_aversion') or data.get('riskAversion') or 3.0
         tau = data.get('tau', 0.05)  # Scaling factor
+        
+        # Ensure risk_aversion and tau are valid numbers
+        if risk_aversion is None or not isinstance(risk_aversion, (int, float)):
+            risk_aversion = 3.0
+        risk_aversion = float(risk_aversion)
+        
+        if tau is None or not isinstance(tau, (int, float)):
+            tau = 0.05
+        tau = float(tau)
+        
+        # Validate returns matrix - replace None/NaN with 0
+        if np.any(np.isnan(returns_matrix)) or np.any(np.isinf(returns_matrix)):
+            returns_matrix = np.nan_to_num(returns_matrix, nan=0.0, posinf=0.0, neginf=0.0)
         
         n_assets = len(symbols)
         

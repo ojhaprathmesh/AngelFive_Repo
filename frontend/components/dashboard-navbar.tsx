@@ -27,7 +27,6 @@ import {
   AlertCircle,
   GalleryVerticalEnd,
   Bookmark,
-  Briefcase,
   Activity,
   BarChart3,
   type LucideIcon,
@@ -191,12 +190,6 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
       label: "Watchlist",
       icon: Bookmark,
       active: pathname === "/dashboard/watchlist",
-    },
-    {
-      href: "/dashboard/portfolio",
-      label: "Portfolio",
-      icon: Briefcase,
-      active: pathname === "/dashboard/portfolio",
     },
     {
       href: "/dashboard/dsfm",

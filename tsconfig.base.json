@@ -41,7 +41,7 @@
     "emitDecoratorMetadata": true,
     "resolveJsonModule": true,
     "useDefineForClassFields": true,
-    "incremental": true,
+    "incremental": false,
     "tsBuildInfoFile": ".tsbuildinfo"
   },
   "exclude": [

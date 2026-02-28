@@ -11,13 +11,14 @@ import {
   CandlestickSeries,
   Time,
   UTCTimestamp,
-  BusinessDay,
 } from "lightweight-charts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { marketDataService, type MarketData as LiveMarketData } from "@/lib/market-data";
+import {
+  marketDataService,
+  type MarketData as LiveMarketData,
+} from "@/lib/market-data";
 import { format } from "date-fns";
 import {
   TrendingUp,
@@ -74,14 +75,21 @@ export function TradingChart() {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>("1D");
   const [chartType, setChartType] = useState<ChartType>("Area");
   const [isLoading, setIsLoading] = useState(true);
+  const [chartDataLoading, setChartDataLoading] = useState(true);
+  const [chartDataEmpty, setChartDataEmpty] = useState(false);
+  const [autoSwitchedFrom, setAutoSwitchedFrom] = useState<TimeFrame | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
-  const [indexState, setIndexState] = useState<Record<IndexType, LiveMarketData | null>>({
+  const [indexState, setIndexState] = useState<
+    Record<IndexType, LiveMarketData | null>
+  >({
     SENSEX: null,
     NIFTY: null,
     BANKNIFTY: null,
     INDIAVIX: null,
-    FINNIFTY: null
+    FINNIFTY: null,
   });
 
   // Persist chart type selection across sessions
@@ -238,28 +246,8 @@ export function TradingChart() {
       seriesRef.current = candlestickSeries;
     }
 
-    // Generate sample data for the current timeframe
-    const sampleData = generateSampleData(timeFrame);
-    setChartData(sampleData);
-
-    if (seriesRef.current) {
-      const chartDataForSeries = sampleData.map((d) => ({
-        time: d.time,
-        ...(chartType === "Area"
-          ? { value: d.value }
-          : {
-              open: d.open || d.value,
-              high: d.high || d.value * 1.02,
-              low: d.low || d.value * 0.98,
-              close: d.close || d.value,
-            }),
-      }));
-
-      seriesRef.current.setData(chartDataForSeries);
-
-      // Fit the chart to show all data automatically
-      chart.timeScale().fitContent();
-    }
+    // Chart starts empty - real data is loaded by the fetch effect
+    setChartData([]);
 
     // Handle resize
     const handleResize = () => {
@@ -274,81 +262,6 @@ export function TradingChart() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [chartType, selectedIndex, isPositive, timeFrame]);
-
-  const generateSampleData = (timeframe: TimeFrame = timeFrame) => {
-    const data: ChartData[] = [];
-    const basePrice = currentData.price;
-    const now = new Date();
-
-    // Calculate the number of data points and time interval based on timeframe
-    let dataPoints: number;
-    let intervalMs: number;
-
-    switch (timeframe) {
-      case "1D":
-        dataPoints = 24; // 24 hours
-        intervalMs = 60 * 60 * 1000; // 1 hour intervals
-        break;
-      case "5D":
-        dataPoints = 5; // 5 days
-        intervalMs = 24 * 60 * 60 * 1000; // 1 day intervals
-        break;
-      case "1M":
-        dataPoints = 30; // 30 days
-        intervalMs = 24 * 60 * 60 * 1000; // 1 day intervals
-        break;
-      case "6M":
-        dataPoints = 26; // 26 weeks
-        intervalMs = 7 * 24 * 60 * 60 * 1000; // 1 week intervals
-        break;
-      case "1Y":
-        dataPoints = 52; // 52 weeks
-        intervalMs = 7 * 24 * 60 * 60 * 1000; // 1 week intervals
-        break;
-      case "5Y":
-        dataPoints = 60; // 60 months
-        intervalMs = 30 * 24 * 60 * 60 * 1000; // 1 month intervals
-        break;
-      case "Max":
-        dataPoints = 120; // 10 years worth of months
-        intervalMs = 30 * 24 * 60 * 60 * 1000; // 1 month intervals
-        break;
-      default:
-        dataPoints = 100;
-        intervalMs = 24 * 60 * 60 * 1000;
-    }
-
-    for (let i = dataPoints - 1; i >= 0; i--) {
-      const time = new Date(now.getTime() - i * intervalMs);
-      const randomFactor = 0.95 + Math.random() * 0.1;
-      const value = basePrice * randomFactor;
-
-      // Format time based on timeframe - lightweight-charts expects specific formats
-      let timeValue: Time;
-      if (timeframe === "1D") {
-        // For intraday data, use Unix timestamp (UTCTimestamp)
-        timeValue = Math.floor(time.getTime() / 1000) as UTCTimestamp;
-      } else {
-        // For daily and longer timeframes, use BusinessDay
-        timeValue = {
-          year: time.getUTCFullYear(),
-          month: (time.getUTCMonth() + 1) as number,
-          day: time.getUTCDate(),
-        } as BusinessDay;
-      }
-
-      data.push({
-        time: timeValue,
-        value,
-        open: value * (0.99 + Math.random() * 0.02),
-        high: value * (1.01 + Math.random() * 0.02),
-        low: value * (0.97 + Math.random() * 0.02),
-        close: value,
-      });
-    }
-
-    return data;
-  };
 
   // Initialize chart on mount and when dependencies change
   useEffect(() => {
@@ -367,8 +280,20 @@ export function TradingChart() {
     };
     const load = async () => {
       try {
-        const keys: IndexType[] = ["SENSEX","NIFTY","BANKNIFTY","INDIAVIX","FINNIFTY"];
-        const updates: Record<IndexType, LiveMarketData | null> = { SENSEX:null,NIFTY:null,BANKNIFTY:null,INDIAVIX:null,FINNIFTY:null };
+        const keys: IndexType[] = [
+          "SENSEX",
+          "NIFTY",
+          "BANKNIFTY",
+          "INDIAVIX",
+          "FINNIFTY",
+        ];
+        const updates: Record<IndexType, LiveMarketData | null> = {
+          SENSEX: null,
+          NIFTY: null,
+          BANKNIFTY: null,
+          INDIAVIX: null,
+          FINNIFTY: null,
+        };
         for (const k of keys) {
           const r = await marketDataService.getMarketDataWithStatus(map[k]);
           updates[k] = r.data;
@@ -383,6 +308,11 @@ export function TradingChart() {
     return () => clearInterval(i);
   }, []);
 
+  // Clear auto-switch message when user changes index
+  useEffect(() => {
+    setAutoSwitchedFrom(null);
+  }, [selectedIndex]);
+
   useEffect(() => {
     const map: Record<IndexType, string> = {
       SENSEX: "BSE:SENSEX",
@@ -390,48 +320,140 @@ export function TradingChart() {
       BANKNIFTY: "NSE:BANKNIFTY",
       INDIAVIX: "NSE:INDIAVIX",
       FINNIFTY: "NSE:FINNIFTY",
-    };``
+    };
+    setChartDataLoading(true);
+    setChartDataEmpty(false);
+
     const run = async () => {
       try {
         const symbol = map[selectedIndex];
         const now = new Date();
-        const toDate = `${format(now, "yyyy-MM-dd HH:mm")}`;
-        const from = new Date(now);
-        let interval = "ONE_DAY";
-        switch (timeFrame) {
-          case "1D":
-            interval = "ONE_MINUTE";
-            from.setHours(now.getHours() - 8);
-            break;
-          case "5D":
-            interval = "THREE_MINUTE";
-            from.setDate(now.getDate() - 5);
-            break;
-          case "1M":
-            interval = "FIFTEEN_MINUTE";
-            from.setMonth(now.getMonth() - 1);
-            break;
-          case "6M":
-            interval = "ONE_DAY";
-            from.setMonth(now.getMonth() - 6);
-            break;
-          case "1Y":
-            interval = "ONE_DAY";
-            from.setFullYear(now.getFullYear() - 1);
-            break;
-          case "5Y":
-            interval = "ONE_DAY";
-            from.setFullYear(now.getFullYear() - 5);
-            break;
-          case "Max":
-            interval = "ONE_DAY";
-            from.setFullYear(now.getFullYear() - 10);
-            break;
+
+        // Helper: format a Date to "yyyy-MM-dd HH:mm" treating it as UTC values
+        const fmtUTC = (d: Date) =>
+          `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+
+        let fromDate: string;
+        let toDate: string;
+        let interval: string;
+
+        if (timeFrame === "1D") {
+          interval = "ONE_MINUTE";
+
+          // AngelOne expects IST times. Compute "now" in IST (UTC+5:30).
+          const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+          const nowIST = new Date(now.getTime() + IST_OFFSET_MS);
+
+          const dow = nowIST.getUTCDay(); // 0=Sun, 1=Mon ... 6=Sat in IST
+          const istH = nowIST.getUTCHours();
+          const istM = nowIST.getUTCMinutes();
+          const beforeOpen = istH < 9 || (istH === 9 && istM < 15);
+
+          // How many days back to the last trading day?
+          let daysBack = 0;
+          if (dow === 0)
+            daysBack = 2; // Sunday  → Friday
+          else if (dow === 6)
+            daysBack = 1; // Saturday → Friday
+          else if (beforeOpen && dow === 1)
+            daysBack = 3; // Monday before 9:15 → Friday
+          else if (beforeOpen) daysBack = 1; // Weekday before 9:15 → yesterday
+
+          const tDay = new Date(nowIST);
+          tDay.setUTCDate(tDay.getUTCDate() - daysBack);
+
+          // 09:15 IST = 03:45 UTC
+          const fromUTC = new Date(
+            Date.UTC(
+              tDay.getUTCFullYear(),
+              tDay.getUTCMonth(),
+              tDay.getUTCDate(),
+              3,
+              45,
+            ),
+          );
+          // 15:30 IST = 10:00 UTC
+          const toUTC = new Date(
+            Date.UTC(
+              tDay.getUTCFullYear(),
+              tDay.getUTCMonth(),
+              tDay.getUTCDate(),
+              10,
+              0,
+            ),
+          );
+
+          fromDate = fmtUTC(fromUTC);
+          toDate = fmtUTC(toUTC);
+        } else {
+          const from = new Date(now);
+          toDate = format(now, "yyyy-MM-dd HH:mm");
+          switch (timeFrame) {
+            case "5D":
+              interval = "THREE_MINUTE";
+              from.setDate(now.getDate() - 5);
+              break;
+            case "1M":
+              interval = "FIFTEEN_MINUTE";
+              from.setMonth(now.getMonth() - 1);
+              break;
+            case "6M":
+              interval = "ONE_DAY";
+              from.setMonth(now.getMonth() - 6);
+              break;
+            case "1Y":
+              interval = "ONE_DAY";
+              from.setFullYear(now.getFullYear() - 1);
+              break;
+            case "5Y":
+              interval = "ONE_DAY";
+              from.setFullYear(now.getFullYear() - 5);
+              break;
+            case "Max":
+              interval = "ONE_DAY";
+              from.setFullYear(now.getFullYear() - 10);
+              break;
+            default:
+              interval = "ONE_DAY";
+              from.setFullYear(now.getFullYear() - 1);
+          }
+          fromDate = format(from, "yyyy-MM-dd HH:mm");
         }
-        const fromDate = `${format(from, "yyyy-MM-dd HH:mm")}`;
+
         const tokenInfo = await marketDataService.getSymbolToken(symbol);
-        if (!tokenInfo) return;
-        const candles = await marketDataService.getCandleData(tokenInfo.exchange, tokenInfo.token, interval, fromDate, toDate);
+        if (!tokenInfo) {
+          setChartDataEmpty(true);
+          return;
+        }
+
+        let candles = await marketDataService.getCandleData(
+          tokenInfo.exchange,
+          tokenInfo.token,
+          interval,
+          fromDate,
+          toDate,
+        );
+
+        // 1D cascade fallback: ONE_MINUTE → FIVE_MINUTE → FIFTEEN_MINUTE
+        if (timeFrame === "1D" && candles.length === 0) {
+          candles = await marketDataService.getCandleData(
+            tokenInfo.exchange,
+            tokenInfo.token,
+            "FIVE_MINUTE",
+            fromDate,
+            toDate,
+          );
+        }
+        if (timeFrame === "1D" && candles.length === 0) {
+          candles = await marketDataService.getCandleData(
+            tokenInfo.exchange,
+            tokenInfo.token,
+            "FIFTEEN_MINUTE",
+            fromDate,
+            toDate,
+          );
+        }
+
         const mapped = candles.map((c) => ({
           time: Math.floor(new Date(c[0]).getTime() / 1000) as UTCTimestamp,
           value: c[4],
@@ -440,22 +462,70 @@ export function TradingChart() {
           low: c[3],
           close: c[4],
         }));
-        setChartData(mapped);
-        if (seriesRef.current) {
+
+        const minPointsFor1D = 10;
+        const isSparse1D =
+          timeFrame === "1D" &&
+          mapped.length > 0 &&
+          mapped.length < minPointsFor1D;
+
+        if (mapped.length === 0 || isSparse1D) {
+          setChartDataEmpty(true);
+          const tfList: TimeFrame[] = [
+            "1D",
+            "5D",
+            "1M",
+            "6M",
+            "1Y",
+            "5Y",
+            "Max",
+          ];
+          const idx = tfList.indexOf(timeFrame);
+          if (idx >= 0 && idx < tfList.length - 1) {
+            setAutoSwitchedFrom(timeFrame);
+            setTimeFrame(tfList[idx + 1]);
+          }
+        } else {
+          setChartData(mapped);
+          setChartDataEmpty(false);
+          setAutoSwitchedFrom(null);
+        }
+
+        if (seriesRef.current && mapped.length > 0) {
           if (chartType === "Area") {
-            seriesRef.current.setData(mapped.map((d) => ({ time: d.time, value: d.value })));
+            seriesRef.current.setData(
+              mapped.map((d) => ({ time: d.time, value: d.value })),
+            );
           } else {
-            seriesRef.current.setData(mapped.map((d) => ({ time: d.time, open: d.open!, high: d.high!, low: d.low!, close: d.close! })));
+            seriesRef.current.setData(
+              mapped.map((d) => ({
+                time: d.time,
+                open: d.open!,
+                high: d.high!,
+                low: d.low!,
+                close: d.close!,
+              })),
+            );
           }
           chartRef.current?.timeScale().fitContent();
         }
-      } catch {}
+      } catch {
+        setChartDataEmpty(true);
+      } finally {
+        setChartDataLoading(false);
+      }
     };
     run();
   }, [selectedIndex, timeFrame, chartType]);
 
   const timeFrames: TimeFrame[] = ["1D", "5D", "1M", "6M", "1Y", "5Y", "Max"];
-  const indices: IndexType[] = ["SENSEX", "NIFTY", "BANKNIFTY", "INDIAVIX", "FINNIFTY"];
+  const indices: IndexType[] = [
+    "SENSEX",
+    "NIFTY",
+    "BANKNIFTY",
+    "INDIAVIX",
+    "FINNIFTY",
+  ];
 
   if (error) {
     return (
@@ -476,7 +546,7 @@ export function TradingChart() {
       </div>
 
       {/* Index tabs with solid vertical dividers and active bottom line */}
-      <div className="border border-solid border-[var(--divider-color)] rounded-lg">
+      <div className="border border-solid border-(--divider-color) rounded-lg">
         <div className="flex flex-wrap items-center overflow-x-auto ">
           {indices.map((index, i) => {
             const data = indexState[index]
@@ -489,7 +559,10 @@ export function TradingChart() {
                   high: indexState[index]!.high || 0,
                   low: indexState[index]!.low || 0,
                   close: indexState[index]!.close || 0,
-                  dayRange: { low: indexState[index]!.low || 0, high: indexState[index]!.high || 0 },
+                  dayRange: {
+                    low: indexState[index]!.low || 0,
+                    high: indexState[index]!.high || 0,
+                  },
                 }
               : currentData;
             const isActive = selectedIndex === index;
@@ -499,11 +572,11 @@ export function TradingChart() {
               <React.Fragment key={index}>
                 <button
                   onClick={() => setSelectedIndex(index)}
-                  className={`group px-3 py-2 transition-colors min-w-[120px] hover:bg-gray-50 dark:hover:bg-gray-700 border-b-2 ${
+                  className={`group px-3 py-2 transition-colors min-w-30 hover:bg-gray-50 dark:hover:bg-gray-700 border-b-2 ${
                     isActive ? "border-b-blue-500" : "border-b-transparent"
                   } ${index === "SENSEX" && isActive ? "rounded-tl-lg" : ""}`}
                 >
-                  <div className="text-[11px] font-medium text-gray-600 dark:text-gray-400 text-left truncate max-w-[100px]">
+                  <div className="text-[11px] font-medium text-gray-600 dark:text-gray-400 text-left truncate max-w-25">
                     {index}
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -553,7 +626,7 @@ export function TradingChart() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Section - OHLC Chart Component and Heatscale Visualization */}
           <div
-            className="flex-1 lg:flex-[1] space-y-6 min-w-[300px]"
+            className="flex-1 lg:flex-1 space-y-6 min-w-75"
             role="complementary"
             aria-label="Market Data and Analysis Section"
           >
@@ -567,7 +640,7 @@ export function TradingChart() {
               </h3>
               <div className="space-y-3">
                 <div className="relative">
-                  <div className="w-full h-1.5 bg-gradient-to-r from-[#d64d4d] to-[#029076] rounded-full"></div>
+                  <div className="w-full h-1.5 bg-linear-to-r from-[#d64d4d] to-[#029076] rounded-full"></div>
                   <div
                     className="absolute -top-2 transition-all duration-300"
                     style={{
@@ -578,8 +651,8 @@ export function TradingChart() {
                           ((currentData.price - currentData.dayRange.low) /
                             (currentData.dayRange.high -
                               currentData.dayRange.low)) *
-                            100
-                        )
+                            100,
+                        ),
                       )}%`,
                       transform:
                         "translateX(-50%) translateY(-40%) rotate(180deg)",
@@ -676,70 +749,109 @@ export function TradingChart() {
 
           {/* Right Section */}
           {/* Primary Chart Container */}
-            <div
-              className="flex-1 lg:flex-[1] relative bg-white dark:bg-gray-900 rounded-lg"
-              style={{ zIndex: 1 }}
-            >
-              {isLoading && (
-                <div
-                  className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-800/80 rounded-lg"
-                  style={{ zIndex: 10 }}
-                >
-                  <Skeleton className="w-full h-[280px]" />
-                </div>
-              )}
+          <div
+            className="flex-1 lg:flex-1 relative bg-white dark:bg-gray-900 rounded-lg"
+            style={{ zIndex: 1 }}
+          >
+            {(isLoading || chartDataLoading) && (
               <div
-                ref={chartContainerRef}
-                className="w-full h-[280px] rounded-lg"
-                role="img"
-                aria-label={`${selectedIndex} price chart showing ${chartType.toLowerCase()} visualization for ${timeFrame} timeframe`}
-              />
-
-              <div className="flex items-center justify-between p-2">
-                <div className="flex items-center gap-1.5 flex-wrap" aria-label="Select chart timeframe">
-                  {timeFrames.map((tf) => (
-                    <Button
-                      key={tf}
-                      variant={timeFrame === tf ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setTimeFrame(tf)}
-                      className="text-xs px-3 py-1 rounded-full"
-                      aria-label={`Select ${tf} time frame`}
-                    >
-                      {tf}
-                    </Button>
-                  ))}
-                </div>
-                <div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleChartType}
-                    aria-label={
-                      chartType === "Area"
-                        ? "Area chart selected. Click to switch to Candlestick chart"
-                        : "Candlestick chart selected. Click to switch to Area chart"
-                    }
-                    aria-pressed={chartType === "Candles"}
-                    className="rounded-lg px-2"
-                    title={
-                      chartType === "Area"
-                        ? "Switch to Candles"
-                        : "Switch to Area"
-                    }
-                  >
-                    {chartType === "Area" ? (
-                      <Activity className="h-5 w-5" />
-                    ) : (
-                      <BarChart3 className="h-5 w-5" />
-                    )}
-                    <span className="sr-only">
-                      {chartType === "Area" ? "Area chart selected" : "Candlestick chart selected"}
-                    </span>
-                  </Button>
+                className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-800/80 rounded-lg z-10"
+                style={{ zIndex: 10 }}
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Loading chart data...
+                  </span>
                 </div>
               </div>
+            )}
+            {autoSwitchedFrom && !chartDataEmpty && (
+              <div
+                className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs z-10"
+                style={{ zIndex: 10 }}
+              >
+                {autoSwitchedFrom} unavailable for {selectedIndex}, showing{" "}
+                {timeFrame}
+              </div>
+            )}
+            {!chartDataLoading && chartDataEmpty && (
+              <div
+                className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-800/80 rounded-lg z-10"
+                style={{ zIndex: 10 }}
+              >
+                <div className="flex flex-col items-center gap-2 text-center px-4">
+                  <BarChart3 className="h-10 w-10 text-gray-400" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    No chart data available for {timeFrame}
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-500">
+                    Intraday data may not be available for indices. Try stocks
+                    for 1D.
+                  </span>
+                </div>
+              </div>
+            )}
+            <div
+              ref={chartContainerRef}
+              className="w-full h-70 rounded-lg"
+              role="img"
+              aria-label={`${selectedIndex} price chart showing ${chartType.toLowerCase()} visualization for ${timeFrame} timeframe`}
+            />
+
+            <div className="flex items-center justify-between p-2">
+              <div
+                className="flex items-center gap-1.5 flex-wrap"
+                aria-label="Select chart timeframe"
+              >
+                {timeFrames.map((tf) => (
+                  <Button
+                    key={tf}
+                    variant={timeFrame === tf ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => {
+                      setAutoSwitchedFrom(null);
+                      setTimeFrame(tf);
+                    }}
+                    className="text-xs px-3 py-1 rounded-full"
+                    aria-label={`Select ${tf} time frame`}
+                  >
+                    {tf}
+                  </Button>
+                ))}
+              </div>
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleChartType}
+                  aria-label={
+                    chartType === "Area"
+                      ? "Area chart selected. Click to switch to Candlestick chart"
+                      : "Candlestick chart selected. Click to switch to Area chart"
+                  }
+                  aria-pressed={chartType === "Candles"}
+                  className="rounded-lg px-2"
+                  title={
+                    chartType === "Area"
+                      ? "Switch to Candles"
+                      : "Switch to Area"
+                  }
+                >
+                  {chartType === "Area" ? (
+                    <Activity className="h-5 w-5" />
+                  ) : (
+                    <BarChart3 className="h-5 w-5" />
+                  )}
+                  <span className="sr-only">
+                    {chartType === "Area"
+                      ? "Area chart selected"
+                      : "Candlestick chart selected"}
+                  </span>
+                </Button>
+              </div>
             </div>
+          </div>
         </div>
       </div>
     </div>

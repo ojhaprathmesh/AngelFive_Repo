@@ -1,5 +1,11 @@
 packages:
-  - "frontend"
-  - "backend"
-  - "ml-service"
-  - "scripts"
+  - frontend
+  - backend
+  - ml-service
+  - scripts
+
+onlyBuiltDependencies:
+  - '@firebase/util'
+  - sharp
+  - protobufjs
+  - unrs-resolver

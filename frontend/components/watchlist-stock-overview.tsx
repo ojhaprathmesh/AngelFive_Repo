@@ -46,9 +46,16 @@ interface StockOverviewPanelProps {
   exchange?: string;
 }
 
-const formatNumber = (value: number | null | undefined, options?: Intl.NumberFormatOptions) => {
+const formatNumber = (
+  value: number | null | undefined,
+  options?: Intl.NumberFormatOptions,
+) => {
   if (value == null || Number.isNaN(value)) return "—";
-  return value.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2, ...options });
+  return value.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    ...options,
+  });
 };
 
 const formatInteger = (value: number | null | undefined) => {
@@ -69,7 +76,10 @@ const clampPercentage = (value: number) => {
   return value;
 };
 
-export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPanelProps) {
+export function StockOverviewPanel({
+  symbol,
+  exchange = "NSE",
+}: StockOverviewPanelProps) {
   const [data, setData] = useState<StockOverviewData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +94,7 @@ export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPa
       try {
         const resp = await fetch(
           `/api/market/stock-overview?symbol=${encodeURIComponent(symbol)}&exchange=${encodeURIComponent(exchange)}`,
-          { signal: controller.signal }
+          { signal: controller.signal },
         );
         if (!resp.ok) {
           throw new Error(`Failed to load stock overview (${resp.status})`);
@@ -94,7 +104,9 @@ export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPa
       } catch (err) {
         if ((err as DOMException).name === "AbortError") return;
         console.error("[StockOverview] Error fetching overview:", err);
-        setError(err instanceof Error ? err.message : "Unable to load stock overview");
+        setError(
+          err instanceof Error ? err.message : "Unable to load stock overview",
+        );
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -106,7 +118,11 @@ export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPa
     return () => controller.abort();
   }, [symbol, exchange]);
 
-  const priceDirection = data?.change ? (data.change >= 0 ? "up" : "down") : "flat";
+  const priceDirection = data?.change
+    ? data.change >= 0
+      ? "up"
+      : "down"
+    : "flat";
 
   const circuitProgress = useMemo(() => {
     if (
@@ -118,7 +134,9 @@ export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPa
       return null;
     }
     const pct =
-      ((data.lastPrice - data.lowerCircuit) / (data.upperCircuit - data.lowerCircuit)) * 100;
+      ((data.lastPrice - data.lowerCircuit) /
+        (data.upperCircuit - data.lowerCircuit)) *
+      100;
     return clampPercentage(pct);
   }, [data?.lastPrice, data?.lowerCircuit, data?.upperCircuit]);
 
@@ -131,7 +149,8 @@ export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPa
     ) {
       return null;
     }
-    const pct = ((data.lastPrice - data.weekLow) / (data.weekHigh - data.weekLow)) * 100;
+    const pct =
+      ((data.lastPrice - data.weekLow) / (data.weekHigh - data.weekLow)) * 100;
     return clampPercentage(pct);
   }, [data?.lastPrice, data?.weekHigh, data?.weekLow]);
 
@@ -180,7 +199,9 @@ export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPa
                 <Badge variant="secondary">{exchange}</Badge>
               </div>
               {data.industry && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">{data.industry}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {data.industry}
+                </p>
               )}
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -193,11 +214,15 @@ export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPa
                     "flex items-center text-sm font-semibold",
                     priceDirection === "up" && "text-green-600",
                     priceDirection === "down" && "text-red-600",
-                    priceDirection === "flat" && "text-gray-500"
+                    priceDirection === "flat" && "text-gray-500",
                   )}
                 >
-                  {priceDirection === "up" && <ArrowUpRight className="h-4 w-4 mr-1" />}
-                  {priceDirection === "down" && <ArrowDownRight className="h-4 w-4 mr-1" />}
+                  {priceDirection === "up" && (
+                    <ArrowUpRight className="h-4 w-4 mr-1" />
+                  )}
+                  {priceDirection === "down" && (
+                    <ArrowDownRight className="h-4 w-4 mr-1" />
+                  )}
                   {formatNumber(data.change, { minimumFractionDigits: 2 })} (
                   {formatNumber(data.pChange, { minimumFractionDigits: 2 })}%)
                 </div>
@@ -207,7 +232,9 @@ export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPa
               </Button>
             </div>
           </div>
-          {loading && <p className="text-xs text-gray-400">Refreshing overview…</p>}
+          {loading && (
+            <p className="text-xs text-gray-400">Refreshing overview…</p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -224,9 +251,21 @@ export function StockOverviewPanel({ symbol, exchange = "NSE" }: StockOverviewPa
             title="Price Details"
             metrics={[
               { label: "Average Price (VWAP)", value: data.averagePrice },
-              { label: "Volume", value: data.totalTradedVolume, formatter: formatInteger },
-              { label: "Traded Value", value: data.totalTradedValue, formatter: formatInteger },
-              { label: "Market Cap", value: data.marketCap, formatter: formatInteger },
+              {
+                label: "Volume",
+                value: data.totalTradedVolume,
+                formatter: formatInteger,
+              },
+              {
+                label: "Traded Value",
+                value: data.totalTradedValue,
+                formatter: formatInteger,
+              },
+              {
+                label: "Market Cap",
+                value: data.marketCap,
+                formatter: formatInteger,
+              },
             ]}
           />
         </div>
@@ -281,14 +320,20 @@ function Metric(props: MetricProps) {
       <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {label}
       </div>
-      <div className="text-base font-semibold text-gray-900 dark:text-white">{display}</div>
+      <div className="text-base font-semibold text-gray-900 dark:text-white">
+        {display}
+      </div>
     </div>
   );
 }
 
 function metricHasValue(metric: MetricProps) {
   if (metric.formatter) {
-    return metric.value !== null && metric.value !== undefined && !(typeof metric.value === "number" && Number.isNaN(metric.value));
+    return (
+      metric.value !== null &&
+      metric.value !== undefined &&
+      !(typeof metric.value === "number" && Number.isNaN(metric.value))
+    );
   }
   if (typeof metric.value === "number") {
     return !Number.isNaN(metric.value);
@@ -326,10 +371,12 @@ function RangeCard({ title, lowLabel, highLabel, progress }: RangeCardProps) {
 
   return (
     <div className="bg-white dark:bg-gray-900 p-3">
-      <div className="text-xs font-medium text-gray-900 dark:text-white mb-3">{title}</div>
+      <div className="text-xs font-medium text-gray-900 dark:text-white mb-3">
+        {title}
+      </div>
       <div className="space-y-3">
         <div className="relative">
-          <div className="w-full h-1.5 bg-gradient-to-r from-[#d64d4d] to-[#029076] rounded-full"></div>
+          <div className="w-full h-1.5 bg-linear-to-r from-[#d64d4d] to-[#029076] rounded-full"></div>
           {progress != null && (
             <div
               className="absolute -top-2 transition-all duration-300"
@@ -383,11 +430,15 @@ function MetricGroup({ title, metrics }: MetricGroupProps) {
 
   return (
     <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-      <div className="px-4 pt-4 text-sm font-semibold text-gray-700 dark:text-gray-300">{title}</div>
+      <div className="px-4 pt-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
+        {title}
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 text-sm divide-y divide-gray-100 dark:divide-gray-800 md:divide-y-0 md:divide-x">
         {filtered.map((metric, idx) => (
           <div key={idx} className="p-4">
-            <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{metric.label}</div>
+            <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {metric.label}
+            </div>
             <div className="text-lg font-semibold text-gray-900 dark:text-white">
               {formatMetricDisplay(metric)}
             </div>
@@ -398,12 +449,28 @@ function MetricGroup({ title, metrics }: MetricGroupProps) {
   );
 }
 
-function FundamentalsCard({ data, exchange }: { data: StockOverviewData; exchange: string }) {
+function FundamentalsCard({
+  data,
+  exchange,
+}: {
+  data: StockOverviewData;
+  exchange: string;
+}) {
   const fundamentals = [
     { label: "PE Ratio", value: data.pe },
     { label: "PB Ratio", value: data.pb },
-    { label: "ROE", value: data.roe, formatter: (val: number | null | undefined) => (val != null ? `${val.toFixed(2)}%` : "—") },
-    { label: "Dividend Yield", value: data.dividendYield, formatter: (val: number | null | undefined) => (val != null ? `${val.toFixed(2)}%` : "—") },
+    {
+      label: "ROE",
+      value: data.roe,
+      formatter: (val: number | null | undefined) =>
+        val != null ? `${val.toFixed(2)}%` : "—",
+    },
+    {
+      label: "Dividend Yield",
+      value: data.dividendYield,
+      formatter: (val: number | null | undefined) =>
+        val != null ? `${val.toFixed(2)}%` : "—",
+    },
     { label: "Face Value", value: data.faceValue, prefix: "₹" },
     { label: "Beta", value: data.beta },
     { label: "Exchange", value: exchange },
@@ -417,7 +484,9 @@ function FundamentalsCard({ data, exchange }: { data: StockOverviewData; exchang
 
   return (
     <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4">
-      <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">Fundamental Ratios</div>
+      <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+        Fundamental Ratios
+      </div>
       <div className="grid grid-cols-2 gap-3 text-sm">
         {filtered.map((metric, idx) => (
           <Metric key={`${metric.label}-${idx}`} {...metric} />
@@ -426,4 +495,3 @@ function FundamentalsCard({ data, exchange }: { data: StockOverviewData; exchang
     </div>
   );
 }
-

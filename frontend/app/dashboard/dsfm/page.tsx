@@ -14,7 +14,8 @@ export default function DSFMPage() {
           Data Science in Financial Markets
         </h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Advanced analytics, statistical modeling, and portfolio optimization tools
+          Advanced analytics, statistical modeling, and portfolio optimization
+          tools
         </p>
       </div>
 
@@ -43,7 +44,7 @@ export default function DSFMPage() {
         </TabsContent>
 
         <TabsContent value="portfolio" className="mt-6">
-           <PortfolioOptimization />
+          <PortfolioOptimization />
         </TabsContent>
       </Tabs>
     </div>

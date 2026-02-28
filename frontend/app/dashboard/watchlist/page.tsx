@@ -51,13 +51,17 @@ interface StockCardProps {
 function StockCard({ item, isSelected, onSelect }: StockCardProps) {
   const positive = item.changePct >= 0;
   const PriceIcon = positive ? TrendingUp : TrendingDown;
-  const color = positive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
-  const bgColor = positive ? "bg-green-50 dark:bg-green-900/20" : "bg-red-50 dark:bg-red-900/20";
-  const change = item.change || (item.price * item.changePct / 100);
+  const color = positive
+    ? "text-green-600 dark:text-green-400"
+    : "text-red-600 dark:text-red-400";
+  const bgColor = positive
+    ? "bg-green-50 dark:bg-green-900/20"
+    : "bg-red-50 dark:bg-red-900/20";
+  const change = item.change || (item.price * item.changePct) / 100;
 
   return (
-    <div 
-      className={`flex items-center justify-between px-3 py-2.5 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${isSelected ? bgColor : ''}`}
+    <div
+      className={`flex items-center justify-between px-3 py-2.5 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${isSelected ? bgColor : ""}`}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -66,7 +70,9 @@ function StockCard({ item, isSelected, onSelect }: StockCardProps) {
     >
       <div className="flex flex-col flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{item.symbol}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {item.symbol}
+          </span>
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {item.exchange}
           </span>
@@ -75,7 +81,8 @@ function StockCard({ item, isSelected, onSelect }: StockCardProps) {
       <div className={`flex flex-col items-end ${color}`}>
         <div className="flex items-center gap-1">
           <span className="text-sm font-semibold">
-            ₹{item.price.toLocaleString("en-IN", {
+            ₹
+            {item.price.toLocaleString("en-IN", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
@@ -83,7 +90,9 @@ function StockCard({ item, isSelected, onSelect }: StockCardProps) {
           <PriceIcon className="h-3.5 w-3.5" />
         </div>
         <div className="text-xs font-medium">
-          {change >= 0 ? '+' : ''}{change.toFixed(2)} ({change >= 0 ? '+' : ''}{item.changePct.toFixed(2)}%)
+          {change >= 0 ? "+" : ""}
+          {change.toFixed(2)} ({change >= 0 ? "+" : ""}
+          {item.changePct.toFixed(2)}%)
         </div>
       </div>
     </div>
@@ -174,7 +183,7 @@ export default function WatchlistPage() {
       (err) => {
         setError(err);
         setLoading(false);
-      }
+      },
     );
     return () => unsub();
   }, [uid]);
@@ -227,7 +236,7 @@ export default function WatchlistPage() {
     try {
       await watchlistService.reorder(
         uid,
-        current.map((w) => w.id)
+        current.map((w) => w.id),
       );
     } catch {}
   };
@@ -248,7 +257,8 @@ export default function WatchlistPage() {
       if (!trimmed) return;
       const exists = watchlists.some(
         (w) =>
-          w.name.toLowerCase() === trimmed.toLowerCase() && w.id !== editPanelId
+          w.name.toLowerCase() === trimmed.toLowerCase() &&
+          w.id !== editPanelId,
       );
       if (exists) return;
       await watchlistService.rename(uid, editPanelId, trimmed);
@@ -268,13 +278,13 @@ export default function WatchlistPage() {
       await watchlistService.addSymbol(uid, selectedId, symbol);
       setShowAddStockModal(false);
       setNewStockSymbol("");
-      
+
       // Refresh symbols
       const listSymbols = await watchlistService.getSymbols(uid, selectedId);
       const names = listSymbols.map((s) => s.symbol).filter(Boolean);
       if (names.length > 0) {
         const resp = await fetch(
-          `/api/market/quotes?symbols=${encodeURIComponent(names.join(","))}`
+          `/api/market/quotes?symbols=${encodeURIComponent(names.join(","))}`,
         );
         if (resp.ok) {
           const json = await resp.json();
@@ -287,7 +297,7 @@ export default function WatchlistPage() {
           }));
           setSymbols(mapped);
           // Auto-select the newly added symbol
-          const addedStock = mapped.find(s => s.symbol === symbol);
+          const addedStock = mapped.find((s) => s.symbol === symbol);
           if (addedStock) {
             setSelectedSymbol(addedStock.symbol);
             setSelectedExchange(addedStock.exchange);
@@ -301,11 +311,10 @@ export default function WatchlistPage() {
     }
   };
 
-
   // Fetch and update stock prices
   useEffect(() => {
     if (!uid || !selectedId) return;
-    
+
     const fetchSymbols = async (showLoading = true) => {
       try {
         if (showLoading) {
@@ -315,7 +324,7 @@ export default function WatchlistPage() {
         const names = listSymbols.map((s) => s.symbol).filter(Boolean);
         if (names.length > 0) {
           const resp = await fetch(
-            `/api/market/quotes?symbols=${encodeURIComponent(names.join(","))}`
+            `/api/market/quotes?symbols=${encodeURIComponent(names.join(","))}`,
           );
           if (resp.ok) {
             const json = await resp.json();
@@ -386,7 +395,7 @@ export default function WatchlistPage() {
     return symbols.filter(
       (s) =>
         s.symbol.toLowerCase().includes(query) ||
-        s.exchange.toLowerCase().includes(query)
+        s.exchange.toLowerCase().includes(query),
     );
   }, [symbols, searchQuery]);
 
@@ -398,7 +407,7 @@ export default function WatchlistPage() {
       const trimmed = newName.trim();
       if (!trimmed) throw new Error("Name is required");
       const exists = watchlists.some(
-        (w) => w.name.toLowerCase() === trimmed.toLowerCase()
+        (w) => w.name.toLowerCase() === trimmed.toLowerCase(),
       );
       if (exists) throw new Error("A watchlist with this name already exists");
       await watchlistService.create(uid, trimmed);
@@ -458,7 +467,6 @@ export default function WatchlistPage() {
             <div
               ref={tabsRef}
               className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap"
-              role="tablist"
             >
               {loading && (
                 <span className="text-xs text-gray-500">Loading…</span>
@@ -504,8 +512,10 @@ export default function WatchlistPage() {
                   <Settings className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[275px]">
-                <div className="text-xs px-2 py-1.5 font-medium">Watchlists</div>
+              <DropdownMenuContent className="w-68.75">
+                <div className="text-xs px-2 py-1.5 font-medium">
+                  Watchlists
+                </div>
                 <div className="space-y-1">
                   {numberedTabs.map((t) => {
                     const wl = watchlists.find((w) => w.id === t.id)!;
@@ -526,8 +536,7 @@ export default function WatchlistPage() {
                         onDrop={(e) => {
                           e.preventDefault();
                           const fromId =
-                            draggingId ||
-                            e.dataTransfer.getData("text/plain");
+                            draggingId || e.dataTransfer.getData("text/plain");
                           const toId = wl.id;
                           setDraggingId(null);
                           if (fromId && fromId !== toId)
@@ -541,7 +550,9 @@ export default function WatchlistPage() {
                           <GripVertical className="h-3.5 w-3.5" />
                         </div>
                         <div className="flex items-center px-1">
-                          <span className="text-[12px] truncate">{wl.name}</span>
+                          <span className="text-[12px] truncate">
+                            {wl.name}
+                          </span>
                         </div>
                         <div className="text-[11px] text-muted-foreground px-1">
                           {(counts[wl.id] ?? 0).toString()}
@@ -565,7 +576,7 @@ export default function WatchlistPage() {
                             onClick={async () => {
                               if (!uid) return;
                               const ok = window.confirm(
-                                `Delete watchlist "${wl.name}"?`
+                                `Delete watchlist "${wl.name}"?`,
                               );
                               if (!ok) return;
                               try {
@@ -670,29 +681,47 @@ export default function WatchlistPage() {
                             const symbol = input.value.trim().toUpperCase();
                             if (symbol) {
                               try {
-                                await watchlistService.addSymbol(uid, editPanelId, symbol);
+                                await watchlistService.addSymbol(
+                                  uid,
+                                  editPanelId,
+                                  symbol,
+                                );
                                 input.value = "";
                                 // Refresh symbols
-                                const listSymbols = await watchlistService.getSymbols(uid, editPanelId);
-                                const names = listSymbols.map((s) => s.symbol).filter(Boolean);
+                                const listSymbols =
+                                  await watchlistService.getSymbols(
+                                    uid,
+                                    editPanelId,
+                                  );
+                                const names = listSymbols
+                                  .map((s) => s.symbol)
+                                  .filter(Boolean);
                                 if (names.length > 0) {
                                   const resp = await fetch(
-                                    `/api/market/quotes?symbols=${encodeURIComponent(names.join(","))}`
+                                    `/api/market/quotes?symbols=${encodeURIComponent(names.join(","))}`,
                                   );
                                   if (resp.ok) {
                                     const json = await resp.json();
-                                    const q = Array.isArray(json?.quotes) ? json.quotes : [];
-                                    const mapped: StockItem[] = q.map((x: any) => ({
-                                      symbol: String(x.symbol || ""),
-                                      exchange: String(x.exchange || "NSE"),
-                                      price: Number(x.price || 0),
-                                      changePct: Number(x.changePct || 0),
-                                    }));
+                                    const q = Array.isArray(json?.quotes)
+                                      ? json.quotes
+                                      : [];
+                                    const mapped: StockItem[] = q.map(
+                                      (x: any) => ({
+                                        symbol: String(x.symbol || ""),
+                                        exchange: String(x.exchange || "NSE"),
+                                        price: Number(x.price || 0),
+                                        changePct: Number(x.changePct || 0),
+                                      }),
+                                    );
                                     setSymbols(mapped);
                                   }
                                 }
                               } catch (err) {
-                                alert(err instanceof Error ? err.message : "Failed to add symbol");
+                                alert(
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Failed to add symbol",
+                                );
                               }
                             }
                           }
@@ -717,10 +746,22 @@ export default function WatchlistPage() {
                             onClick={async () => {
                               if (!uid || !editPanelId) return;
                               try {
-                                await watchlistService.removeSymbol(uid, editPanelId, s.symbol);
-                                setSymbols(symbols.filter((sym) => sym.symbol !== s.symbol));
+                                await watchlistService.removeSymbol(
+                                  uid,
+                                  editPanelId,
+                                  s.symbol,
+                                );
+                                setSymbols(
+                                  symbols.filter(
+                                    (sym) => sym.symbol !== s.symbol,
+                                  ),
+                                );
                               } catch (err) {
-                                alert(err instanceof Error ? err.message : "Failed to remove symbol");
+                                alert(
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Failed to remove symbol",
+                                );
                               }
                             }}
                           >
@@ -781,7 +822,11 @@ export default function WatchlistPage() {
                         item={s}
                         isSelected={selectedSymbol === s.symbol}
                         onSelect={(item) => {
-                          console.log("[WatchlistPage] 🔵 Stock clicked:", item.symbol, item.exchange);
+                          console.log(
+                            "[WatchlistPage] 🔵 Stock clicked:",
+                            item.symbol,
+                            item.exchange,
+                          );
                           setSelectedSymbol(item.symbol);
                           setSelectedExchange(item.exchange);
                           setChartKey((prev) => prev + 1);
@@ -790,34 +835,37 @@ export default function WatchlistPage() {
                     ))}
                   </div>
                 )}
-                {!loadingSymbols && filteredSymbols.length === 0 && symbols.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-12 px-4">
-                    <div className="text-center mb-4">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                        No stocks in this watchlist
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
-                        Add stocks to track their prices and performance
-                      </p>
+                {!loadingSymbols &&
+                  filteredSymbols.length === 0 &&
+                  symbols.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-12 px-4">
+                      <div className="text-center mb-4">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                          No stocks in this watchlist
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+                          Add stocks to track their prices and performance
+                        </p>
+                      </div>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setShowAddStockModal(true)}
+                        className="whitespace-nowrap"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Your First Stock
+                      </Button>
                     </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => setShowAddStockModal(true)}
-                      className="whitespace-nowrap"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Your First Stock
-                    </Button>
-                  </div>
-                )}
-                {!loadingSymbols && filteredSymbols.length === 0 && symbols.length > 0 && (
-                  <div className="text-center py-8 text-sm text-gray-500">
-                    No stocks match your search
-                  </div>
-                )}
+                  )}
+                {!loadingSymbols &&
+                  filteredSymbols.length === 0 &&
+                  symbols.length > 0 && (
+                    <div className="text-center py-8 text-sm text-gray-500">
+                      No stocks match your search
+                    </div>
+                  )}
               </div>
-
             </div>
           )}
         </aside>
@@ -834,12 +882,10 @@ export default function WatchlistPage() {
                     ? "text-blue-600 dark:text-blue-400"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                 }`}
-                role="tab"
-                aria-selected={mainTab === t}
               >
                 {t}
                 {mainTab === t && (
-                  <span className="absolute left-0 right-0 bottom-0 h-[2px] bg-blue-600 dark:bg-blue-400" />
+                  <span className="absolute left-0 right-0 bottom-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
                 )}
               </button>
             ))}
@@ -847,10 +893,10 @@ export default function WatchlistPage() {
           <div className="flex-1 min-h-0 overflow-hidden">
             {mainTab === "Chart" ? (
               selectedSymbol ? (
-                <WatchlistChart 
-                  key={`${selectedSymbol}-${selectedExchange}-${chartKey}`} 
-                  symbol={selectedSymbol} 
-                  exchange={selectedExchange} 
+                <WatchlistChart
+                  key={`${selectedSymbol}-${selectedExchange}-${chartKey}`}
+                  symbol={selectedSymbol}
+                  exchange={selectedExchange}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full">
@@ -859,16 +905,17 @@ export default function WatchlistPage() {
                   </p>
                 </div>
               )
+            ) : selectedSymbol ? (
+              <StockOverviewPanel
+                symbol={selectedSymbol}
+                exchange={selectedExchange}
+              />
             ) : (
-              selectedSymbol ? (
-                <StockOverviewPanel symbol={selectedSymbol} exchange={selectedExchange} />
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500 dark:text-gray-400">
-                    Select a stock from watchlist to view overview
-                  </p>
-                </div>
-              )
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-500 dark:text-gray-400">
+                  Select a stock from watchlist to view overview
+                </p>
+              </div>
             )}
           </div>
         </main>
@@ -909,9 +956,7 @@ export default function WatchlistPage() {
                   if (e.key === "Enter") handleCreate();
                 }}
               />
-              {error && (
-                <div className="text-xs text-red-600">{error}</div>
-              )}
+              {error && <div className="text-xs text-red-600">{error}</div>}
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
@@ -968,11 +1013,17 @@ export default function WatchlistPage() {
               </label>
               <input
                 value={newStockSymbol}
-                onChange={(e) => setNewStockSymbol(e.target.value.toUpperCase())}
+                onChange={(e) =>
+                  setNewStockSymbol(e.target.value.toUpperCase())
+                }
                 className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
                 placeholder="Enter symbol (e.g., RELIANCE, TCS)"
                 onKeyDown={async (e) => {
-                  if (e.key === "Enter" && newStockSymbol.trim() && !addingStock) {
+                  if (
+                    e.key === "Enter" &&
+                    newStockSymbol.trim() &&
+                    !addingStock
+                  ) {
                     await handleAddStock();
                   }
                 }}

@@ -11,18 +11,12 @@ import { Timestamp } from "firebase/firestore";
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey:
-    process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain:
-    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId:
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket:
-    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId:
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId:
-    process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase
@@ -68,7 +62,7 @@ export interface AuthResult {
 }
 
 // Authentication operation type
-export type AuthOperation = 'login' | 'signup';
+export type AuthOperation = "login" | "signup";
 
 // Authentication request interface
 export interface AuthRequest {
@@ -100,10 +94,10 @@ export class FirebaseClientAuth {
 
   /**
    * Unified authentication function that handles both login and signup operations
-   * 
+   *
    * @param request - Authentication request containing operation type, credentials, and optional user data
    * @returns Promise<AuthResult> - Result object containing success status, user data, or error information
-   * 
+   *
    * @example
    * // Login example
    * const loginResult = await authService.authenticate({
@@ -111,7 +105,7 @@ export class FirebaseClientAuth {
    *   email: 'user@example.com',
    *   password: 'password123'
    * });
-   * 
+   *
    * @example
    * // Signup example
    * const signupResult = await authService.authenticate({
@@ -129,45 +123,50 @@ export class FirebaseClientAuth {
       if (!validation.isValid) {
         return {
           success: false,
-          error: validation.errors.join(', '),
-          errorCode: 'validation-error'
+          error: validation.errors.join(", "),
+          errorCode: "validation-error",
         };
       }
 
       // Route to appropriate authentication method
-      if (request.operation === 'login') {
+      if (request.operation === "login") {
         return await this.signIn(request.email, request.password);
-      } else if (request.operation === 'signup') {
+      } else if (request.operation === "signup") {
         if (!request.fullName) {
           return {
             success: false,
-            error: 'Full name is required for signup',
-            errorCode: 'missing-full-name'
+            error: "Full name is required for signup",
+            errorCode: "missing-full-name",
           };
         }
-        return await this.signUp(request.email, request.password, request.fullName);
+        return await this.signUp(
+          request.email,
+          request.password,
+          request.fullName,
+        );
       } else {
         return {
           success: false,
-          error: 'Invalid operation type',
-          errorCode: 'invalid-operation'
+          error: "Invalid operation type",
+          errorCode: "invalid-operation",
         };
       }
     } catch (error: unknown) {
-      console.error('Authentication error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-      const errorCode = (error as { code?: string })?.code || 'unknown-error';
+      console.error("Authentication error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
+      const errorCode = (error as { code?: string })?.code || "unknown-error";
       return {
         success: false,
         error: errorMessage,
-        errorCode: errorCode
+        errorCode: errorCode,
       };
     }
   }
 
   /**
    * Validates authentication request data
-   * 
+   *
    * @param request - Authentication request to validate
    * @returns ValidationResult - Object containing validation status and any errors
    */
@@ -176,40 +175,40 @@ export class FirebaseClientAuth {
 
     // Validate email
     if (!request.email || !request.email.trim()) {
-      errors.push('Email is required');
+      errors.push("Email is required");
     } else if (!this.isValidEmail(request.email)) {
-      errors.push('Invalid email format');
+      errors.push("Invalid email format");
     }
 
     // Validate password
     if (!request.password || !request.password.trim()) {
-      errors.push('Password is required');
+      errors.push("Password is required");
     } else if (request.password.length < 6) {
-      errors.push('Password must be at least 6 characters long');
+      errors.push("Password must be at least 6 characters long");
     }
 
     // Additional validation for signup
-    if (request.operation === 'signup') {
+    if (request.operation === "signup") {
       if (!request.fullName || !request.fullName.trim()) {
-        errors.push('Full name is required for signup');
+        errors.push("Full name is required for signup");
       }
 
       if (!request.confirmPassword) {
-        errors.push('Password confirmation is required');
+        errors.push("Password confirmation is required");
       } else if (request.password !== request.confirmPassword) {
-        errors.push('Passwords do not match');
+        errors.push("Passwords do not match");
       }
     }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
   /**
    * Validates email format using a simple regex
-   * 
+   *
    * @param email - Email string to validate
    * @returns boolean - True if email format is valid
    */
@@ -220,15 +219,15 @@ export class FirebaseClientAuth {
   async signUp(
     email: string,
     password: string,
-    fullName: string
+    fullName: string,
   ): Promise<AuthResult> {
     try {
       // Use backend API for signup instead of direct Firebase calls
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
       const response = await fetch(`${apiUrl}/api/auth/frontend/signup`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           email,
@@ -250,9 +249,9 @@ export class FirebaseClientAuth {
 
       // Sign in with the custom token returned from backend
       if (data.data?.token) {
-        const { signInWithCustomToken } = await import('firebase/auth');
+        const { signInWithCustomToken } = await import("firebase/auth");
         await signInWithCustomToken(auth, data.data.token);
-        
+
         return {
           success: true,
           user: data.data.user,
@@ -265,7 +264,8 @@ export class FirebaseClientAuth {
       };
     } catch (error: unknown) {
       console.error("Sign up error:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
       const errorCode = (error as { code?: string })?.code || "unknown-error";
       return {
         success: false,
@@ -281,11 +281,11 @@ export class FirebaseClientAuth {
   async signIn(email: string, password: string): Promise<AuthResult> {
     try {
       // Use backend API for login instead of direct Firebase calls
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
       const response = await fetch(`${apiUrl}/api/auth/frontend/login`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           email,
@@ -305,9 +305,9 @@ export class FirebaseClientAuth {
 
       // Sign in with the custom token returned from backend
       if (data.data?.token) {
-        const { signInWithCustomToken } = await import('firebase/auth');
+        const { signInWithCustomToken } = await import("firebase/auth");
         await signInWithCustomToken(auth, data.data.token);
-        
+
         return {
           success: true,
           user: data.data.user,
@@ -320,7 +320,8 @@ export class FirebaseClientAuth {
       };
     } catch (error: unknown) {
       console.error("Sign in error:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
       const errorCode = (error as { code?: string })?.code || "unknown-error";
       return {
         success: false,
@@ -369,24 +370,25 @@ export class FirebaseClientAuth {
 
       let token = await user.getIdToken(true);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
       let response = await fetch(`${apiUrl}/api/auth/user/${uid}`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (response.status === 403 || response.status === 401) {
         token = await user.getIdToken(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const apiUrl =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
         response = await fetch(`${apiUrl}/api/auth/user/${uid}`, {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         });
       }
 
@@ -412,7 +414,7 @@ export class FirebaseClientAuth {
    */
   private async createUserProfile(
     user: User,
-    fullName: string
+    fullName: string,
   ): Promise<UserProfile> {
     // This method is no longer used since profile creation is handled by backend
     // But kept for compatibility with existing code
@@ -435,17 +437,22 @@ export class FirebaseClientAuth {
    */
   private async updateLastLoginTime(uid: string): Promise<void> {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/auth/user/${uid}/last-login`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await auth.currentUser?.getIdToken()}`
-        }
-      });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const response = await fetch(
+        `${apiUrl}/api/auth/user/${uid}/last-login`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+          },
+        },
+      );
 
       if (!response.ok) {
-        throw new Error(`Failed to update last login time: ${response.statusText}`);
+        throw new Error(
+          `Failed to update last login time: ${response.statusText}`,
+        );
       }
     } catch (error) {
       console.error("Error updating last login time via API:", error);
@@ -457,16 +464,19 @@ export class FirebaseClientAuth {
    */
   async sendPasswordResetEmail(email: string): Promise<AuthResult> {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/auth/frontend/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const response = await fetch(
+        `${apiUrl}/api/auth/frontend/reset-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+          }),
         },
-        body: JSON.stringify({
-          email,
-        }),
-      });
+      );
 
       const data = await response.json();
 
@@ -483,7 +493,8 @@ export class FirebaseClientAuth {
       };
     } catch (error: unknown) {
       console.error("Password reset error:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
       const errorCode = (error as { code?: string })?.code || "unknown-error";
       return {
         success: false,

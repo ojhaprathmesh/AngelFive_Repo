@@ -26,21 +26,21 @@ export function SignupForm() {
 
     try {
       const authRequest: AuthRequest = {
-        operation: 'signup',
+        operation: "signup",
         email,
         password,
         confirmPassword,
-        fullName
+        fullName,
       };
 
       const result = await authService.authenticate(authRequest);
 
       if (result.success && result.user) {
         toast.success("Account created successfully!");
-        
+
         // Refresh user data in context
         await refreshUser();
-        
+
         // Redirect to dashboard/market
         router.push("/dashboard/market");
       } else {
@@ -59,7 +59,7 @@ export function SignupForm() {
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
           Create your account
-        </h1> 
+        </h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -117,11 +117,7 @@ export function SignupForm() {
           />
         </Field>
 
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full"
-        >
+        <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? (
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

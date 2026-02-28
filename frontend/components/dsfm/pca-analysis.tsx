@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function PCAAnalysis() {
@@ -33,7 +39,8 @@ export function PCAAnalysis() {
         <CardHeader>
           <CardTitle>Dimensionality Reduction & PCA</CardTitle>
           <CardDescription>
-            Principal Component Analysis to reduce data dimensions and identify asset groups
+            Principal Component Analysis to reduce data dimensions and identify
+            asset groups
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -55,4 +62,3 @@ export function PCAAnalysis() {
     </div>
   );
 }
-

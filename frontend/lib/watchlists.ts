@@ -11,10 +11,14 @@ class WatchlistHttpService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    this.baseUrl = process.env.API_URL || "";
   }
 
-  subscribe(_uid: string, onUpdate: (items: WatchlistItem[]) => void, onError?: (error: string) => void): () => void {
+  subscribe(
+    _uid: string,
+    onUpdate: (items: WatchlistItem[]) => void,
+    onError?: (error: string) => void,
+  ): () => void {
     let es: EventSource | null = null;
     (async () => {
       try {
@@ -64,14 +68,17 @@ class WatchlistHttpService {
     const trimmed = (name || "").trim();
     if (!trimmed) throw new Error("Name is required");
     const token = await auth.currentUser?.getIdToken(true);
-    const res = await fetch(`${this.baseUrl}/api/watchlists/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${String(token)}`,
+    const res = await fetch(
+      `${this.baseUrl}/api/watchlists/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${String(token)}`,
+        },
+        body: JSON.stringify({ name: trimmed }),
       },
-      body: JSON.stringify({ name: trimmed }),
-    });
+    );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.message || "Failed to rename watchlist");
@@ -80,12 +87,15 @@ class WatchlistHttpService {
 
   async remove(_uid: string, id: string): Promise<void> {
     const token = await auth.currentUser?.getIdToken(true);
-    const res = await fetch(`${this.baseUrl}/api/watchlists/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${String(token)}`,
+    const res = await fetch(
+      `${this.baseUrl}/api/watchlists/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${String(token)}`,
+        },
       },
-    });
+    );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.message || "Failed to delete watchlist");
@@ -124,20 +134,40 @@ class WatchlistHttpService {
     return (json?.counts as Record<string, number>) || {};
   }
 
-  async getSymbols(_uid: string, id: string): Promise<Array<{ id: string; symbol: string; exchange: string; ltp: number; changePct: number }>> {
+  async getSymbols(
+    _uid: string,
+    id: string,
+  ): Promise<
+    Array<{
+      id: string;
+      symbol: string;
+      exchange: string;
+      ltp: number;
+      changePct: number;
+    }>
+  > {
     const token = await auth.currentUser?.getIdToken(true);
-    const res = await fetch(`${this.baseUrl}/api/watchlists/${encodeURIComponent(id)}/symbols`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${String(token)}`,
+    const res = await fetch(
+      `${this.baseUrl}/api/watchlists/${encodeURIComponent(id)}/symbols`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${String(token)}`,
+        },
       },
-    });
+    );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.message || "Failed to load symbols");
     }
     const json = await res.json().catch(() => ({ symbols: [] }));
-    type ApiSymbol = { id?: string; symbol?: string; exchange?: string; ltp?: number; changePct?: number };
+    type ApiSymbol = {
+      id?: string;
+      symbol?: string;
+      exchange?: string;
+      ltp?: number;
+      changePct?: number;
+    };
     const symbols = (json?.symbols as Array<ApiSymbol>) || [];
     return symbols.map((s) => ({
       id: String(s.id || s.symbol || ""),
@@ -148,30 +178,48 @@ class WatchlistHttpService {
     }));
   }
 
-  async addSymbol(_uid: string, watchlistId: string, symbol: string, exchange: string = "NSE"): Promise<void> {
+  async addSymbol(
+    _uid: string,
+    watchlistId: string,
+    symbol: string,
+    exchange: string = "NSE",
+  ): Promise<void> {
     const token = await auth.currentUser?.getIdToken(true);
-    const res = await fetch(`${this.baseUrl}/api/watchlists/${encodeURIComponent(watchlistId)}/symbols`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${String(token)}`,
+    const res = await fetch(
+      `${this.baseUrl}/api/watchlists/${encodeURIComponent(watchlistId)}/symbols`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${String(token)}`,
+        },
+        body: JSON.stringify({
+          symbol: symbol.trim().toUpperCase(),
+          exchange: exchange.trim().toUpperCase(),
+        }),
       },
-      body: JSON.stringify({ symbol: symbol.trim().toUpperCase(), exchange: exchange.trim().toUpperCase() }),
-    });
+    );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.message || "Failed to add symbol");
     }
   }
 
-  async removeSymbol(_uid: string, watchlistId: string, symbolId: string): Promise<void> {
+  async removeSymbol(
+    _uid: string,
+    watchlistId: string,
+    symbolId: string,
+  ): Promise<void> {
     const token = await auth.currentUser?.getIdToken(true);
-    const res = await fetch(`${this.baseUrl}/api/watchlists/${encodeURIComponent(watchlistId)}/symbols/${encodeURIComponent(symbolId)}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${String(token)}`,
+    const res = await fetch(
+      `${this.baseUrl}/api/watchlists/${encodeURIComponent(watchlistId)}/symbols/${encodeURIComponent(symbolId)}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${String(token)}`,
+        },
       },
-    });
+    );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.message || "Failed to remove symbol");

@@ -33,14 +33,14 @@ const resolveFirebaseConfig = (): FirebaseConfig => {
     const privateKey: string | undefined = json.private_key;
     if (!projectId || !clientEmail || !privateKey) {
       throw new Error(
-        "Invalid credentials JSON. Missing project_id, client_email or private_key."
+        "Invalid credentials JSON. Missing project_id, client_email or private_key.",
       );
     }
     return { projectId, clientEmail, privateKey };
   }
 
   throw new Error(
-    "Missing Firebase configuration. Provide FIREBASE_* env or a valid GOOGLE_APPLICATION_CREDENTIALS file."
+    "Missing Firebase configuration. Provide FIREBASE_* env or a valid GOOGLE_APPLICATION_CREDENTIALS file.",
   );
 };
 

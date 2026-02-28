@@ -19,12 +19,12 @@
     "setup": "pnpm install:all && pnpm --filter backend install && pnpm --filter frontend install && pnpm --filter ml-service install"
   },
   "devDependencies": {
-    "@types/node": "^20.10.5",
+    "@types/node": "^20.19.35",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
-    "dotenv": "^16.3.1",
-    "nodemon": "^3.0.2",
-    "typescript": "^5.3.3"
+    "dotenv": "^16.6.1",
+    "nodemon": "^3.1.14",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -41,6 +41,6 @@
     "typescript",
     "monorepo"
   ],
-  "author": "AngelFive Team",
+  "author": "Angel Five Team",
   "license": "MIT"
 }

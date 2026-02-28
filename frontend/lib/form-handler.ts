@@ -48,7 +48,7 @@ const validateEmail = (email: string): boolean => {
  * Validates password complexity requirements
  */
 const validatePassword = (
-  password: string
+  password: string,
 ): { isValid: boolean; message?: string } => {
   if (password.length < 8) {
     return {
@@ -150,7 +150,7 @@ const createSubmissionPayload = (data: FormData): SubmissionPayload => {
  * Sends the validated payload to Firebase Authentication
  */
 const authenticateWithFirebase = async (
-  payload: SubmissionPayload
+  payload: SubmissionPayload,
 ): Promise<AuthResult> => {
   const firebaseAuth = FirebaseClientAuth.getInstance();
 
@@ -165,7 +165,7 @@ const authenticateWithFirebase = async (
       return await firebaseAuth.signUp(
         payload.email,
         payload.password,
-        payload.fullName
+        payload.fullName,
       );
     }
   } catch (error) {
@@ -178,14 +178,14 @@ const authenticateWithFirebase = async (
  * Main form submission handler function
  */
 export const handleFormSubmission = async (
-  data: FormData
+  data: FormData,
 ): Promise<boolean> => {
   // Show loading toast
   const loadingToastId = toast.loading(
     `Processing ${data.submissionType.toLowerCase()}...`,
     {
       position: "bottom-right",
-    }
+    },
   );
 
   try {
@@ -223,7 +223,7 @@ export const handleFormSubmission = async (
         {
           position: "bottom-right",
           duration: 3000,
-        }
+        },
       );
 
       // Redirect to dashboard/market
@@ -239,7 +239,7 @@ export const handleFormSubmission = async (
         {
           position: "bottom-right",
           duration: 5000,
-        }
+        },
       );
       return false;
     }
@@ -274,7 +274,7 @@ export const handleFormSubmission = async (
  */
 export const extractFormData = (
   formElement: HTMLFormElement,
-  submissionType: SubmissionType
+  submissionType: SubmissionType,
 ): FormData => {
   const formData = new FormData(formElement);
 

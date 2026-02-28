@@ -89,7 +89,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
         // Show error toast if there are any errors
         if (results.sensex.error || results.nifty.error) {
           const errors = [results.sensex.error, results.nifty.error].filter(
-            Boolean
+            Boolean,
           );
           if (errors.length > 0) {
             console.warn("Market data errors:", errors);
@@ -310,146 +310,146 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-gray-800 dark:bg-gray-950/95 dark:supports-[backdrop-filter]:bg-gray-950/60 safe-top">
-      <div className="container-responsive">
-        <div className="flex h-16 items-center justify-between">
-          {/* Left Section */}
-          <div className="flex items-center space-x-4 lg:space-x-8">
-            {/* Logo */}
-            <Link
-              href="/dashboard/market"
-              className="flex items-center space-x-2 touch-target"
-            >
-              <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg">
-                <GalleryVerticalEnd className="size-4" />
-              </div>
-              <span className="hidden sm:block text-responsive-lg font-bold text-gray-900 dark:text-gray-100">
-                AngelFive
-              </span>
-            </Link>
+    <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur supports-backdrop-filter:bg-white/60 dark:border-gray-800 dark:bg-gray-950/95 dark:supports-backdrop-filter:bg-gray-950/60 safe-top mb-4">
+      <div className="flex h-16 items-center justify-between p-4">
+        {/* Left Section */}
+        <div className="flex items-center space-x-4 lg:space-x-8">
+          {/* Logo */}
+          <Link
+            href="/dashboard/market"
+            className="flex items-center space-x-2 touch-target"
+          >
+            <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg">
+              <GalleryVerticalEnd className="size-4" />
+            </div>
+            <span className="hidden sm:block text-responsive-lg font-bold text-gray-900 dark:text-gray-100">
+              AngelFive
+            </span>
+          </Link>
 
-            {/* Market Indicators */}
-            <div className="hidden lg:flex items-center space-x-6">
-              {(marketData.sensex.error || marketData.nifty.error) && (
-                <Alert className="w-auto p-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    Market data issues detected
-                  </AlertDescription>
-                </Alert>
+          {/* Market Indicators */}
+          <div className="hidden lg:flex items-center space-x-6">
+            {(marketData.sensex.error || marketData.nifty.error) && (
+              <Alert className="w-auto p-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Market data issues detected
+                </AlertDescription>
+              </Alert>
+            )}
+            <MarketIndicator marketInfo={marketData.sensex} />
+            <div className="h-8 w-px bg-gray-200 dark:bg-gray-700" />
+            <MarketIndicator marketInfo={marketData.nifty} />
+          </div>
+        </div>
+
+        {/* Left Section */}
+        <div className="flex items-center space-x-1">
+          {/* Navigation Links */}
+          <div className="hidden md:flex items-center space-x-1">
+            {navigationLinks.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link key={link.href} href={link.href}>
+                  <Button
+                    variant={link.active ? "default" : "ghost"}
+                    size={link.active ? "default" : "icon-sm"}
+                    title={link.label}
+                    aria-label={link.label}
+                    className={`transition-all duration-200 ease-out touch-target ${
+                      link.active
+                        ? "px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {link.active && (
+                      <span className="ml-2 text-sm font-medium">
+                        {link.label}
+                      </span>
+                    )}
+                  </Button>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Profile and Notifications */}
+          <div className="flex items-center space-x-2 lg:space-x-4">
+            {/* Mobile Market Indicators */}
+            <div className="flex lg:hidden items-center space-x-2">
+              {!(marketData.sensex.error && marketData.nifty.error) && (
+                <>
+                  <MarketIndicator
+                    marketInfo={marketData.sensex}
+                    isCompact={true}
+                  />
+                  <div className="h-6 w-px bg-gray-200 dark:bg-gray-700" />
+                  <MarketIndicator
+                    marketInfo={marketData.nifty}
+                    isCompact={true}
+                  />
+                </>
               )}
-              <MarketIndicator marketInfo={marketData.sensex} />
-              <div className="h-8 w-px bg-gray-200 dark:bg-gray-700" />
-              <MarketIndicator marketInfo={marketData.nifty} />
             </div>
           </div>
 
-          {/* Left Section */}
-          <div className="flex items-center space-x-1">
-            {/* Navigation Links */}
-            <div className="hidden md:flex items-center space-x-1">
-              {navigationLinks.map((link) => {
-                const Icon = link.icon;
-                return (
-                  <Link key={link.href} href={link.href}>
-                    <Button
-                      variant={link.active ? "default" : "ghost"}
-                      size={link.active ? "default" : "icon-sm"}
-                      title={link.label}
-                      aria-label={link.label}
-                      className={`transition-all duration-200 ease-out touch-target ${
-                        link.active
-                          ? "px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
-                          : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-                      }`}
-                    >
-                      <Icon className="h-5 w-5" />
-                      {link.active && (
-                        <span className="ml-2 text-sm font-medium">{link.label}</span>
-                      )}
-                    </Button>
-                  </Link>
-                );
-              })}
-            </div>
+          {/* Notifications */}
+          <Button variant="ghost" size="sm" className="relative touch-target">
+            <Bell className="h-5 w-5" />
+            <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 text-[9.75px]">
+              3
+            </Badge>
+          </Button>
 
-            {/* Profile and Notifications */}
-            <div className="flex items-center space-x-2 lg:space-x-4">
-              {/* Mobile Market Indicators */}
-              <div className="flex lg:hidden items-center space-x-2">
-                {!(marketData.sensex.error && marketData.nifty.error) && (
-                  <>
-                    <MarketIndicator
-                      marketInfo={marketData.sensex}
-                      isCompact={true}
-                    />
-                    <div className="h-6 w-px bg-gray-200 dark:bg-gray-700" />
-                    <MarketIndicator
-                      marketInfo={marketData.nifty}
-                      isCompact={true}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Notifications */}
-            <Button variant="ghost" size="sm" className="relative touch-target">
-              <Bell className="h-5 w-5" />
-              <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 text-[9.75px]">
-                3
-              </Badge>
-            </Button>
-
-            {/* User Profile Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="relative h-8 w-8 rounded-full touch-target"
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage
-                      src={user?.avatar}
-                      alt={user?.name || "User Avatar"}
-                    />
-                    <AvatarFallback>
-                      {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {user?.name || "John Doe"}
-                    </p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user?.email || "john.doe@example.com"}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer">
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="cursor-pointer text-red-600 focus:text-red-600"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {/* User Profile Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="relative h-8 w-8 rounded-full touch-target"
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarImage
+                    src={user?.avatar}
+                    alt={user?.name || "User Avatar"}
+                  />
+                  <AvatarFallback>
+                    {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {user?.name || "John Doe"}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {user?.email || "john.doe@example.com"}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="cursor-pointer text-red-600 focus:text-red-600"
+                onClick={handleLogout}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </nav>

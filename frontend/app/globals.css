@@ -77,8 +77,8 @@
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
   /* Custom UI divider variables */
-  --divider-color: #E0E0E0; /* light gray for solid dividers */
-  --dotted-color: #CCCCCC;  /* gray for dotted separators */
+  --divider-color: #e0e0e0; /* light gray for solid dividers */
+  --dotted-color: #cccccc; /* gray for dotted separators */
 }
 
 .dark {
@@ -115,7 +115,7 @@
   --sidebar-ring: oklch(0.551 0.027 264.364);
   /* Maintain divider variables in dark mode for consistency */
   --divider-color: #3f3f46; /* zinc-700 approx for dark separators */
-  --dotted-color: #4b5563;  /* gray-600 approx for dotted separators */
+  --dotted-color: #4b5563; /* gray-600 approx for dotted separators */
 }
 
 @layer base {
@@ -129,103 +129,161 @@
 
 @layer utilities {
   /* Responsive Typography Scale */
-  .text-responsive-xs { @apply text-xs sm:text-sm; }
-  .text-responsive-sm { @apply text-sm sm:text-base; }
-  .text-responsive-base { @apply text-base sm:text-lg; }
-  .text-responsive-lg { @apply text-lg sm:text-xl; }
-  .text-responsive-xl { @apply text-xl sm:text-2xl; }
-  .text-responsive-2xl { @apply text-2xl sm:text-3xl; }
-  .text-responsive-3xl { @apply text-3xl sm:text-4xl lg:text-5xl; }
-  
-  /* Font Weight Mappings */
-  .font-regular { font-weight: 400; }
-  .font-medium { font-weight: 500; }
-  .font-bold { font-weight: 700; }
-  
+  .text-responsive-xs {
+    @apply text-xs sm:text-sm;
+  }
+  .text-responsive-sm {
+    @apply text-sm sm:text-base;
+  }
+  .text-responsive-base {
+    @apply text-base sm:text-lg;
+  }
+  .text-responsive-lg {
+    @apply text-lg sm:text-xl;
+  }
+  .text-responsive-xl {
+    @apply text-xl sm:text-2xl;
+  }
+  .text-responsive-2xl {
+    @apply text-2xl sm:text-3xl;
+  }
+  .text-responsive-3xl {
+    @apply text-3xl sm:text-4xl lg:text-5xl;
+  }
 
-  
+  /* Font Weight Mappings */
+  .font-regular {
+    font-weight: 400;
+  }
+  .font-medium {
+    font-weight: 500;
+  }
+  .font-bold {
+    font-weight: 700;
+  }
+
   /* Numeric tabular alignment utilities */
   .numeric-tabular {
-    font-feature-settings: 'tnum' on;
+    font-feature-settings: "tnum" on;
     font-variant-numeric: tabular-nums;
   }
-  
+
   .numeric-right {
     text-align: right;
   }
-  
+
   /* Mobile-first Container Utilities */
   .container-responsive {
     @apply w-full mx-auto px-4 sm:px-6 lg:px-8;
     max-width: 100%;
   }
-  
-  @screen sm {
-    .container-responsive { max-width: 640px; }
+
+  @media (min-width: 640px) {
+    .container-responsive {
+      max-width: 640px;
+    }
   }
-  
-  @screen md {
-    .container-responsive { max-width: 768px; }
+
+  @media (min-width: 768px) {
+    .container-responsive {
+      max-width: 768px;
+    }
   }
-  
-  @screen lg {
-    .container-responsive { max-width: 1024px; }
+
+  @media (min-width: 1024px) {
+    .container-responsive {
+      max-width: 1024px;
+    }
   }
-  
-  @screen xl {
-    .container-responsive { max-width: 1280px; }
+
+  @media (min-width: 1280px) {
+    .container-responsive {
+      max-width: 1280px;
+    }
   }
-  
-  @screen 2xl {
-    .container-responsive { max-width: 1536px; }
+
+  @media (min-width: 1536px) {
+    .container-responsive {
+      max-width: 1536px;
+    }
   }
-  
+
   /* Mobile Navigation Utilities */
   .mobile-menu-enter {
     @apply opacity-0 scale-95 transform;
   }
-  
+
   .mobile-menu-enter-active {
     @apply opacity-100 scale-100 transform transition-all duration-200 ease-out;
   }
-  
+
   .mobile-menu-exit {
     @apply opacity-100 scale-100 transform;
   }
-  
+
   .mobile-menu-exit-active {
     @apply opacity-0 scale-95 transform transition-all duration-150 ease-in;
   }
-  
+
   /* Touch-friendly Interactive Elements */
   .touch-target {
-    @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+    @apply min-h-11 min-w-11 flex items-center justify-center;
   }
-  
+
   /* Safe Area Utilities for Mobile */
-  .safe-top { padding-top: env(safe-area-inset-top); }
-  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-  .safe-left { padding-left: env(safe-area-inset-left); }
-  .safe-right { padding-right: env(safe-area-inset-right); }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
 
   /* Divider utilities */
-  .divide-custom { --tw-divide-color: var(--divider-color); }
-  .divide-dotted > :not([hidden]) ~ :not([hidden]) { border-left-style: dotted; border-left-color: var(--dotted-color); }
-  .v-divider-air { width: 1px; border-right: 1px dotted var(--dotted-color); }
-  .v-divider-air-tabs { height: 3rem; }
-  .v-divider-air-chart { height: 18rem; }
+  .divide-custom {
+    --tw-divide-color: var(--divider-color);
+  }
+  .divide-dotted > :not([hidden]) ~ :not([hidden]) {
+    border-left-style: dotted;
+    border-left-color: var(--dotted-color);
+  }
+  .v-divider-air {
+    width: 1px;
+    border-right: 1px dotted var(--dotted-color);
+  }
+  .v-divider-air-tabs {
+    height: 3rem;
+  }
+  .v-divider-air-chart {
+    height: 18rem;
+  }
 
   /* Horizontal divider line */
-  .divider-line { height: 1px; width: 100%; background-color: var(--divider-color); }
+  .divider-line {
+    height: 1px;
+    width: 100%;
+    background-color: var(--divider-color);
+  }
 
   /* Numeric alignment utilities */
-  .numeric-tabular { font-variant-numeric: tabular-nums; }
-  .numeric-right { text-align: end; }
+  .numeric-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .numeric-right {
+    text-align: end;
+  }
 
   /* Hide scrollbars but keep scroll functionality */
   .no-scrollbar {
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
   }
-  .no-scrollbar::-webkit-scrollbar { display: none; } /* Chrome, Safari */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  } /* Chrome, Safari */
 }

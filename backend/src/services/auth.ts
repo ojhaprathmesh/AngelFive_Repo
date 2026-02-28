@@ -76,7 +76,7 @@ export class FirebaseAuthService {
       // Create user profile in Firestore
       const userProfile = await this.createUserProfile(
         userRecord,
-        userData.fullName
+        userData.fullName,
       );
 
       return {
@@ -165,7 +165,7 @@ export class FirebaseAuthService {
    */
   async updateUserProfile(
     uid: string,
-    updates: Partial<UserProfile>
+    updates: Partial<UserProfile>,
   ): Promise<boolean> {
     try {
       const updateData = {
@@ -239,7 +239,7 @@ export class FirebaseAuthService {
    */
   public async createUserProfile(
     userRecord: UserRecord,
-    fullName?: string
+    fullName?: string,
   ): Promise<UserProfile> {
     const now = Timestamp.now();
 
@@ -273,9 +273,15 @@ export class FirebaseAuthService {
       .collection(this.usersCollection)
       .doc(userRecord.uid)
       .set(userProfile);
-    const wlCol = firebaseFirestore.collection(this.usersCollection).doc(userRecord.uid).collection("watchlists");
+    const wlCol = firebaseFirestore
+      .collection(this.usersCollection)
+      .doc(userRecord.uid)
+      .collection("watchlists");
     const defDoc = wlCol.doc("default");
-    await defDoc.set({ name: "Default", createdAt: FieldValue.serverTimestamp() }, { merge: true });
+    await defDoc.set(
+      { name: "Default", createdAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
     const symCol = defDoc.collection("symbols");
     const symSnap = await symCol.limit(1).get();
     if (symSnap.empty) {
@@ -289,7 +295,17 @@ export class FirebaseAuthService {
       const batch = firebaseFirestore.batch();
       samples.forEach((s) => {
         const ref = symCol.doc(s.symbol);
-        batch.set(ref, { symbol: s.symbol, exchange: s.exchange, ltp: s.ltp, changePct: s.changePct, createdAt: FieldValue.serverTimestamp() }, { merge: true });
+        batch.set(
+          ref,
+          {
+            symbol: s.symbol,
+            exchange: s.exchange,
+            ltp: s.ltp,
+            changePct: s.changePct,
+            createdAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
       });
       await batch.commit();
     }
@@ -316,7 +332,7 @@ export class FirebaseAuthService {
    */
   private mapToUserProfile(
     userRecord: UserRecord,
-    firestoreData?: any
+    firestoreData?: any,
   ): UserProfile {
     return {
       uid: userRecord.uid,

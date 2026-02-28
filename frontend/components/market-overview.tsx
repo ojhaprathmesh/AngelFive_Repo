@@ -30,15 +30,15 @@ export function MarketOverview() {
     {
       symbol: "NIFTY",
       name: "NIFTY",
-      value: 25789.10,
-      change: -67.00,
+      value: 25789.1,
+      change: -67.0,
       changePercent: -0.26,
       isPositive: false,
     },
     {
       symbol: "BANKNIFTY",
       name: "BANKNIFTY",
-      value: 58208.90,
+      value: 58208.9,
       change: 432.55,
       changePercent: 0.75,
       isPositive: true,
@@ -54,7 +54,7 @@ export function MarketOverview() {
     {
       symbol: "FINNIFTY",
       name: "FINNIFTY",
-      value: 27352.30,
+      value: 27352.3,
       change: 219.45,
       changePercent: 0.79,
       isPositive: true,
@@ -74,27 +74,30 @@ export function MarketOverview() {
         ]);
 
         if (sensexData && niftyData) {
-          setIndexData(prev => prev.map(index => {
-            if (index.symbol === "SENSEX") {
-              return {
-                ...index,
-                value: sensexData.price || index.value,
-                change: sensexData.change || index.change,
-                changePercent: sensexData.changePercent || index.changePercent,
-                isPositive: (sensexData.change || index.change) >= 0,
-              };
-            }
-            if (index.symbol === "NIFTY") {
-              return {
-                ...index,
-                value: niftyData.price || index.value,
-                change: niftyData.change || index.change,
-                changePercent: niftyData.changePercent || index.changePercent,
-                isPositive: (niftyData.change || index.change) >= 0,
-              };
-            }
-            return index;
-          }));
+          setIndexData((prev) =>
+            prev.map((index) => {
+              if (index.symbol === "SENSEX") {
+                return {
+                  ...index,
+                  value: sensexData.price || index.value,
+                  change: sensexData.change || index.change,
+                  changePercent:
+                    sensexData.changePercent || index.changePercent,
+                  isPositive: (sensexData.change || index.change) >= 0,
+                };
+              }
+              if (index.symbol === "NIFTY") {
+                return {
+                  ...index,
+                  value: niftyData.price || index.value,
+                  change: niftyData.change || index.change,
+                  changePercent: niftyData.changePercent || index.changePercent,
+                  isPositive: (niftyData.change || index.change) >= 0,
+                };
+              }
+              return index;
+            }),
+          );
         }
       } catch (error) {
         console.error("Error fetching market data:", error);
@@ -113,8 +116,14 @@ export function MarketOverview() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Index Overview</h1>
-        <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 hover:bg-blue-50">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Index Overview
+        </h1>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-blue-600 border-blue-600 hover:bg-blue-50"
+        >
           VIEW ALL →
         </Button>
       </div>
@@ -137,15 +146,15 @@ export function MarketOverview() {
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   {index.name}
                 </div>
-                
+
                 {/* Current Value */}
                 <div className="text-lg font-bold text-gray-900 dark:text-white">
-                  {index.value.toLocaleString('en-IN', {
+                  {index.value.toLocaleString("en-IN", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
                 </div>
-                
+
                 {/* Change and Percentage */}
                 <div className="flex items-center space-x-1">
                   {index.isPositive ? (
@@ -158,7 +167,8 @@ export function MarketOverview() {
                       index.isPositive ? "text-green-600" : "text-red-600"
                     }`}
                   >
-                    {index.isPositive ? "+" : ""}{index.change.toFixed(2)}
+                    {index.isPositive ? "+" : ""}
+                    {index.change.toFixed(2)}
                   </span>
                   <Badge
                     variant="secondary"
@@ -168,7 +178,8 @@ export function MarketOverview() {
                         : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                     }`}
                   >
-                    {index.isPositive ? "+" : ""}{index.changePercent.toFixed(2)}%
+                    {index.isPositive ? "+" : ""}
+                    {index.changePercent.toFixed(2)}%
                   </Badge>
                 </div>
               </div>

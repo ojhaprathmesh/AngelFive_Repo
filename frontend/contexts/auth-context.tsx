@@ -43,12 +43,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Update last activity on user interactions
   const updateActivity = () => {
     setLastActivity(new Date());
-    localStorage.setItem('lastActivity', new Date().toISOString());
+    localStorage.setItem("lastActivity", new Date().toISOString());
   };
 
   // Check for session timeout
   const checkSessionTimeout = () => {
-    const lastActivityStr = localStorage.getItem('lastActivity');
+    const lastActivityStr = localStorage.getItem("lastActivity");
     if (!lastActivityStr || !firebaseUser) return;
 
     const lastActivityTime = new Date(lastActivityStr);
@@ -82,23 +82,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Clear local storage
-      localStorage.removeItem('lastActivity');
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('userProfile');
-      
+      localStorage.removeItem("lastActivity");
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("userProfile");
+
       // Sign out from Firebase
       await authService.signOut();
-      
+
       // Clear state
       setUser(null);
       setFirebaseUser(null);
       setSessionTimeout(null);
       setLastActivity(null);
-      
+
       // Redirect to login
-      window.location.href = '/login?message=Successfully logged out';
+      window.location.href = "/login?message=Successfully logged out";
     } catch (error) {
       console.error("Sign out error:", error);
       setError("Failed to sign out");
@@ -113,14 +113,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         setLoading(true);
         setError(null);
-        
+
         if (firebaseUser) {
           setFirebaseUser(firebaseUser);
-          
+
           // Get user profile
-          const userProfile = await authService.getUserProfile(firebaseUser.uid);
+          const userProfile = await authService.getUserProfile(
+            firebaseUser.uid,
+          );
           setUser(userProfile);
-          
+
           // Initialize activity tracking
           updateActivity();
         } else {
@@ -144,16 +146,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     if (!firebaseUser) return;
 
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    
+    const events = [
+      "mousedown",
+      "mousemove",
+      "keypress",
+      "scroll",
+      "touchstart",
+      "click",
+    ];
+
     const activityHandler = () => updateActivity();
-    
-    events.forEach(event => {
+
+    events.forEach((event) => {
       document.addEventListener(event, activityHandler, true);
     });
 
     return () => {
-      events.forEach(event => {
+      events.forEach((event) => {
         document.removeEventListener(event, activityHandler, true);
       });
     };
@@ -164,13 +173,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!firebaseUser) return;
 
     const interval = setInterval(checkSessionTimeout, ACTIVITY_CHECK_INTERVAL);
-    
+
     return () => clearInterval(interval);
   }, [firebaseUser]);
 
   // Initialize last activity from localStorage
   useEffect(() => {
-    const lastActivityStr = localStorage.getItem('lastActivity');
+    const lastActivityStr = localStorage.getItem("lastActivity");
     if (lastActivityStr) {
       setLastActivity(new Date(lastActivityStr));
     }
@@ -187,9 +196,5 @@ export function AuthProvider({ children }: AuthProviderProps) {
     lastActivity,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

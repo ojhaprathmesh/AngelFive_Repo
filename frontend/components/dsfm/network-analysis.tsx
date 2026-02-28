@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function NetworkAnalysis() {
@@ -33,7 +39,8 @@ export function NetworkAnalysis() {
         <CardHeader>
           <CardTitle>Network Analysis & Market Dynamics</CardTitle>
           <CardDescription>
-            Construct financial networks from correlation matrices using Minimum Spanning Tree (MST) to analyze network topology and systemic risk
+            Construct financial networks from correlation matrices using Minimum
+            Spanning Tree (MST) to analyze network topology and systemic risk
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -55,4 +62,3 @@ export function NetworkAnalysis() {
     </div>
   );
 }
-

@@ -10,8 +10,15 @@ export default function SignupPage() {
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
-          <Link href="/" className="flex items-center gap-2 font-medium" aria-label="AngelFive - Go to homepage">
-            <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md" aria-hidden="true">
+          <Link
+            href="/"
+            className="flex items-center gap-2 font-medium"
+            aria-label="AngelFive - Go to homepage"
+          >
+            <div
+              className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md"
+              aria-hidden="true"
+            >
               <GalleryVerticalEnd className="size-4" />
             </div>
             <span className="text-responsive-lg font-semibold">AngelFive</span>
@@ -27,7 +34,7 @@ export default function SignupPage() {
       </div>
       <div className="bg-muted relative hidden lg:block">
         <Image
-          src="/signup-illustration.svg"
+          src="/login-illustration.svg"
           alt="Financial dashboard illustration showing charts and market data visualization"
           className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
           fill

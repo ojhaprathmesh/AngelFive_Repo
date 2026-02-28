@@ -123,6 +123,19 @@ def log_response(response):
     return response
 
 # Health check endpoints
+@app.route("/", methods=["GET"])
+def root():
+    return jsonify({
+        "service": "AngelFive ML Service",
+        "status": "running",
+        "available_endpoints": [
+            "/health",
+            "/forecast",
+            "/models",
+            "/dsfm/*"
+        ]
+    }), 200
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Basic health check"""

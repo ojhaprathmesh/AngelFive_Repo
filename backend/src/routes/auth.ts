@@ -69,7 +69,7 @@ const signupValidation = [
     .isLength({ min: 8 })
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage(
-      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+      "Password must contain at least one uppercase letter, one lowercase letter, and one number",
     ),
   body("fullName")
     .trim()
@@ -91,7 +91,7 @@ const logSubmission = (
   req: Request,
   type: string,
   status: "SUCCESS" | "ERROR",
-  message?: string
+  message?: string,
 ) => {
   const timestamp = new Date().toISOString();
   const ip = req.ip || req.connection.remoteAddress || "unknown";
@@ -121,7 +121,7 @@ router.post(
           `Validation failed: ${errors
             .array()
             .map((e) => e.msg)
-            .join(", ")}`
+            .join(", ")}`,
         );
         return res.status(400).json({
           status: "error",
@@ -181,7 +181,7 @@ router.post(
         "ERROR",
         `Server error: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
+        }`,
       );
 
       return res.status(500).json({
@@ -190,7 +190,7 @@ router.post(
         timestamp: new Date().toISOString(),
       });
     }
-  }
+  },
 );
 
 // Signup endpoint with Firebase authentication
@@ -209,7 +209,7 @@ router.post(
           `Validation failed: ${errors
             .array()
             .map((e) => e.msg)
-            .join(", ")}`
+            .join(", ")}`,
         );
         return res.status(400).json({
           status: "error",
@@ -219,7 +219,11 @@ router.post(
         });
       }
 
-      const { email, password, fullName } = req.body as { email: string; password: string; fullName: string };
+      const { email, password, fullName } = req.body as {
+        email: string;
+        password: string;
+        fullName: string;
+      };
 
       // Check if user already exists
       const emailExists = await authService.emailExists(email);
@@ -285,7 +289,7 @@ router.post(
         "ERROR",
         `Server error: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
+        }`,
       );
 
       return res.status(500).json({
@@ -294,7 +298,7 @@ router.post(
         timestamp: new Date().toISOString(),
       });
     }
-  }
+  },
 );
 
 // Health check for auth routes with Firebase integration
@@ -329,7 +333,7 @@ router.get("/health", async (req: Request, res: Response) => {
 const verifyToken = async (req: AuthRequest, res: Response, next: Function) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         status: "error",
         message: "No token provided",
@@ -337,7 +341,7 @@ const verifyToken = async (req: AuthRequest, res: Response, next: Function) => {
       });
     }
 
-    const idToken = authHeader.split('Bearer ')[1];
+    const idToken = authHeader.split("Bearer ")[1];
     const decodedToken = await getAuth().verifyIdToken(idToken);
     req.user = { uid: decodedToken.uid, email: decodedToken.email };
     next();
@@ -353,82 +357,91 @@ const verifyToken = async (req: AuthRequest, res: Response, next: Function) => {
 };
 
 // Get user profile endpoint
-router.get('/user/:uid', verifyToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const { uid } = req.params;
-    
-    // Ensure user can only access their own profile
-    if (req.user!.uid !== uid) {
-      return res.status(403).json({
+router.get(
+  "/user/:uid",
+  verifyToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { uid } = req.params;
+
+      // Ensure user can only access their own profile
+      if (req.user!.uid !== uid) {
+        return res.status(403).json({
+          status: "error",
+          message: "Access denied",
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const userProfile = await authService.getUserProfile(uid);
+
+      if (!userProfile) {
+        return res.status(404).json({
+          status: "error",
+          message: "User profile not found",
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      return res.json({
+        status: "success",
+        user: userProfile,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Get user profile error:", error);
+      return res.status(500).json({
         status: "error",
-        message: "Access denied",
+        message: "Failed to get user profile",
         timestamp: new Date().toISOString(),
       });
     }
-
-    const userProfile = await authService.getUserProfile(uid);
-    
-    if (!userProfile) {
-      return res.status(404).json({
-        status: "error",
-        message: "User profile not found",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    return res.json({
-      status: "success",
-      user: userProfile,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Get user profile error:", error);
-    return res.status(500).json({
-      status: "error",
-      message: "Failed to get user profile",
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
+  },
+);
 
 // Update last login time endpoint
-router.put('/user/:uid/last-login', verifyToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const { uid } = req.params;
-    
-    // Ensure user can only update their own last login time
-    if (req.user!.uid !== uid) {
-      return res.status(403).json({
+router.put(
+  "/user/:uid/last-login",
+  verifyToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { uid } = req.params;
+
+      // Ensure user can only update their own last login time
+      if (req.user!.uid !== uid) {
+        return res.status(403).json({
+          status: "error",
+          message: "Access denied",
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      await authService.updateUserProfile(uid, {
+        lastLoginAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+
+      return res.json({
+        status: "success",
+        message: "Last login time updated successfully",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Update last login error:", error);
+      return res.status(500).json({
         status: "error",
-        message: "Access denied",
+        message: "Failed to update last login time",
         timestamp: new Date().toISOString(),
       });
     }
-
-    await authService.updateUserProfile(uid, {
-      lastLoginAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
-
-    return res.json({
-      status: "success",
-      message: "Last login time updated successfully",
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Update last login error:", error);
-    return res.status(500).json({
-      status: "error",
-      message: "Failed to update last login time",
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
+  },
+);
 
 // New frontend authentication endpoints
 
 // Frontend login endpoint
-router.post('/frontend/login',
+router.post(
+  "/frontend/login",
   [
     body("email")
       .isEmail()
@@ -488,20 +501,19 @@ router.post('/frontend/login',
           },
           timestamp: new Date().toISOString(),
         });
-
       } catch (error: any) {
         console.error("Frontend login error:", error);
-        
+
         let errorMessage = "Authentication failed";
         let errorCode = "auth/unknown-error";
-        
-        if (error.code === 'auth/user-not-found') {
+
+        if (error.code === "auth/user-not-found") {
           errorMessage = "Invalid email or password";
           errorCode = "auth/invalid-credential";
-        } else if (error.code === 'auth/user-disabled') {
+        } else if (error.code === "auth/user-disabled") {
           errorMessage = "User account is disabled";
           errorCode = "auth/user-disabled";
-        } else if (error.code === 'auth/wrong-password') {
+        } else if (error.code === "auth/wrong-password") {
           errorMessage = "Invalid email or password";
           errorCode = "auth/invalid-credential";
         }
@@ -521,11 +533,12 @@ router.post('/frontend/login',
         timestamp: new Date().toISOString(),
       });
     }
-  }
+  },
 );
 
 // Frontend signup endpoint
-router.post('/frontend/signup',
+router.post(
+  "/frontend/signup",
   [
     body("email")
       .isEmail()
@@ -557,7 +570,11 @@ router.post('/frontend/signup',
         });
       }
 
-      const { email, password, fullName } = req.body as { email: string; password: string; fullName: string };
+      const { email, password, fullName } = req.body as {
+        email: string;
+        password: string;
+        fullName: string;
+      };
 
       try {
         // Check if user already exists
@@ -570,7 +587,7 @@ router.post('/frontend/signup',
             timestamp: new Date().toISOString(),
           });
         } catch (error: any) {
-          if (error.code !== 'auth/user-not-found') {
+          if (error.code !== "auth/user-not-found") {
             throw error;
           }
           // User doesn't exist, which is what we want
@@ -585,7 +602,10 @@ router.post('/frontend/signup',
         });
 
         // Create user profile in Firestore
-        const userProfile = await authService.createUserProfile(userRecord, fullName);
+        const userProfile = await authService.createUserProfile(
+          userRecord,
+          fullName,
+        );
 
         // Create custom token for frontend
         const customToken = await getAuth().createCustomToken(userRecord.uid);
@@ -599,20 +619,19 @@ router.post('/frontend/signup',
           },
           timestamp: new Date().toISOString(),
         });
-
       } catch (error: any) {
         console.error("Signup error:", error);
-        
+
         let errorMessage = "Failed to create account";
         let errorCode = "auth/unknown-error";
-        
-        if (error.code === 'auth/email-already-exists') {
+
+        if (error.code === "auth/email-already-exists") {
           errorMessage = "An account with this email already exists";
           errorCode = "auth/email-already-in-use";
-        } else if (error.code === 'auth/invalid-email') {
+        } else if (error.code === "auth/invalid-email") {
           errorMessage = "Invalid email address";
           errorCode = "auth/invalid-email";
-        } else if (error.code === 'auth/weak-password') {
+        } else if (error.code === "auth/weak-password") {
           errorMessage = "Password is too weak";
           errorCode = "auth/weak-password";
         }
@@ -632,11 +651,12 @@ router.post('/frontend/signup',
         timestamp: new Date().toISOString(),
       });
     }
-  }
+  },
 );
 
 // Frontend password reset endpoint
-router.post('/frontend/reset-password',
+router.post(
+  "/frontend/reset-password",
   [
     body("email")
       .isEmail()
@@ -660,10 +680,10 @@ router.post('/frontend/reset-password',
       try {
         // Check if user exists
         const userRecord = await getAuth().getUserByEmail(email);
-        
+
         // Generate password reset link
         const resetLink = await getAuth().generatePasswordResetLink(email);
-        
+
         // In a production environment, you would send this link via email
         // For now, we'll just return success
         console.log(`Password reset link generated for ${email}: ${resetLink}`);
@@ -673,17 +693,17 @@ router.post('/frontend/reset-password',
           message: "Password reset email sent successfully",
           timestamp: new Date().toISOString(),
         });
-
       } catch (error: any) {
-        if (error.code === 'auth/user-not-found') {
+        if (error.code === "auth/user-not-found") {
           // Don't reveal if user exists or not for security
           return res.json({
             status: "success",
-            message: "If an account exists with this email, a password reset link has been sent",
+            message:
+              "If an account exists with this email, a password reset link has been sent",
             timestamp: new Date().toISOString(),
           });
         }
-        
+
         return res.status(500).json({
           status: "error",
           message: "Failed to process password reset request",
@@ -698,7 +718,7 @@ router.post('/frontend/reset-password',
         timestamp: new Date().toISOString(),
       });
     }
-  }
+  },
 );
 
 export default router;

@@ -17,13 +17,13 @@ export function LoginForm() {
 
   // Show message from URL params (e.g., from logout or redirect) only once
   useEffect(() => {
-    const message = searchParams.get('message');
+    const message = searchParams.get("message");
     if (message) {
       toast.info(message);
       // Clear the message from URL to prevent showing it again
       const newUrl = new URL(window.location.href);
-      newUrl.searchParams.delete('message');
-      window.history.replaceState({}, '', newUrl.toString());
+      newUrl.searchParams.delete("message");
+      window.history.replaceState({}, "", newUrl.toString());
     }
   }, [searchParams]);
 
@@ -37,19 +37,19 @@ export function LoginForm() {
 
     try {
       const authRequest: AuthRequest = {
-        operation: 'login',
+        operation: "login",
         email,
-        password
+        password,
       };
 
       const result = await authService.authenticate(authRequest);
 
       if (result.success && result.user) {
         toast.success("Successfully logged in!");
-        
+
         // Refresh user data in context
         await refreshUser();
-        
+
         // Redirect to dashboard/market
         router.push("/dashboard/market");
       } else {
@@ -112,11 +112,7 @@ export function LoginForm() {
           </div>
         </div>
 
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full"
-        >
+        <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? (
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

@@ -647,7 +647,7 @@ export function TradingChart() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Section - OHLC Chart Component and Heatscale Visualization */}
           <div
-            className="flex-1 lg:flex-1 space-y-6 min-w-75"
+            className="flex-1 lg:flex-1 flex flex-col justify-center min-w-75"
             role="complementary"
             aria-label="Market Data and Analysis Section"
           >

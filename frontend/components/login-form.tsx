@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
@@ -15,12 +15,13 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const { refreshUser } = useAuth();
 
-  // Show message from URL params (e.g., from logout or redirect) only once
+  const toastShownRef = useRef(false);
+
   useEffect(() => {
     const message = searchParams.get("message");
-    if (message) {
+    if (message && !toastShownRef.current) {
+      toastShownRef.current = true;
       toast.info(message);
-      // Clear the message from URL to prevent showing it again
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete("message");
       window.history.replaceState({}, "", newUrl.toString());

@@ -31,6 +31,7 @@ import {
   BarChart3,
   type LucideIcon,
 } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 
 interface MarketData {
   symbol: string;
@@ -146,27 +147,13 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
     };
   }, []);
 
+  const { signOut } = useAuth();
+
   const handleLogout = async () => {
     try {
-      // Clear session storage
-      sessionStorage.clear();
-      localStorage.clear();
-
-      // Clear any cached data
-      if (typeof window !== "undefined") {
-        // Clear any application-specific storage
-        Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith("angelfive_")) {
-            localStorage.removeItem(key);
-          }
-        });
-      }
-
-      // Redirect to login with success message
-      router.push("/login?message=Successfully logged out");
+      await signOut(); // auth-context handles redirect + message
     } catch (error) {
       console.error("Logout error:", error);
-      // Force redirect even if cleanup fails
       router.push("/login");
     }
   };

@@ -91,6 +91,7 @@ export function TradingChart() {
     INDIAVIX: null,
     FINNIFTY: null,
   });
+  const [chartColor, setChartColor] = useState<"green" | "red">("green");
 
   // Persist chart type selection across sessions
   useEffect(() => {
@@ -224,13 +225,9 @@ export function TradingChart() {
     // Add series based on chart type
     if (chartType === "Area") {
       const areaSeries = chart.addSeries(AreaSeries, {
-        lineColor: isPositive ? "#22c55e" : "#ef4444",
-        topColor: isPositive
-          ? "rgba(34, 197, 94, 0.3)"
-          : "rgba(239, 68, 68, 0.3)",
-        bottomColor: isPositive
-          ? "rgba(34, 197, 94, 0.05)"
-          : "rgba(239, 68, 68, 0.05)",
+        lineColor: "#9ca3af",
+        topColor: "rgba(156, 163, 175, 0.3)",
+        bottomColor: "rgba(156, 163, 175, 0.05)",
         lineWidth: 2,
       });
       seriesRef.current = areaSeries;
@@ -261,7 +258,7 @@ export function TradingChart() {
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [chartType, selectedIndex, isPositive, timeFrame]);
+  }, [chartType, selectedIndex, timeFrame]);
 
   // Initialize chart on mount and when dependencies change
   useEffect(() => {
@@ -462,6 +459,30 @@ export function TradingChart() {
           low: c[3],
           close: c[4],
         }));
+
+        // Determine color from chart data: first open vs last close
+        if (mapped.length > 0) {
+          const firstOpen = mapped[0].open ?? mapped[0].value;
+          const lastClose =
+            mapped[mapped.length - 1].close ?? mapped[mapped.length - 1].value;
+          setChartColor(lastClose >= firstOpen ? "green" : "red");
+
+          // Update area series colors to reflect chart-period direction
+          if (seriesRef.current && chartType === "Area") {
+            const color = lastClose >= firstOpen ? "#22c55e" : "#ef4444";
+            seriesRef.current.applyOptions({
+              lineColor: color,
+              topColor:
+                lastClose >= firstOpen
+                  ? "rgba(34, 197, 94, 0.3)"
+                  : "rgba(239, 68, 68, 0.3)",
+              bottomColor:
+                lastClose >= firstOpen
+                  ? "rgba(34, 197, 94, 0.05)"
+                  : "rgba(239, 68, 68, 0.05)",
+            });
+          }
+        }
 
         const minPointsFor1D = 10;
         const isSparse1D =

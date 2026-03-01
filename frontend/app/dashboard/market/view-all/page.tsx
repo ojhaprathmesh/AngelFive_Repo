@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,7 +12,6 @@ import {
   SlidersHorizontal,
   TrendingUp,
   TrendingDown,
-  Zap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -22,13 +21,11 @@ type Section =
   | "most-bought"
   | "top-movers"
   | "top-performers"
-  | "technical-screeners"
   | "pocket-friendly";
 
 type SortKey = "symbol" | "price" | "change" | "changePercent" | "volume";
 type SortDir = "asc" | "desc";
 type PFTier = "all" | "under50" | "under100" | "under200";
-type SignalFilter = "all" | "BULLISH" | "BEARISH" | "NEUTRAL";
 type PerfTf = "1W" | "1M" | "1Y" | "5Y";
 
 interface StockItem {
@@ -37,7 +34,6 @@ interface StockItem {
   change: number;
   changePercent: number;
   volume?: number;
-  signal?: string;
   tier?: "under50" | "under100" | "under200";
 }
 
@@ -45,7 +41,6 @@ const SECTION_LABELS: Record<Section, string> = {
   "most-bought": "Most Bought Stocks",
   "top-movers": "Top Movers",
   "top-performers": "Top Performers",
-  "technical-screeners": "Technical Screeners",
   "pocket-friendly": "Pocket Friendly Stocks",
 };
 
@@ -68,35 +63,6 @@ function PriceBadge({ value }: { value: number }) {
       )}
       {up ? "+" : ""}
       {value.toFixed(2)}%
-    </span>
-  );
-}
-
-function SignalBadge({ signal }: { signal: string }) {
-  const map: Record<string, { color: string; icon: React.ReactNode }> = {
-    BULLISH: {
-      color:
-        "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800",
-      icon: <TrendingUp className="h-3 w-3" />,
-    },
-    BEARISH: {
-      color:
-        "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800",
-      icon: <TrendingDown className="h-3 w-3" />,
-    },
-    NEUTRAL: {
-      color:
-        "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700",
-      icon: <Zap className="h-3 w-3" />,
-    },
-  };
-  const style = map[signal] || map["NEUTRAL"];
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${style.color}`}
-    >
-      {style.icon}
-      {signal}
     </span>
   );
 }
@@ -147,14 +113,12 @@ function StockTable({
   sortKey,
   sortDir,
   onSort,
-  showSignal = false,
   showTier = false,
 }: {
   items: StockItem[];
   sortKey: SortKey;
   sortDir: SortDir;
   onSort: (k: SortKey) => void;
-  showSignal?: boolean;
   showTier?: boolean;
 }) {
   if (items.length === 0) {
@@ -207,11 +171,6 @@ function StockTable({
               dir={sortDir}
               onSort={onSort}
             />
-            {showSignal && (
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
-                Signal
-              </th>
-            )}
             {showTier && (
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">
                 Tier
@@ -249,11 +208,6 @@ function StockTable({
                 <td className="px-4 py-3">
                   <PriceBadge value={item.changePercent} />
                 </td>
-                {showSignal && (
-                  <td className="px-4 py-3">
-                    {item.signal && <SignalBadge signal={item.signal} />}
-                  </td>
-                )}
                 {showTier && (
                   <td className="px-4 py-3">
                     <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
@@ -294,9 +248,6 @@ export default function ViewAllPage() {
   const [perfTf, setPerfTf] = useState<PerfTf>("1W");
   const [perfLoading, setPerfLoading] = useState(false);
 
-  // Technical screeners specific
-  const [signalFilter, setSignalFilter] = useState<SignalFilter>("all");
-
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -309,57 +260,34 @@ export default function ViewAllPage() {
     } else {
       fetchSection();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
 
   useEffect(() => {
     if (section === "top-performers") {
       fetchPerformers(perfTf);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfTf]);
 
   async function fetchSection() {
     try {
-      if (section === "technical-screeners") {
-        const resp = await fetch("/api/market/technical-screeners");
-        if (!resp.ok) throw new Error("Failed");
-        const data = await resp.json();
-        const screeners = (data.screeners || []) as Array<{
-          symbol: string;
-          price: number;
-          changePercent: number;
-          signal: string;
-        }>;
-        setItems(
-          screeners.map((s) => ({
-            symbol: s.symbol,
-            price: s.price,
-            change: 0,
-            changePercent: s.changePercent,
-            signal: s.signal,
-          })),
-        );
-      } else {
-        const resp = await fetch("/api/market/discovery");
-        if (!resp.ok) throw new Error("Failed");
-        const data = await resp.json();
+      const resp = await fetch("/api/market/discovery");
+      if (!resp.ok) throw new Error("Failed");
+      const data = await resp.json();
 
-        if (section === "most-bought") {
-          setItems(mapQuotes(data.mostBought || []));
-        } else if (section === "top-movers") {
-          setItems([
-            ...mapQuotes(data.topGainers || []),
-            ...mapQuotes(data.topLosers || []),
-          ]);
-        } else if (section === "pocket-friendly") {
-          const pf = data.pocketFriendly || {};
-          setItems([
-            ...mapQuotes(pf.under50 || [], "under50"),
-            ...mapQuotes(pf.under100 || [], "under100"),
-            ...mapQuotes(pf.under200 || [], "under200"),
-          ]);
-        }
+      if (section === "most-bought") {
+        setItems(mapQuotes(data.mostBought || []));
+      } else if (section === "top-movers") {
+        setItems([
+          ...mapQuotes(data.topGainers || []),
+          ...mapQuotes(data.topLosers || []),
+        ]);
+      } else if (section === "pocket-friendly") {
+        const pf = data.pocketFriendly || {};
+        setItems([
+          ...mapQuotes(pf.under50 || [], "under50"),
+          ...mapQuotes(pf.under100 || [], "under100"),
+          ...mapQuotes(pf.under200 || [], "under200"),
+        ]);
       }
     } catch {
       setError("Failed to load data. Please try again.");
@@ -443,11 +371,6 @@ export default function ViewAllPage() {
       list = list.filter((s) => s.tier === pfTier);
     }
 
-    // Signal filter (technical screeners)
-    if (section === "technical-screeners" && signalFilter !== "all") {
-      list = list.filter((s) => s.signal === signalFilter);
-    }
-
     // Sort
     list.sort((a, b) => {
       let av: string | number, bv: string | number;
@@ -485,7 +408,7 @@ export default function ViewAllPage() {
     });
 
     return list;
-  }, [items, search, pfTier, signalFilter, sortKey, sortDir, section]);
+  }, [items, search, pfTier, sortKey, sortDir, section]);
 
   // ── Stats ─────────────────────────────────────────────────────────────────
 
@@ -625,32 +548,6 @@ export default function ViewAllPage() {
               </div>
             )}
 
-            {/* Technical Screeners — signal filter */}
-            {section === "technical-screeners" && (
-              <div className="flex gap-1 bg-gray-50 dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700">
-                {(
-                  [
-                    { value: "all", label: "All Signals" },
-                    { value: "BULLISH", label: "Bullish" },
-                    { value: "NEUTRAL", label: "Neutral" },
-                    { value: "BEARISH", label: "Bearish" },
-                  ] as { value: SignalFilter; label: string }[]
-                ).map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setSignalFilter(opt.value)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                      signalFilter === opt.value
-                        ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
             {/* Quick sort buttons */}
             <div className="flex gap-1 ml-auto">
               <button
@@ -717,7 +614,6 @@ export default function ViewAllPage() {
               sortKey={sortKey}
               sortDir={sortDir}
               onSort={handleSort}
-              showSignal={section === "technical-screeners"}
               showTier={section === "pocket-friendly"}
             />
           </div>

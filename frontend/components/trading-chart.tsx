@@ -568,7 +568,7 @@ export function TradingChart() {
 
       {/* Index tabs with solid vertical dividers and active bottom line */}
       <div className="border border-solid border-(--divider-color) rounded-lg">
-        <div className="flex flex-wrap items-center overflow-x-auto ">
+        <div className="grid grid-cols-5">
           {indices.map((index, i) => {
             const data = indexState[index]
               ? {
@@ -593,9 +593,11 @@ export function TradingChart() {
               <React.Fragment key={index}>
                 <button
                   onClick={() => setSelectedIndex(index)}
-                  className={`group px-3 py-2 transition-colors min-w-30 hover:bg-gray-50 dark:hover:bg-gray-700 border-b-2 ${
+                  className={`group w-full px-3 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 border-b-2 ${
                     isActive ? "border-b-blue-500" : "border-b-transparent"
-                  } ${index === "SENSEX" && isActive ? "rounded-tl-lg" : ""}`}
+                  } ${i !== 0 ? "border-l border-l-gray-200 dark:border-l-gray-700" : ""} ${
+                    i === 0 && isActive ? "rounded-tl-lg" : ""
+                  } ${i === indices.length - 1 && isActive ? "rounded-tr-lg" : ""}`}
                 >
                   <div className="text-[11px] font-medium text-gray-600 dark:text-gray-400 text-left truncate max-w-25">
                     {index}
@@ -633,9 +635,6 @@ export function TradingChart() {
                     </div>
                   </div>
                 </button>
-                {i <= indices.length - 1 && (
-                  <div className="hidden lg:block v-divider-air v-divider-air-tabs self-center mx-2" />
-                )}
               </React.Fragment>
             );
           })}
@@ -818,8 +817,11 @@ export function TradingChart() {
               className="w-full h-70 rounded-lg"
               role="img"
               aria-label={`${selectedIndex} price chart showing ${chartType.toLowerCase()} visualization for ${timeFrame} timeframe`}
+              style={{
+                visibility:
+                  isLoading || chartDataLoading ? "hidden" : "visible",
+              }}
             />
-
             <div className="flex items-center justify-between p-2">
               <div
                 className="flex items-center gap-1.5 flex-wrap"

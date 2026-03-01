@@ -343,55 +343,6 @@ router.get(
     }
   },
 );
-router.get(
-  "/technical-screeners",
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const rows = await fetchNSEIndex("NIFTY 500");
-      const quotes: Quote[] = rows.map((r: any) => ({
-        symbol: String(r?.symbol || ""),
-        regularMarketPrice: Number(r?.lastPrice || 0),
-        regularMarketChange: Number(r?.change || 0),
-        regularMarketChangePercent: Number(r?.pChange || 0),
-        regularMarketVolume: Number(r?.totalTradedVolume || 0),
-      }));
-
-      // Filter stocks with positive price and good volume
-      const validStocks = quotes
-        .filter(
-          (q) => q.regularMarketPrice > 0 && (q.regularMarketVolume || 0) > 0,
-        )
-        .sort(
-          (a, b) => b.regularMarketChangePercent - a.regularMarketChangePercent,
-        );
-
-      // Use a simple momentum-based signal instead of EMA
-      // BULLISH: Strong positive momentum (>3% gain)
-      // BEARISH: Strong negative momentum (<-3% loss)
-      // NEUTRAL: Everything else
-      const screeners = validStocks.slice(0, 5).map((stock) => {
-        let signal = "NEUTRAL";
-        if (stock.regularMarketChangePercent > 3) {
-          signal = "BULLISH";
-        } else if (stock.regularMarketChangePercent < -3) {
-          signal = "BEARISH";
-        }
-
-        return {
-          symbol: stock.symbol,
-          price: stock.regularMarketPrice,
-          changePercent: stock.regularMarketChangePercent,
-          signal: signal,
-        };
-      });
-
-      res.json({ screeners });
-    } catch (e) {
-      console.error("Error fetching technical screeners:", e);
-      res.status(500).json({ error: "failed_to_fetch_technical_screeners" });
-    }
-  },
-);
 
 router.get("/quotes", async (req: Request, res: Response): Promise<void> => {
   try {
@@ -912,7 +863,14 @@ router.post("/gainers-losers", async (req: Request, res: Response) => {
       smartData.status === true &&
       Array.isArray(smartData.data)
     ) {
-      return res.json({ source: "smartapi", items: smartData.data });
+      const isLosers = datatype.toLowerCase().includes("losers");
+      const items = smartData.data.map((item: any) => ({
+        ...item,
+        percentChange: isLosers
+          ? -Math.abs(Number(item.percentChange || 0))
+          : Number(item.percentChange || 0),
+      }));
+      return res.json({ source: "smartapi", items });
     }
 
     const rows = await fetchNSEIndex("NIFTY 500");

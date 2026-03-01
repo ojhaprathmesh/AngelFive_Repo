@@ -35,17 +35,6 @@ interface PerformersResponse {
   performers: Array<{ symbol: string; price: number; changePct: number }>;
 }
 
-interface TechnicalScreenerItem {
-  symbol: string;
-  price: number;
-  changePercent: number;
-  signal: string;
-}
-
-interface TechnicalScreenersResponse {
-  screeners: TechnicalScreenerItem[];
-}
-
 function PriceBadge({ value }: { value: number }) {
   const positive = value >= 0;
   return (
@@ -74,9 +63,6 @@ export default function MarketDiscovery() {
   const [tf, setTf] = useState<"1W" | "1M" | "1Y" | "5Y">("1W");
   const [performers, setPerformers] = useState<PerformerItem[]>([]);
   const [loadingPerformers, setLoadingPerformers] = useState(false);
-  const [technicalScreeners, setTechnicalScreeners] = useState<
-    TechnicalScreenerItem[]
-  >([]);
 
   useEffect(() => {
     const load = async () => {
@@ -158,7 +144,17 @@ export default function MarketDiscovery() {
                 }>;
               } = await resp2.json();
               if (jl2.source === "smartapi" && Array.isArray(jl2.items)) {
-                setLosers(jl2.items.map(mapItem).slice(0, 8));
+                setLosers(
+                  jl2.items
+                    .map((x) => ({
+                      symbol: x.tradingSymbol,
+                      price: 0,
+                      change: 0,
+                      changePercent: -Math.abs(Number(x.percentChange || 0)), // ← negate for losers
+                      lastUpdated: new Date().toISOString(),
+                    }))
+                    .slice(0, 8),
+                );
               }
             }
           }
@@ -166,24 +162,6 @@ export default function MarketDiscovery() {
       } catch {}
     };
     loadMovers();
-  }, []);
-
-  useEffect(() => {
-    const loadScreeners = async () => {
-      try {
-        const resp = await fetch(`/api/market/technical-screeners`);
-        if (resp.ok) {
-          const data: TechnicalScreenersResponse = await resp.json();
-          setTechnicalScreeners(data.screeners || []);
-        }
-      } catch (e) {
-        console.error("Failed to load technical screeners:", e);
-        setTechnicalScreeners([]);
-      }
-    };
-    loadScreeners();
-    const interval = setInterval(loadScreeners, 60000); // Refresh every minute
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -367,43 +345,6 @@ export default function MarketDiscovery() {
                 </div>
               </div>
             ))}
-        </div>
-      </div>
-
-      <div className="border rounded-lg p-4">
-        {header("Technical Screeners", "technical-screeners")}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {!loading && technicalScreeners.length === 0 && (
-            <div className="text-xs text-gray-500">
-              No data available right now.
-            </div>
-          )}
-          {technicalScreeners.map((s, idx) => (
-            <div key={idx} className="border rounded-lg p-3">
-              <div className="text-sm font-semibold">{s.symbol}</div>
-              <div className="text-xs text-gray-500">
-                {s.signal === "BULLISH" && (
-                  <span className="text-green-600 font-medium">
-                    🟢 BULLISH (EMA)
-                  </span>
-                )}
-                {s.signal === "BEARISH" && (
-                  <span className="text-red-600 font-medium">
-                    🔴 BEARISH (EMA)
-                  </span>
-                )}
-                {s.signal === "NEUTRAL" && (
-                  <span className="text-gray-600 font-medium">
-                    ⚪ NEUTRAL (EMA)
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm">₹{s.price.toFixed(2)}</span>
-                <PriceBadge value={s.changePercent} />
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 

@@ -720,5 +720,111 @@ router.post(
     }
   },
 );
+router.post(
+  "/google",
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { credential } = req.body as { credential: string };
+
+      if (!credential) {
+        return res.status(400).json({
+          status: "error",
+          message: "Google credential token is required",
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Verify the raw Google ID token via Google's public tokeninfo endpoint
+      const googleResponse = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`,
+      );
+
+      if (!googleResponse.ok) {
+        return res.status(401).json({
+          status: "error",
+          message: "Invalid Google credential",
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const googlePayload = (await googleResponse.json()) as {
+        sub: string;
+        email: string;
+        name: string;
+        picture?: string;
+        email_verified: string;
+        aud: string;
+      };
+
+      // (Optional but recommended) Verify the token audience matches your OAuth client ID
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (clientId && googlePayload.aud !== clientId) {
+        return res.status(401).json({
+          status: "error",
+          message: "Google credential audience mismatch",
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const { email, name, picture: photoURL } = googlePayload;
+      const emailVerified = googlePayload.email_verified === "true";
+
+      // Get existing Firebase user or create a new one
+      let uid: string;
+      try {
+        const existingUser = await getAuth().getUserByEmail(email);
+        uid = existingUser.uid;
+
+        // Keep displayName / photoURL fresh
+        await getAuth().updateUser(uid, {
+          displayName: name,
+          ...(photoURL && { photoURL }),
+          emailVerified,
+        });
+      } catch (err: any) {
+        if (err.code === "auth/user-not-found") {
+          // First-time Google sign-in — create the Firebase account
+          const newUser = await getAuth().createUser({
+            email,
+            displayName: name,
+            ...(photoURL && { photoURL }),
+            emailVerified: true,
+          });
+          uid = newUser.uid;
+
+          // Persist a Firestore profile so the rest of the app can read it
+          await authService.createUserProfile(newUser, name);
+        } else {
+          throw err;
+        }
+      }
+
+      // Issue a short-lived Firebase custom token for the frontend
+      const customToken = await getAuth().createCustomToken(uid, {
+        provider: "google.com",
+      });
+
+      // Return the full profile the frontend needs
+      const userProfile = await authService.getUserProfile(uid);
+
+      return res.json({
+        status: "success",
+        message: "Google sign-in successful",
+        data: {
+          token: customToken,
+          user: userProfile,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Google auth error:", error);
+      return res.status(500).json({
+        status: "error",
+        message: "Google authentication failed",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  },
+);
 
 export default router;

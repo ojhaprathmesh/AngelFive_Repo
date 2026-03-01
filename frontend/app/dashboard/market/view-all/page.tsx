@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -13,7 +13,6 @@ import {
   TrendingUp,
   TrendingDown,
   Zap,
-  ChevronDown,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 

@@ -749,13 +749,45 @@ router.get(
         symbol, // Direct
       ];
 
-      // Calculate date range (1 year)
+      // Replace the hardcoded date range section in the /yahoo-finance route with this:
+
+      const timeframe = String(req.query.timeframe || "1Y").toUpperCase();
+
+      // Determine interval and date range based on timeframe
+      let interval: string;
+      let from: number;
       const to = Math.floor(Date.now() / 1000);
-      const from = to - 365 * 24 * 60 * 60;
+
+      switch (timeframe) {
+        case "1D":
+          interval = "5m";
+          from = to - 1 * 24 * 60 * 60;
+          break;
+        case "5D":
+          interval = "30m";
+          from = to - 5 * 24 * 60 * 60;
+          break;
+        case "1M":
+          interval = "1d";
+          from = to - 30 * 24 * 60 * 60;
+          break;
+        case "3M":
+          interval = "1d";
+          from = to - 90 * 24 * 60 * 60;
+          break;
+        case "6M":
+          interval = "1d";
+          from = to - 180 * 24 * 60 * 60;
+          break;
+        default: // 1Y and beyond
+          interval = "1d";
+          from = to - 365 * 24 * 60 * 60;
+          break;
+      }
 
       for (const yahooSymbol of symbolFormats) {
         try {
-          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?period1=${from}&period2=${to}&interval=1d&events=history`;
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?period1=${from}&period2=${to}&interval=${interval}&events=history`;
 
           console.log(`[Yahoo Finance] Trying: ${yahooSymbol}`);
 

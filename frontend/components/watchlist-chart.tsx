@@ -82,7 +82,7 @@ export function WatchlistChart({
 
       try {
         const response = await fetch(
-          `/api/market/yahoo-finance?symbol=${encodeURIComponent(cleanSymbol)}`,
+          `/api/market/yahoo-finance?symbol=${encodeURIComponent(cleanSymbol)}&timeframe=${timeframe}`,
         );
 
         if (!response.ok) {
@@ -179,50 +179,6 @@ export function WatchlistChart({
     }
     return `${cleanSymbol}-EQ`;
   };
-
-  // Filter data by timeframe
-  const filterDataByTimeframe = useCallback(
-    (data: any[], tf: typeof timeframe) => {
-      if (tf === "1Y") return data;
-
-      const now = new Date();
-      return data.filter((d) => {
-        const date =
-          typeof d.time === "number"
-            ? new Date(d.time * 1000)
-            : new Date(
-                (d.time as BusinessDay).year,
-                (d.time as BusinessDay).month - 1,
-                (d.time as BusinessDay).day,
-              );
-
-        switch (tf) {
-          case "1D":
-            return date >= new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
-          case "5D":
-            return date >= new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
-          case "1M":
-            return (
-              date >=
-              new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-            );
-          case "3M":
-            return (
-              date >=
-              new Date(now.getFullYear(), now.getMonth() - 3, now.getDate())
-            );
-          case "6M":
-            return (
-              date >=
-              new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
-            );
-          default:
-            return true;
-        }
-      });
-    },
-    [],
-  );
 
   // Initialize chart - simplified and reliable
   const initializeChart = useCallback(() => {
@@ -379,14 +335,13 @@ export function WatchlistChart({
       }
 
       try {
-        const filteredData = filterDataByTimeframe(data, timeframe);
-        console.log("[WatchlistChart] Setting", filteredData.length, "candles");
+        console.log("[WatchlistChart] Setting", data.length, "candles");
 
-        seriesRef.current.setData(filteredData);
+        seriesRef.current.setData(data);
         chartRef.current?.timeScale().fitContent();
 
         if (showEMA) {
-          updateEMA(filteredData);
+          updateEMA(data);
         }
 
         console.log("[WatchlistChart] Data set successfully");
@@ -394,7 +349,7 @@ export function WatchlistChart({
         console.error("[WatchlistChart] Error setting data:", e);
       }
     },
-    [timeframe, filterDataByTimeframe, showEMA, updateEMA],
+    [showEMA, updateEMA],
   );
 
   // Main effect: Load data and initialize chart
@@ -530,10 +485,9 @@ export function WatchlistChart({
           // Set data after chart is ready
           if (chartRef.current && seriesRef.current && allData.length > 0) {
             console.log("[WatchlistChart] Setting chart data...");
-            const filteredData = filterDataByTimeframe(allData, timeframe);
             console.log(
-              "[WatchlistChart] Filtered data:",
-              filteredData.length,
+              "[WatchlistChart] Data points:",
+              allData.length,
               "candles",
             );
 
@@ -547,7 +501,7 @@ export function WatchlistChart({
                 borderVisible: true,
               });
 
-              seriesRef.current.setData(filteredData);
+              seriesRef.current.setData(allData);
               chartRef.current.timeScale().fitContent();
 
               // CRITICAL: Ensure X-axis is visible AFTER fitContent
@@ -594,7 +548,7 @@ export function WatchlistChart({
               console.log("[WatchlistChart] ✅ Data set successfully!");
 
               if (showEMA) {
-                updateEMA(filteredData);
+                updateEMA(allData);
               }
 
               setIsLoading(false);
@@ -642,38 +596,36 @@ export function WatchlistChart({
     initializeChart,
     setChartData,
     fetchYahooFinanceData,
-    filterDataByTimeframe,
     timeframe,
     showEMA,
     updateEMA,
   ]);
 
-  // Update chart when timeframe changes
+  // Trigger full reload when timeframe changes
   useEffect(() => {
-    if (allChartData.length > 0 && seriesRef.current) {
-      setChartData(allChartData);
+    if (!symbol) return;
+
+    // Clear existing data so the main loadChart effect re-runs fresh
+    setAllChartData([]);
+    setIsLoading(true);
+    setError(null);
+
+    if (chartRef.current && seriesRef.current) {
+      seriesRef.current.setData([]); // clear visual candles immediately
     }
-  }, [timeframe, allChartData, setChartData]);
+  }, [timeframe, symbol]);
 
   // Update EMA when enabled/period changes
   useEffect(() => {
     if (allChartData.length > 0 && chartRef.current && seriesRef.current) {
-      const filteredData = filterDataByTimeframe(allChartData, timeframe);
       if (showEMA) {
-        updateEMA(filteredData);
+        updateEMA(allChartData);
       } else if (emaSeriesRef.current) {
         chartRef.current.removeSeries(emaSeriesRef.current);
         emaSeriesRef.current = null;
       }
     }
-  }, [
-    showEMA,
-    emaPeriod,
-    allChartData,
-    timeframe,
-    filterDataByTimeframe,
-    updateEMA,
-  ]);
+  }, [showEMA, emaPeriod, allChartData, updateEMA]);
 
   // Handle tool mode changes
   useEffect(() => {

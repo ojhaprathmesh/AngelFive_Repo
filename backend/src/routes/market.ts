@@ -4,6 +4,7 @@ import {
   fetchSmartApiQuotes,
   fetchSmartApiCandles,
 } from "../lib/smartapi";
+import { swrCache, TTL } from "../services/cache";
 
 const router = express.Router();
 
@@ -78,46 +79,44 @@ function formatDateForNSE(date: Date): string {
   return `${day}-${month}-${year}`;
 }
 
+async function fetchDiscoveryData() {
+  const rows = await fetchNSEIndex("NIFTY 500");
+  const map = (r: any): Quote => ({
+    symbol: String(r?.symbol || ""),
+    regularMarketPrice: Number(r?.lastPrice || 0),
+    regularMarketChange: Number(r?.change || 0),
+    regularMarketChangePercent: Number(r?.pChange || 0),
+    regularMarketVolume: Number(r?.totalTradedVolume || 0),
+  });
+  const quotes: Quote[] = rows.map(map);
+  const mostBought = [...quotes]
+    .sort((a, b) => (b.regularMarketVolume || 0) - (a.regularMarketVolume || 0))
+    .slice(0, 8);
+  const topGainers = [...quotes]
+    .sort((a, b) => b.regularMarketChangePercent - a.regularMarketChangePercent)
+    .slice(0, 8);
+  const topLosers = [...quotes]
+    .sort((a, b) => a.regularMarketChangePercent - b.regularMarketChangePercent)
+    .slice(0, 8);
+  const under50 = quotes.filter((q) => q.regularMarketPrice < 50).slice(0, 8);
+  const under100 = quotes.filter((q) => q.regularMarketPrice < 100).slice(0, 8);
+  const under200 = quotes.filter((q) => q.regularMarketPrice < 200).slice(0, 8);
+  return {
+    mostBought,
+    topGainers,
+    topLosers,
+    pocketFriendly: { under50, under100, under200 },
+  };
+}
+
 router.get("/discovery", async (req: Request, res: Response) => {
   try {
-    const rows = await fetchNSEIndex("NIFTY 500");
-    const map = (r: any): Quote => ({
-      symbol: String(r?.symbol || ""),
-      regularMarketPrice: Number(r?.lastPrice || 0),
-      regularMarketChange: Number(r?.change || 0),
-      regularMarketChangePercent: Number(r?.pChange || 0),
-      regularMarketVolume: Number(r?.totalTradedVolume || 0),
-    });
-    const quotes: Quote[] = rows.map(map);
-    const mostBought = [...quotes]
-      .sort(
-        (a, b) => (b.regularMarketVolume || 0) - (a.regularMarketVolume || 0),
-      )
-      .slice(0, 8);
-    const topGainers = [...quotes]
-      .sort(
-        (a, b) => b.regularMarketChangePercent - a.regularMarketChangePercent,
-      )
-      .slice(0, 8);
-    const topLosers = [...quotes]
-      .sort(
-        (a, b) => a.regularMarketChangePercent - b.regularMarketChangePercent,
-      )
-      .slice(0, 8);
-    const under50 = quotes.filter((q) => q.regularMarketPrice < 50).slice(0, 8);
-    const under100 = quotes
-      .filter((q) => q.regularMarketPrice < 100)
-      .slice(0, 8);
-    const under200 = quotes
-      .filter((q) => q.regularMarketPrice < 200)
-      .slice(0, 8);
-
-    res.json({
-      mostBought,
-      topGainers,
-      topLosers,
-      pocketFriendly: { under50, under100, under200 },
-    });
+    const data = await swrCache.get(
+      "discovery",
+      fetchDiscoveryData,
+      TTL.DISCOVERY,
+    );
+    res.json(data);
   } catch (e) {
     res.status(500).json({ error: "failed_to_fetch_discovery" });
   }
@@ -182,161 +181,160 @@ async function fetchNSEHistoricalPrice(
   }
 }
 
+async function fetchPerformersData(
+  tf: string,
+): Promise<Array<{ symbol: string; price: number; changePct: number }>> {
+  console.log(`[Performers] Fetching fresh data for timeframe: ${tf}`);
+
+  const rows = await fetchNSEIndex("NIFTY 500");
+  if (rows.length === 0) {
+    console.log("[Performers] No data from NSE index");
+    return [];
+  }
+
+  // Calculate date range based on timeframe
+  const now = new Date();
+  const from = new Date(now);
+  if (tf === "1W") from.setDate(now.getDate() - 7);
+  else if (tf === "1M") from.setMonth(now.getMonth() - 1);
+  else if (tf === "1Y") from.setFullYear(now.getFullYear() - 1);
+  else if (tf === "5Y") from.setFullYear(now.getFullYear() - 5);
+  else from.setMonth(now.getMonth() - 1); // default to 1M
+
+  const fromIso = from.toISOString().split("T")[0];
+  const toIso = now.toISOString().split("T")[0];
+  console.log(`[Performers] Date range: ${fromIso} to ${toIso}`);
+
+  // NSE historical API expects DD-MM-YYYY
+  const fromDateStr = formatDateForNSE(from);
+  const toDateStr = formatDateForNSE(now);
+
+  // Get current prices
+  const quotes: Quote[] = rows.map((r: any) => ({
+    symbol: String(r?.symbol || ""),
+    regularMarketPrice: Number(r?.lastPrice || 0),
+    regularMarketChange: Number(r?.change || 0),
+    regularMarketChangePercent: Number(r?.pChange || 0),
+    regularMarketVolume: Number(r?.totalTradedVolume || 0),
+  }));
+
+  // Filter valid stocks with good volume, sort by volume
+  const validStocks = quotes
+    .filter(
+      (q) => q.regularMarketPrice > 0 && (q.regularMarketVolume || 0) > 10000,
+    )
+    .sort((a, b) => (b.regularMarketVolume || 0) - (a.regularMarketVolume || 0))
+    .slice(0, 30); // Limit to top 30 by volume to avoid too many API calls
+
+  console.log(`[Performers] Processing ${validStocks.length} stocks`);
+
+  // Fetch historical data and calculate performance
+  const performers: Array<{
+    symbol: string;
+    price: number;
+    changePct: number;
+  }> = [];
+
+  // Process stocks to get historical performance
+  for (let i = 0; i < validStocks.length; i++) {
+    if (performers.length >= 8) break;
+
+    const stock = validStocks[i];
+    const historical = await fetchNSEHistoricalPrice(
+      stock.symbol,
+      fromDateStr,
+      toDateStr,
+    );
+
+    if (historical && historical.startPrice > 0) {
+      const changePct =
+        ((historical.endPrice - historical.startPrice) /
+          historical.startPrice) *
+        100;
+      performers.push({
+        symbol: stock.symbol,
+        price: stock.regularMarketPrice,
+        changePct: changePct,
+      });
+      console.log(
+        `[Performers] ${stock.symbol}: ${changePct.toFixed(2)}% (${historical.startPrice} -> ${historical.endPrice})`,
+      );
+    }
+  }
+
+  console.log(
+    `[Performers] Found ${performers.length} stocks with historical data`,
+  );
+
+  // If we don't have enough historical data, use a different approach
+  if (performers.length < 8) {
+    console.log(
+      `[Performers] Only found ${performers.length} stocks with historical data, using estimated performance`,
+    );
+
+    const remainingStocks = validStocks.filter(
+      (q) =>
+        !performers.find((p) => p.symbol === q.symbol) &&
+        q.regularMarketPrice > 0,
+    );
+
+    const timeframeMultipliers: Record<string, number> = {
+      "1W": 2.0,
+      "1M": 5.0,
+      "1Y": 25.0,
+      "5Y": 80.0,
+    };
+
+    const multiplier = timeframeMultipliers[tf] || 1.0;
+
+    const estimated = remainingStocks
+      .map((q) => {
+        const volumeScore = Math.log10((q.regularMarketVolume || 1) / 1000000);
+        const changeScore = q.regularMarketChangePercent * multiplier;
+        const combinedScore = changeScore + volumeScore * 0.5;
+
+        return {
+          symbol: q.symbol,
+          price: q.regularMarketPrice,
+          changePct: changeScore,
+          score: combinedScore,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8 - performers.length)
+      .map(({ symbol, price, changePct }) => ({
+        symbol,
+        price,
+        changePct,
+      }));
+
+    performers.push(...estimated);
+    console.log(
+      `[Performers] Added ${estimated.length} estimated performers for ${tf} using multiplier ${multiplier}x`,
+    );
+  }
+
+  // Sort by change percentage and return top 8
+  performers.sort((a, b) => b.changePct - a.changePct);
+  const result = performers.slice(0, 8);
+  console.log(
+    `[Performers] Returning ${result.length} performers for timeframe ${tf}`,
+  );
+  return result;
+}
+
 router.get(
   "/performers",
   async (req: Request, res: Response): Promise<void> => {
     try {
       const tf = String(req.query.tf || "1M");
-      console.log(`[Performers] Fetching for timeframe: ${tf}`);
-
-      const rows = await fetchNSEIndex("NIFTY 500");
-      if (rows.length === 0) {
-        console.log("[Performers] No data from NSE index");
-        res.json({ performers: [] });
-        return;
-      }
-
-      // Calculate date range based on timeframe
-      const now = new Date();
-      const from = new Date(now);
-      if (tf === "1W") from.setDate(now.getDate() - 7);
-      else if (tf === "1M") from.setMonth(now.getMonth() - 1);
-      else if (tf === "1Y") from.setFullYear(now.getFullYear() - 1);
-      else if (tf === "5Y") from.setFullYear(now.getFullYear() - 5);
-      else from.setMonth(now.getMonth() - 1); // default to 1M
-
-      const fromIso = from.toISOString().split("T")[0];
-      const toIso = now.toISOString().split("T")[0];
-      console.log(`[Performers] Date range: ${fromIso} to ${toIso}`);
-
-      // NSE historical API expects DD-MM-YYYY
-      const fromDateStr = formatDateForNSE(from);
-      const toDateStr = formatDateForNSE(now);
-
-      // Get current prices
-      const quotes: Quote[] = rows.map((r: any) => ({
-        symbol: String(r?.symbol || ""),
-        regularMarketPrice: Number(r?.lastPrice || 0),
-        regularMarketChange: Number(r?.change || 0),
-        regularMarketChangePercent: Number(r?.pChange || 0),
-        regularMarketVolume: Number(r?.totalTradedVolume || 0),
-      }));
-
-      // Filter valid stocks with good volume, sort by volume
-      const validStocks = quotes
-        .filter(
-          (q) =>
-            q.regularMarketPrice > 0 && (q.regularMarketVolume || 0) > 10000,
-        )
-        .sort(
-          (a, b) => (b.regularMarketVolume || 0) - (a.regularMarketVolume || 0),
-        )
-        .slice(0, 30); // Limit to top 30 by volume to avoid too many API calls
-
-      console.log(`[Performers] Processing ${validStocks.length} stocks`);
-
-      // Fetch historical data and calculate performance
-      const performers: Array<{
-        symbol: string;
-        price: number;
-        changePct: number;
-      }> = [];
-
-      // Process stocks to get historical performance
-      for (let i = 0; i < validStocks.length; i++) {
-        if (performers.length >= 8) break;
-
-        const stock = validStocks[i];
-        const historical = await fetchNSEHistoricalPrice(
-          stock.symbol,
-          fromDateStr,
-          toDateStr,
-        );
-
-        if (historical && historical.startPrice > 0) {
-          const changePct =
-            ((historical.endPrice - historical.startPrice) /
-              historical.startPrice) *
-            100;
-          performers.push({
-            symbol: stock.symbol,
-            price: stock.regularMarketPrice, // Current price
-            changePct: changePct, // Historical performance over the period
-          });
-          console.log(
-            `[Performers] ${stock.symbol}: ${changePct.toFixed(2)}% (${historical.startPrice} -> ${historical.endPrice})`,
-          );
-        }
-      }
-
-      console.log(
-        `[Performers] Found ${performers.length} stocks with historical data`,
+      const cacheKey = `performers:${tf}`;
+      const performers = await swrCache.get(
+        cacheKey,
+        () => fetchPerformersData(tf),
+        TTL.PERFORMERS,
       );
-
-      // If we don't have enough historical data, use a different approach
-      // For longer timeframes, estimate based on current price and a multiplier
-      if (performers.length < 8) {
-        console.log(
-          `[Performers] Only found ${performers.length} stocks with historical data, using estimated performance`,
-        );
-
-        // Get stocks that don't have historical data yet
-        const remainingStocks = validStocks.filter(
-          (q) =>
-            !performers.find((p) => p.symbol === q.symbol) &&
-            q.regularMarketPrice > 0,
-        );
-
-        // For different timeframes, use different sorting strategies
-        // Since historical API might be failing, we'll use volume-weighted performance
-        // and apply timeframe-specific logic
-        const timeframeMultipliers: Record<string, number> = {
-          "1W": 2.0, // Estimate 2x daily change for week
-          "1M": 5.0, // Estimate 5x daily change for month
-          "1Y": 25.0, // Estimate 25x daily change for year
-          "5Y": 80.0, // Estimate 80x daily change for 5 years
-        };
-
-        const multiplier = timeframeMultipliers[tf] || 1.0;
-
-        // Sort by volume * change to get stocks with both momentum and liquidity
-        const estimated = remainingStocks
-          .map((q) => {
-            // Combine price change with volume for better ranking
-            const volumeScore = Math.log10(
-              (q.regularMarketVolume || 1) / 1000000,
-            ); // Normalize volume
-            const changeScore = q.regularMarketChangePercent * multiplier;
-            const combinedScore = changeScore + volumeScore * 0.5; // Weighted combination
-
-            return {
-              symbol: q.symbol,
-              price: q.regularMarketPrice,
-              changePct: changeScore, // Use the estimated change
-              score: combinedScore,
-            };
-          })
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 8 - performers.length)
-          .map(({ symbol, price, changePct }) => ({
-            symbol,
-            price,
-            changePct,
-          }));
-
-        performers.push(...estimated);
-        console.log(
-          `[Performers] Added ${estimated.length} estimated performers for ${tf} using multiplier ${multiplier}x`,
-        );
-      }
-
-      // Sort by change percentage and return top 8
-      performers.sort((a, b) => b.changePct - a.changePct);
-      const result = performers.slice(0, 8);
-      console.log(
-        `[Performers] Returning ${result.length} performers for timeframe ${tf}`,
-      );
-      res.json({ performers: result });
+      res.json({ performers });
     } catch (e) {
       console.error("[Performers] Error:", e);
       res.status(500).json({ error: "failed_to_fetch_performers" });
@@ -575,18 +573,24 @@ router.get(
 );
 
 async function loadInstrumentMaster(): Promise<any[]> {
-  try {
-    const resp = await fetch(
-      "https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json",
-    );
-    if (resp.ok) {
-      const data = await resp.json();
-      return Array.isArray(data) ? data : [];
-    }
-  } catch (e) {
-    console.error("Failed to load instrument master:", e);
-  }
-  return [];
+  return swrCache.get(
+    "instrument-master",
+    async () => {
+      try {
+        const resp = await fetch(
+          "https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json",
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          return Array.isArray(data) ? data : [];
+        }
+      } catch (e) {
+        console.error("Failed to load instrument master:", e);
+      }
+      return [];
+    },
+    TTL.INSTRUMENT_MASTER,
+  );
 }
 
 // SmartAPI proxy endpoints - credentials stay on backend, frontend calls these
@@ -691,13 +695,32 @@ router.get(
         return;
       }
 
-      const candles = await fetchSmartApiCandles(
-        exchange,
-        symbolToken,
-        interval,
-        fromDate,
-        toDate,
+      // Intraday intervals get a short TTL; historical get a longer one
+      const intradayIntervals = [
+        "ONE_MINUTE",
+        "THREE_MINUTE",
+        "FIVE_MINUTE",
+        "TEN_MINUTE",
+        "FIFTEEN_MINUTE",
+        "THIRTY_MINUTE",
+      ];
+      const isIntraday = intradayIntervals.includes(interval.toUpperCase());
+      const ttl = isIntraday ? TTL.CHART_INTRADAY : TTL.CHART_HISTORICAL;
+
+      const cacheKey = `candles:${exchange}:${symbolToken}:${interval}:${fromDate}:${toDate}`;
+      const candles = await swrCache.get(
+        cacheKey,
+        () =>
+          fetchSmartApiCandles(
+            exchange,
+            symbolToken,
+            interval,
+            fromDate,
+            toDate,
+          ),
+        ttl,
       );
+
       res.json({ candles });
     } catch (e) {
       console.error("[smartapi/candles] Error:", e);
@@ -824,6 +847,11 @@ router.get(
     }
   },
 );
+
+// Debug endpoint — see what's cached and how fresh it is
+router.get("/cache-status", (_req: Request, res: Response) => {
+  res.json({ entries: swrCache.status() });
+});
 
 export default router;
 router.post("/gainers-losers", async (req: Request, res: Response) => {

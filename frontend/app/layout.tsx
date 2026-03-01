@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/auth-context";
 import "./globals.css";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "AngelFive - Smart Financial Data Management",
@@ -56,6 +57,7 @@ export default function RootLayout({
             closeButton={false}
           />
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );

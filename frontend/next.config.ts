@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
-// Backend URL: use NEXT_PUBLIC_API_URL in production (e.g. Vercel), localhost for dev
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
 const nextConfig: NextConfig = {
   async rewrites() {

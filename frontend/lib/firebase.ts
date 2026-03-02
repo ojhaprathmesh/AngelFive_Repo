@@ -223,7 +223,8 @@ export class FirebaseClientAuth {
   ): Promise<AuthResult> {
     try {
       // Use backend API for signup instead of direct Firebase calls
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const apiUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
       const response = await fetch(`${apiUrl}/api/auth/frontend/signup`, {
         method: "POST",
         headers: {
@@ -280,8 +281,8 @@ export class FirebaseClientAuth {
    */
   async signIn(email: string, password: string): Promise<AuthResult> {
     try {
-      // Use backend API for login instead of direct Firebase calls
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const apiUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
       const response = await fetch(`${apiUrl}/api/auth/frontend/login`, {
         method: "POST",
         headers: {
@@ -370,7 +371,8 @@ export class FirebaseClientAuth {
 
       let token = await user.getIdToken(true);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const apiUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
       let response = await fetch(`${apiUrl}/api/auth/user/${uid}`, {
         method: "GET",
         headers: {
@@ -382,7 +384,7 @@ export class FirebaseClientAuth {
       if (response.status === 403 || response.status === 401) {
         token = await user.getIdToken(true);
         const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
         response = await fetch(`${apiUrl}/api/auth/user/${uid}`, {
           method: "GET",
           headers: {
@@ -437,7 +439,8 @@ export class FirebaseClientAuth {
    */
   private async updateLastLoginTime(uid: string): Promise<void> {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const apiUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
       const response = await fetch(
         `${apiUrl}/api/auth/user/${uid}/last-login`,
         {
@@ -464,7 +467,8 @@ export class FirebaseClientAuth {
    */
   async sendPasswordResetEmail(email: string): Promise<AuthResult> {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const apiUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
       const response = await fetch(
         `${apiUrl}/api/auth/frontend/reset-password`,
         {

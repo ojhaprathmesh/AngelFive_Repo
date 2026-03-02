@@ -42,7 +42,8 @@ export function GoogleSignInButton({
   const handleCredentialResponse = async (response: { credential: string }) => {
     setIsLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const apiUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
       const res = await fetch(`${apiUrl}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

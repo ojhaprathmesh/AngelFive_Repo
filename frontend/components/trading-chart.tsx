@@ -558,10 +558,10 @@ export function TradingChart() {
   }
 
   return (
-    <div className="space-y-6 w-full p-4 bg-white dark:bg-gray-800 rounded-sm shadow-[2px] border">
+    <div className="space-y-6 w-full p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">
           Index Overview
         </h2>
       </div>
@@ -599,11 +599,11 @@ export function TradingChart() {
                     i === 0 && isActive ? "rounded-tl-lg" : ""
                   } ${i === indices.length - 1 && isActive ? "rounded-tr-lg" : ""}`}
                 >
-                  <div className="text-[11px] font-medium text-gray-600 dark:text-gray-400 text-left truncate max-w-25">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 text-left truncate max-w-25">
                     {index}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="text-[11px] font-medium text-gray-900 dark:text-white">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
                       {data.price.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
@@ -651,12 +651,9 @@ export function TradingChart() {
             aria-label="Market Data and Analysis Section"
           >
             {/* Heatscale Visualization */}
-            <div
-              className="bg-white dark:bg-gray-900 p-3"
-              style={{ zIndex: 1 }}
-            >
-              <h3 className="text-[12px] font-medium text-gray-900 dark:text-white mb-3">
-                Day&apos;s High/Low
+            <div className="p-3" style={{ zIndex: 1 }}>
+              <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+                Day's High/Low
               </h3>
               <div className="space-y-3">
                 <div className="relative">
@@ -695,14 +692,14 @@ export function TradingChart() {
                     </svg>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[12px] font-medium">
+                <div className="flex items-center justify-between text-xs font-medium text-gray-700 dark:text-gray-300">
                   <div className="flex flex-col">
                     <span>
                       {currentData.dayRange.low.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
                     </span>
-                    <span className="text-[12px] text-gray-600 dark:text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       Low
                     </span>
                   </div>
@@ -712,7 +709,7 @@ export function TradingChart() {
                         minimumFractionDigits: 2,
                       })}
                     </span>
-                    <span className="text-[12px] text-gray-600 dark:text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       High
                     </span>
                   </div>
@@ -720,40 +717,40 @@ export function TradingChart() {
                 {/* OHLC values directly below heatscale */}
                 <div className="grid grid-cols-4 gap-0 divide-x divide-custom divide-dotted text-[12px] font-medium">
                   <div className="flex flex-col pr-3">
-                    <div className="text-gray-600 dark:text-gray-400 mb-1">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                       Open
                     </div>
-                    <div className="font-numbers numeric-tabular text-gray-900 dark:text-white font-bold">
+                    <div className="text-sm font-numbers numeric-tabular text-gray-900 dark:text-white font-semibold">
                       {currentData.open.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
                     </div>
                   </div>
                   <div className="flex flex-col px-3">
-                    <div className="text-gray-600 dark:text-gray-400 mb-1">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                       High
                     </div>
-                    <div className="font-numbers numeric-tabular text-green-600 dark:text-green-400 font-bold">
+                    <div className="text-sm font-numbers numeric-tabular text-green-600 dark:text-green-400 font-semibold">
                       {currentData.high.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
                     </div>
                   </div>
                   <div className="flex flex-col px-3">
-                    <div className="text-gray-600 dark:text-gray-400 mb-1">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                       Low
                     </div>
-                    <div className="font-numbers numeric-tabular text-red-600 dark:text-red-400 font-bold">
+                    <div className="text-sm font-numbers numeric-tabular text-red-600 dark:text-red-400 font-semibold">
                       {currentData.low.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
                     </div>
                   </div>
                   <div className="flex flex-col pl-3">
-                    <div className="text-gray-600 dark:text-gray-400 mb-1">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                       Close
                     </div>
-                    <div className="font-numbers numeric-tabular text-gray-900 dark:text-white font-bold">
+                    <div className="text-sm font-numbers numeric-tabular text-gray-900 dark:text-white font-semibold">
                       {currentData.close.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
@@ -770,12 +767,12 @@ export function TradingChart() {
           {/* Right Section */}
           {/* Primary Chart Container */}
           <div
-            className="flex-1 lg:flex-1 relative bg-white dark:bg-gray-900 rounded-lg"
+            className="flex-1 lg:flex-1 relative rounded-lg"
             style={{ zIndex: 1 }}
           >
             {(isLoading || chartDataLoading) && (
               <div
-                className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-800/80 rounded-lg z-10"
+                className="absolute inset-0 flex items-center justify-center bg-white/95 dark:bg-gray-900/95 rounded-lg z-10"
                 style={{ zIndex: 10 }}
               >
                 <div className="flex flex-col items-center gap-3">

@@ -297,7 +297,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur supports-backdrop-filter:bg-white/60 dark:border-gray-800 dark:bg-gray-950/95 dark:supports-backdrop-filter:bg-gray-950/60 safe-top mb-4">
+    <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur supports-backdrop-filter:bg-white/60 dark:border-gray-800 dark:bg-gray-950/95 dark:supports-backdrop-filter:bg-gray-950/60 safe-top">
       <div className="flex h-16 items-center justify-between p-4">
         {/* Left Section */}
         <div className="flex items-center space-x-4 lg:space-x-8">

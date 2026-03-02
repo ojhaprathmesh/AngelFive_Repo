@@ -1,8 +1,24 @@
 {
   "name": "angelfive-dsfm-repo",
   "version": "1.0.0",
-  "description": "AngelOne Dashboard Replica with DSFM Analytics - Full Stack Financial Dashboard",
   "private": true,
+  "description": "AngelOne Dashboard Replica with DSFM Analytics - Full Stack Financial Dashboard",
+  "author": "Angel Five Team",
+  "license": "MIT",
+  "keywords": [
+    "financial-dashboard",
+    "trading",
+    "machine-learning",
+    "next.js",
+    "express",
+    "flask",
+    "typescript",
+    "monorepo"
+  ],
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": "20.x"
+  },
   "workspaces": [
     "frontend",
     "backend",
@@ -25,21 +41,5 @@
     "dotenv": "^16.6.1",
     "nodemon": "^3.1.14",
     "typescript": "^5.9.3"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "packageManager": "pnpm@10.30.3",
-  "keywords": [
-    "financial-dashboard",
-    "trading",
-    "machine-learning",
-    "next.js",
-    "express",
-    "flask",
-    "typescript",
-    "monorepo"
-  ],
-  "author": "Angel Five Team",
-  "license": "MIT"
+  }
 }

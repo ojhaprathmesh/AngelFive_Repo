@@ -1,8 +1,20 @@
 {
   "name": "@angelfive/backend",
   "version": "1.0.0",
-  "description": "Simple Express backend server for AngelFive DSFM project",
-  "main": "src/server.ts",
+  "private": true,
+  "description": "Express backend server for AngelFive project",
+  "author": "Angel Five Team",
+  "license": "MIT",
+  "keywords": [
+    "express",
+    "typescript",
+    "backend",
+    "api"
+  ],
+  "main": "dist/server.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "nodemon src/server.ts",
     "clean": "rimraf dist",
@@ -31,16 +43,5 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
-  },
-  "keywords": [
-    "express",
-    "typescript",
-    "backend",
-    "api"
-  ],
-  "author": "Angel Five Team",
-  "license": "MIT",
-  "engines": {
-    "node": "20.x"
   }
 }

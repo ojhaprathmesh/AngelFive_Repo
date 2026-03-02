@@ -1,14 +1,30 @@
 {
   "name": "@angelfive/frontend",
   "version": "1.0.0",
-  "description": "Frontend React application for Angel Five DSFM project",
   "private": true,
+  "description": "Next application for Angel Five project",
+  "author": "Angel Five Team",
+  "license": "MIT",
+  "keywords": [
+    "financial-dashboard",
+    "trading",
+    "machine-learning",
+    "next.js",
+    "express",
+    "flask",
+    "typescript",
+    "monorepo"
+  ],
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
-    "clean": "rimraf dist node_modules/.cache .turbo .next"
+    "lint": "eslint .",
+    "clean": "rimraf .next .turbo node_modules/.cache dist"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

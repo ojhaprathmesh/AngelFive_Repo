@@ -1,91 +1,90 @@
 /**
- * SmartAPI service - BACKEND ONLY.
- * NEVER import this in frontend/client code.
- * Credentials stay on server; frontend calls /api/market/* endpoints.
+ * SmartAPI service
  */
 
-let authenticator: any = null;
-try {
-  const otplib = require("otplib");
-  authenticator = otplib.authenticator;
-} catch {
-  console.warn("otplib not installed. SmartAPI JWT generation may fail.");
-}
+import speakeasy from "speakeasy";
+import { ENV } from "../config/env";
 
 let jwtTokenCache: string | null = null;
-let jwtTokenExpiry: number = 0;
+let jwtTokenExpiry = 0;
 
+/* ---------------------------------- */
+/* TOTP Generator                     */
+/* ---------------------------------- */
 function generateTOTP(secret: string): string {
-  if (!authenticator) {
-    throw new Error("otplib not installed. Run: npm install otplib");
-  }
-  return authenticator.generate(secret);
+  return speakeasy.totp({
+    secret,
+    encoding: "base32",
+  });
 }
 
+/* ---------------------------------- */
+/* JWT TOKEN */
+/* ---------------------------------- */
 export async function getSmartApiJwtToken(): Promise<string | null> {
-  if (jwtTokenCache && Date.now() < jwtTokenExpiry - 300000) {
+  // Use cached token (5 min buffer before expiry)
+  if (jwtTokenCache && Date.now() < jwtTokenExpiry - 5 * 60 * 1000) {
     return jwtTokenCache;
   }
 
-  const apiKey = process.env.SMARTAPI_API_KEY;
-  const clientCode = process.env.SMARTAPI_CLIENT_CODE;
-  const password = process.env.SMARTAPI_PASSWORD;
-  const totpSecret = process.env.SMARTAPI_TOTP_SECRET;
-  const localIp = process.env.SMARTAPI_LOCAL_IP || "127.0.0.1";
-  const publicIp = process.env.SMARTAPI_PUBLIC_IP || "127.0.0.1";
-  const mac = process.env.SMARTAPI_MAC_ADDRESS || "00:00:00:00:00:00";
-
-  if (!apiKey || !clientCode || !password || !totpSecret) {
-    return null;
-  }
-
   try {
-    const totp = generateTOTP(totpSecret);
+    const totp = generateTOTP(ENV.SMARTAPI_TOTP_SECRET);
+
     const response = await fetch(
       "https://apiconnect.angelone.in/rest/auth/angelbroking/user/v1/loginByPassword",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-PrivateKey": apiKey,
+          "X-PrivateKey": ENV.SMARTAPI_API_KEY,
           Accept: "application/json",
           "X-SourceID": "WEB",
-          "X-ClientLocalIP": localIp,
-          "X-ClientPublicIP": publicIp,
-          "X-MACAddress": mac,
+          "X-ClientLocalIP": ENV.SMARTAPI_LOCAL_IP,
+          "X-ClientPublicIP": ENV.SMARTAPI_PUBLIC_IP,
+          "X-MACAddress": ENV.SMARTAPI_MAC_ADDRESS,
           "X-UserType": "USER",
         },
         body: JSON.stringify({
-          clientcode: clientCode,
-          password,
+          clientcode: ENV.SMARTAPI_CLIENT_CODE,
+          password: ENV.SMARTAPI_PASSWORD,
           totp,
         }),
       },
     );
 
     if (!response.ok) return null;
+
     const data: any = await response.json();
+
     if (!data.status || !data.data?.jwtToken) return null;
 
     jwtTokenCache = data.data.jwtToken;
-    jwtTokenExpiry = Date.now() + 3600000;
+    jwtTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour
+
     return jwtTokenCache;
-  } catch {
+  } catch (error) {
     jwtTokenCache = null;
     jwtTokenExpiry = 0;
+    console.error("SmartAPI login failed:", error);
     return null;
   }
 }
 
+/* ---------------------------------- */
+/* Credential Check                   */
+/* ---------------------------------- */
 export function hasSmartApiCredentials(): boolean {
   return !!(
-    process.env.SMARTAPI_API_KEY &&
-    process.env.SMARTAPI_CLIENT_CODE &&
-    process.env.SMARTAPI_PASSWORD &&
-    process.env.SMARTAPI_TOTP_SECRET
+    ENV.SMARTAPI_API_KEY &&
+    ENV.SMARTAPI_CLIENT_CODE &&
+    ENV.SMARTAPI_PASSWORD &&
+    ENV.SMARTAPI_TOTP_SECRET
   );
 }
 
+/* ---------------------------------- */
+/* QUOTES                             */
+/* ---------------------------------- */
 export interface SmartApiQuoteItem {
   symbol: string;
   price: number;
@@ -107,11 +106,6 @@ export async function fetchSmartApiQuotes(
   const jwt = await getSmartApiJwtToken();
   if (!jwt) return [];
 
-  const apiKey = process.env.SMARTAPI_API_KEY!;
-  const localIp = process.env.SMARTAPI_LOCAL_IP || "127.0.0.1";
-  const publicIp = process.env.SMARTAPI_PUBLIC_IP || "127.0.0.1";
-  const mac = process.env.SMARTAPI_MAC_ADDRESS || "00:00:00:00:00:00";
-
   try {
     const response = await fetch(
       "https://apiconnect.angelone.in/rest/secure/angelbroking/market/v1/quote/",
@@ -119,11 +113,11 @@ export async function fetchSmartApiQuotes(
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwt}`,
-          "X-PrivateKey": apiKey,
+          "X-PrivateKey": ENV.SMARTAPI_API_KEY,
           "X-SourceID": "WEB",
-          "X-ClientLocalIP": localIp,
-          "X-ClientPublicIP": publicIp,
-          "X-MACAddress": mac,
+          "X-ClientLocalIP": ENV.SMARTAPI_LOCAL_IP,
+          "X-ClientPublicIP": ENV.SMARTAPI_PUBLIC_IP,
+          "X-MACAddress": ENV.SMARTAPI_MAC_ADDRESS,
           "X-UserType": "USER",
           "Content-Type": "application/json",
         },
@@ -135,6 +129,7 @@ export async function fetchSmartApiQuotes(
     );
 
     if (!response.ok) return [];
+
     const data: any = await response.json();
     if (!data.status || !data.data?.fetched) return [];
 
@@ -152,11 +147,15 @@ export async function fetchSmartApiQuotes(
       totBuyQuan: q.totBuyQuan,
       totSellQuan: q.totSellQuan,
     }));
-  } catch {
+  } catch (error) {
+    console.error("SmartAPI quote fetch failed:", error);
     return [];
   }
 }
 
+/* ---------------------------------- */
+/* CANDLES                            */
+/* ---------------------------------- */
 export async function fetchSmartApiCandles(
   exchange: string,
   symbolToken: string,
@@ -167,11 +166,6 @@ export async function fetchSmartApiCandles(
   const jwt = await getSmartApiJwtToken();
   if (!jwt) return [];
 
-  const apiKey = process.env.SMARTAPI_API_KEY!;
-  const localIp = process.env.SMARTAPI_LOCAL_IP || "127.0.0.1";
-  const publicIp = process.env.SMARTAPI_PUBLIC_IP || "127.0.0.1";
-  const mac = process.env.SMARTAPI_MAC_ADDRESS || "00:00:00:00:00:00";
-
   try {
     const response = await fetch(
       "https://apiconnect.angelone.in/rest/secure/angelbroking/historical/v1/getCandleData",
@@ -179,11 +173,11 @@ export async function fetchSmartApiCandles(
         method: "POST",
         headers: {
           Authorization: `Bearer ${jwt}`,
-          "X-PrivateKey": apiKey,
+          "X-PrivateKey": ENV.SMARTAPI_API_KEY,
           "X-SourceID": "WEB",
-          "X-ClientLocalIP": localIp,
-          "X-ClientPublicIP": publicIp,
-          "X-MACAddress": mac,
+          "X-ClientLocalIP": ENV.SMARTAPI_LOCAL_IP,
+          "X-ClientPublicIP": ENV.SMARTAPI_PUBLIC_IP,
+          "X-MACAddress": ENV.SMARTAPI_MAC_ADDRESS,
           "X-UserType": "USER",
           "Content-Type": "application/json",
         },
@@ -198,10 +192,13 @@ export async function fetchSmartApiCandles(
     );
 
     if (!response.ok) return [];
+
     const data: any = await response.json();
     if (!data.status || !Array.isArray(data.data)) return [];
+
     return data.data;
-  } catch {
+  } catch (error) {
+    console.error("SmartAPI candle fetch failed:", error);
     return [];
   }
 }

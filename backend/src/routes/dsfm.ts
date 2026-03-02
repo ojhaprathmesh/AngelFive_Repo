@@ -1,47 +1,6 @@
+import speakeasy from "speakeasy";
 import express, { Request, Response } from "express";
-
-// Try to import otplib for TOTP generation
-let authenticator: any = null;
-try {
-  const otplib = require("otplib");
-  authenticator = otplib.authenticator;
-} catch (e) {
-  console.warn(
-    "otplib not installed. JWT token generation may fail. Install with: npm install otplib",
-  );
-}
-
-// Helper to fetch NSE index data (duplicated from market.ts to avoid circular dependency)
-async function getNSECookie(): Promise<string> {
-  const resp = await fetch("https://www.nseindia.com/", {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-  });
-  return resp.headers.get("set-cookie") || "";
-}
-
-async function fetchNSEIndex(indexName: string = "NIFTY 500"): Promise<any[]> {
-  const cookie = await getNSECookie();
-  const url = `https://www.nseindia.com/api/equity-stockIndices?index=${encodeURIComponent(indexName)}`;
-  const resp = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Accept: "application/json,text/plain,*/*",
-      Referer:
-        "https://www.nseindia.com/market-data/live-equity-market?symbol=NIFTY%20500",
-      Cookie: cookie,
-    },
-  });
-  if (!resp.ok) return [];
-  const json: any = await resp.json();
-  return json?.data || [];
-}
+import { ENV } from "../config/env";
 
 type Candle = {
   time: string;
@@ -78,88 +37,14 @@ const INSTRUMENT_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
 let jwtTokenCache: string | null = null;
 let jwtTokenExpiry: number = 0;
 
-// Generate TOTP using otplib
-function generateTOTP(secret: string): string {
-  if (!authenticator) {
-    throw new Error(
-      "otplib not installed. Please run: npm install otplib in the backend directory",
-    );
-  }
-  return authenticator.generate(secret);
-}
-
-// Get or generate JWT token
-async function getJwtToken(): Promise<string | null> {
-  // Check if token is still valid (with 5 minute buffer)
-  if (jwtTokenCache && Date.now() < jwtTokenExpiry - 300000) {
-    return jwtTokenCache;
-  }
-
-  const apiKey = process.env.SMARTAPI_API_KEY;
-  const clientCode = process.env.SMARTAPI_CLIENT_CODE;
-  const password = process.env.SMARTAPI_PASSWORD;
-  const totpSecret = process.env.SMARTAPI_TOTP_SECRET;
-  const localIp = process.env.SMARTAPI_LOCAL_IP || "127.0.0.1";
-  const publicIp = process.env.SMARTAPI_PUBLIC_IP || "127.0.0.1";
-  const mac = process.env.SMARTAPI_MAC_ADDRESS || "00:00:00:00:00:00";
-
-  if (!apiKey || !clientCode || !password || !totpSecret) {
-    console.error("Missing SmartAPI credentials for JWT token generation");
-    return null;
-  }
-
-  try {
-    // Generate TOTP
-    const totp = generateTOTP(totpSecret);
-
-    const response = await fetch(
-      "https://apiconnect.angelone.in/rest/auth/angelbroking/user/v1/loginByPassword",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-PrivateKey": apiKey,
-          Accept: "application/json",
-          "X-SourceID": "WEB",
-          "X-ClientLocalIP": localIp,
-          "X-ClientPublicIP": publicIp,
-          "X-MACAddress": mac,
-          "X-UserType": "USER",
-        },
-        body: JSON.stringify({
-          clientcode: clientCode,
-          password: password,
-          totp: totp,
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      console.error(
-        `SmartAPI login failed: ${response.status} ${response.statusText}`,
-      );
-      return null;
-    }
-
-    const data: any = await response.json();
-
-    if (!data.status || !data.data?.jwtToken) {
-      console.error("SmartAPI login failed:", data.message || "Login failed");
-      return null;
-    }
-
-    jwtTokenCache = data.data.jwtToken;
-    jwtTokenExpiry = Date.now() + 3600000; // 1 hour expiry
-
-    console.log("✅ SmartAPI JWT Token generated successfully");
-    return jwtTokenCache;
-  } catch (error: any) {
-    console.error("❌ SmartAPI JWT Token generation failed:", error.message);
-    jwtTokenCache = null;
-    jwtTokenExpiry = 0;
-    return null;
-  }
-}
+const smartAPIkey = ENV.SMARTAPI_API_KEY;
+const clientCode = ENV.SMARTAPI_CLIENT_CODE;
+const password = ENV.SMARTAPI_PASSWORD;
+const totpSecret = ENV.SMARTAPI_TOTP_SECRET;
+const localIp = ENV.SMARTAPI_LOCAL_IP;
+const publicIp = ENV.SMARTAPI_PUBLIC_IP;
+const mac = ENV.SMARTAPI_MAC_ADDRESS;
+const mlServiceUrl = ENV.ML_SERVICE_URL;
 
 async function loadInstrumentMaster(): Promise<InstrumentEntry[]> {
   if (
@@ -210,6 +95,95 @@ async function getSymbolToken(
   return null;
 }
 
+/**
+ * Generate TOTP using Speakeasy
+ * SmartAPI requires base32 secret
+ */
+function generateTOTP(secret: string): string {
+  return speakeasy.totp({
+    secret,
+    encoding: "base32",
+  });
+}
+
+// Get or generate JWT token
+async function getJwtToken(): Promise<string | null> {
+  // Check if token is still valid (with 5 minute buffer)
+  if (jwtTokenCache && Date.now() < jwtTokenExpiry - 300000) {
+    return jwtTokenCache;
+  }
+
+  if (!smartAPIkey || !clientCode || !password || !totpSecret) {
+    console.error("Missing SmartAPI credentials for JWT token generation");
+    return null;
+  }
+
+  try {
+    // Generate TOTP
+    const totp = generateTOTP(totpSecret);
+
+    const response = await fetch(
+      "https://apiconnect.angelone.in/rest/auth/angelbroking/user/v1/loginByPassword",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-PrivateKey": smartAPIkey,
+          Accept: "application/json",
+          "X-SourceID": "WEB",
+          "X-ClientLocalIP": localIp,
+          "X-ClientPublicIP": publicIp,
+          "X-MACAddress": mac,
+          "X-UserType": "USER",
+        },
+        body: JSON.stringify({
+          clientcode: clientCode,
+          password: password,
+          totp: totp,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      console.error(
+        `SmartAPI login failed: ${response.status} ${response.statusText}`,
+      );
+      return null;
+    }
+
+    const data: any = await response.json();
+
+    if (!data.status || !data.data?.jwtToken) {
+      console.error("SmartAPI login failed:", data.message || "Login failed");
+      return null;
+    }
+
+    jwtTokenCache = data.data.jwtToken;
+    jwtTokenExpiry = Date.now() + 3600000; // 1 hour expiry
+
+    console.log("✅ SmartAPI JWT Token generated successfully");
+    return jwtTokenCache;
+  } catch (error: any) {
+    console.error("❌ SmartAPI JWT Token generation failed:", error.message);
+    jwtTokenCache = null;
+    jwtTokenExpiry = 0;
+    return null;
+  }
+}
+
+const timeframeMap = {
+  "1W": { interval: "FIFTEEN_MINUTE", days: 7 },
+  "1M": { interval: "ONE_DAY", days: 30 },
+  "3M": { interval: "ONE_DAY", days: 90 },
+  "1Y": { interval: "ONE_DAY", days: 365 },
+} as const;
+
+function getTimeframeConfig(timeframe: string) {
+  return (
+    timeframeMap[timeframe as keyof typeof timeframeMap] ?? timeframeMap["1M"]
+  );
+}
+
 function formatDateTime(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -219,264 +193,6 @@ function formatDateTime(date: Date): string {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
-function getTimeframeConfig(timeframe: string): {
-  interval: string;
-  days: number;
-} {
-  switch (timeframe) {
-    case "1W":
-      return { interval: "FIFTEEN_MINUTE", days: 7 };
-    case "3M":
-      return { interval: "ONE_DAY", days: 90 };
-    case "1Y":
-      return { interval: "ONE_DAY", days: 365 };
-    case "1M":
-    default:
-      return { interval: "ONE_DAY", days: 30 };
-  }
-}
-
-async function fetchAngelHistoricalCandles(
-  symbol: string,
-  timeframe: string,
-): Promise<{ candles: Candle[]; error?: string }> {
-  const tokenInfo = await getSymbolToken(symbol);
-  if (!tokenInfo) {
-    return {
-      candles: [],
-      error: `Symbol "${symbol}" not found in instrument master. Try using the exact symbol from Angel One (e.g., "RELIANCE-EQ" instead of "RELIANCE")`,
-    };
-  }
-
-  const apiKey = process.env.SMARTAPI_API_KEY;
-  const localIp = process.env.SMARTAPI_LOCAL_IP || "127.0.0.1";
-  const publicIp = process.env.SMARTAPI_PUBLIC_IP || "127.0.0.1";
-  const mac = process.env.SMARTAPI_MAC_ADDRESS || "00:00:00:00:00:00";
-
-  if (!apiKey) {
-    const errorMsg =
-      "SmartAPI API key missing. Please set SMARTAPI_API_KEY in your .env.local file. Make sure to restart the backend server after adding credentials.";
-    console.error(errorMsg);
-    return { candles: [], error: errorMsg };
-  }
-
-  // Get JWT token (will generate if needed)
-  const jwt = await getJwtToken();
-  if (!jwt) {
-    const errorMsg =
-      "Failed to generate SmartAPI JWT token. Please check SMARTAPI_CLIENT_CODE, SMARTAPI_PASSWORD, and SMARTAPI_TOTP_SECRET in your .env.local file.";
-    console.error(errorMsg);
-    return { candles: [], error: errorMsg };
-  }
-
-  const { interval, days } = getTimeframeConfig(timeframe);
-  const now = new Date();
-  const fromDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-
-  const body = {
-    exchange: tokenInfo.exchange,
-    symboltoken: tokenInfo.token,
-    interval,
-    fromdate: formatDateTime(fromDate),
-    todate: formatDateTime(now),
-  };
-
-  try {
-    const resp = await fetch(
-      "https://apiconnect.angelone.in/rest/secure/angelbroking/historical/v1/getCandleData",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-PrivateKey": apiKey,
-          "X-SourceID": "WEB",
-          "X-ClientLocalIP": localIp,
-          "X-ClientPublicIP": publicIp,
-          "X-MACAddress": mac,
-          "X-UserType": "USER",
-          Authorization: `Bearer ${jwt}`,
-          Accept: "application/json",
-        },
-        body: JSON.stringify(body),
-      },
-    );
-
-    if (!resp.ok) {
-      const errorText = await resp.text();
-      let errorMsg = `Angel One API error (${resp.status}): ${resp.statusText}`;
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMsg = errorJson.message || errorJson.error || errorMsg;
-      } catch {
-        if (errorText) errorMsg = errorText;
-      }
-      console.error(`Angel historical API error:`, errorMsg);
-      return { candles: [], error: errorMsg };
-    }
-
-    const json = (await resp.json()) as SmartAPICandleResponse;
-    if (!json.status || !Array.isArray(json.data)) {
-      const errorMsg = json.message || "Invalid response from Angel One API";
-      console.error("Invalid Angel historical response", json);
-      return { candles: [], error: errorMsg };
-    }
-
-    // Debug: Log first few timestamps to see format
-    if (json.data.length > 0) {
-      console.log(
-        "Sample API response timestamps (first 5):",
-        json.data.slice(0, 5).map(([time]) => ({
-          time,
-          type: typeof time,
-          raw: JSON.stringify(time),
-          parsed: new Date(time as string).toISOString(),
-        })),
-      );
-    }
-
-    const validCandles: Candle[] = [];
-    let invalidCount = 0;
-
-    for (const [time, open, high, low, close, volume] of json.data) {
-      let dateObj: Date | null = null;
-
-      // Handle different time formats
-      if (typeof time === "string") {
-        // Try parsing as date string first
-        if (
-          time.trim() === "" ||
-          time === "0" ||
-          time === "null" ||
-          time === "undefined"
-        ) {
-          console.warn(`Empty or invalid time string: "${time}"`);
-          invalidCount++;
-          continue;
-        }
-
-        // Try direct date parsing
-        dateObj = new Date(time);
-
-        // If that failed or gave 1970, try other formats
-        if (isNaN(dateObj.getTime()) || dateObj.getFullYear() < 2000) {
-          // Try as Unix timestamp (seconds)
-          const timestampSec = parseInt(time, 10);
-          if (!isNaN(timestampSec) && timestampSec > 946684800) {
-            // After 2000-01-01
-            dateObj = new Date(timestampSec * 1000);
-          } else {
-            // Try as Unix timestamp (milliseconds)
-            const timestampMs = parseInt(time, 10);
-            if (!isNaN(timestampMs) && timestampMs > 946684800000) {
-              dateObj = new Date(timestampMs);
-            } else {
-              // Try parsing with different date formats
-              // Format: "DD-MMM-YYYY HH:MM:SS" or "YYYY-MM-DD HH:MM:SS"
-              const dateMatch = time.match(
-                /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/,
-              );
-              if (dateMatch) {
-                const [, year, month, day, hour, minute, second] = dateMatch;
-                dateObj = new Date(
-                  parseInt(year, 10),
-                  parseInt(month, 10) - 1,
-                  parseInt(day, 10),
-                  parseInt(hour, 10),
-                  parseInt(minute, 10),
-                  parseInt(second, 10),
-                );
-              } else {
-                console.warn(`Could not parse time: "${time}"`);
-                invalidCount++;
-                continue;
-              }
-            }
-          }
-        }
-      } else if (typeof time === "number") {
-        // Handle numeric timestamps
-        if (time === 0 || isNaN(time)) {
-          console.warn(`Invalid numeric time: ${time}`);
-          invalidCount++;
-          continue;
-        }
-        // Check if it's seconds (10 digits) or milliseconds (13 digits)
-        dateObj = time < 10000000000 ? new Date(time * 1000) : new Date(time);
-      } else {
-        console.warn(
-          `Unexpected time type: ${typeof time}, value: ${JSON.stringify(time)}`,
-        );
-        invalidCount++;
-        continue;
-      }
-
-      // Final validation - must be a valid date after year 2000
-      if (
-        !dateObj ||
-        isNaN(dateObj.getTime()) ||
-        dateObj.getFullYear() < 2000
-      ) {
-        console.warn(
-          `Invalid date object created from time: "${time}", year: ${dateObj?.getFullYear()}`,
-        );
-        invalidCount++;
-        continue;
-      }
-
-      // Format as "YYYY-MM-DD HH:MM:SS"
-      const year = dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-      const day = String(dateObj.getDate()).padStart(2, "0");
-      const hours = String(dateObj.getHours()).padStart(2, "0");
-      const minutes = String(dateObj.getMinutes()).padStart(2, "0");
-      const seconds = String(dateObj.getSeconds()).padStart(2, "0");
-      const parsedTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-
-      validCandles.push({
-        time: parsedTime,
-        open: Number(open) || 0,
-        high: Number(high) || 0,
-        low: Number(low) || 0,
-        close: Number(close) || 0,
-        volume: Number(volume) || 0,
-      });
-    }
-
-    if (invalidCount > 0) {
-      console.warn(
-        `Filtered out ${invalidCount} invalid candles with bad dates`,
-      );
-    }
-
-    if (validCandles.length === 0) {
-      console.error(
-        "No valid candles after filtering! All dates were invalid.",
-      );
-      return {
-        candles: [],
-        error: "No valid historical data found. All timestamps were invalid.",
-      };
-    }
-
-    // Sort by time
-    const candles = validCandles.sort(
-      (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime(),
-    );
-
-    console.log(
-      `Successfully parsed ${candles.length} valid candles out of ${json.data.length} total`,
-    );
-
-    return { candles };
-  } catch (e: any) {
-    const errorMsg =
-      e.message || "Network error while fetching data from Angel One API";
-    console.error("Error fetching Angel historical data:", e);
-    return { candles: [], error: errorMsg };
-  }
-}
-
-// Helper function to fetch Yahoo Finance data
 async function fetchYahooFinanceData(
   symbol: string,
   timeframe: string,
@@ -593,6 +309,220 @@ async function fetchYahooFinanceData(
   }
 }
 
+async function fetchAngelHistoricalCandles(
+  symbol: string,
+  timeframe: string,
+): Promise<{ candles: Candle[]; error?: string }> {
+  const tokenInfo = await getSymbolToken(symbol);
+  if (!tokenInfo) {
+    return {
+      candles: [],
+      error: `Symbol "${symbol}" not found in instrument master. Try using the exact symbol from Angel One (e.g., "RELIANCE-EQ" instead of "RELIANCE")`,
+    };
+  }
+
+  if (!smartAPIkey) {
+    const errorMsg =
+      "SmartAPI API key missing. Please set SMARTAPI_API_KEY in your .env file. Make sure to restart the backend server after adding credentials.";
+    console.error(errorMsg);
+    return { candles: [], error: errorMsg };
+  }
+
+  // Get JWT token (will generate if needed)
+  const jwt = await getJwtToken();
+  if (!jwt) {
+    const errorMsg =
+      "Failed to generate SmartAPI JWT token. Please check SMARTAPI_CLIENT_CODE, SMARTAPI_PASSWORD, and SMARTAPI_TOTP_SECRET in your .env file.";
+    console.error(errorMsg);
+    return { candles: [], error: errorMsg };
+  }
+
+  const { interval, days } = getTimeframeConfig(timeframe);
+  const now = new Date();
+  const fromDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+  const body = {
+    exchange: tokenInfo.exchange,
+    symboltoken: tokenInfo.token,
+    interval,
+    fromdate: formatDateTime(fromDate),
+    todate: formatDateTime(now),
+  };
+
+  try {
+    const resp = await fetch(
+      "https://apiconnect.angelone.in/rest/secure/angelbroking/historical/v1/getCandleData",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-PrivateKey": smartAPIkey,
+          "X-SourceID": "WEB",
+          "X-ClientLocalIP": localIp,
+          "X-ClientPublicIP": publicIp,
+          "X-MACAddress": mac,
+          "X-UserType": "USER",
+          Authorization: `Bearer ${jwt}`,
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!resp.ok) {
+      const errorText = await resp.text();
+      let errorMsg = `Angel One API error (${resp.status}): ${resp.statusText}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMsg = errorJson.message || errorJson.error || errorMsg;
+      } catch {
+        if (errorText) errorMsg = errorText;
+      }
+      console.error(`Angel historical API error:`, errorMsg);
+      return { candles: [], error: errorMsg };
+    }
+
+    const json = (await resp.json()) as SmartAPICandleResponse;
+    if (!json.status || !Array.isArray(json.data)) {
+      const errorMsg = json.message || "Invalid response from Angel One API";
+      console.error("Invalid Angel historical response", json);
+      return { candles: [], error: errorMsg };
+    }
+
+    // Debug: Log first few timestamps to see format
+    if (json.data.length > 0) {
+      console.log(
+        "Sample API response timestamps (first 5):",
+        json.data.slice(0, 5).map(([time]) => ({
+          time,
+          type: typeof time,
+          raw: JSON.stringify(time),
+          parsed: new Date(time as string).toISOString(),
+        })),
+      );
+    }
+
+    const validCandles: Candle[] = [];
+    let invalidCount = 0;
+
+    for (const [time, open, high, low, close, volume] of json.data) {
+      let dateObj: Date | null = null;
+
+      // Handle different time formats
+      // Try parsing as date string first
+      if (
+        time.trim() === "" ||
+        time === "0" ||
+        time === "null" ||
+        time === "undefined"
+      ) {
+        console.warn(`Empty or invalid time string: "${time}"`);
+        invalidCount++;
+        continue;
+      }
+      dateObj = new Date(time);
+      if (isNaN(dateObj.getTime()) || dateObj.getFullYear() < 2000) {
+        // Try as Unix timestamp (seconds)
+        const timestampSec = parseInt(time, 10);
+        if (!isNaN(timestampSec) && timestampSec > 946684800) {
+          // After 2000-01-01
+          dateObj = new Date(timestampSec * 1000);
+        } else {
+          // Try as Unix timestamp (milliseconds)
+          const timestampMs = parseInt(time, 10);
+          if (!isNaN(timestampMs) && timestampMs > 946684800000) {
+            dateObj = new Date(timestampMs);
+          } else {
+            // Try parsing with different date formats
+            // Format: "DD-MMM-YYYY HH:MM:SS" or "YYYY-MM-DD HH:MM:SS"
+            const dateMatch = time.match(
+              /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/,
+            );
+            if (dateMatch) {
+              const [, year, month, day, hour, minute, second] = dateMatch;
+              dateObj = new Date(
+                parseInt(year, 10),
+                parseInt(month, 10) - 1,
+                parseInt(day, 10),
+                parseInt(hour, 10),
+                parseInt(minute, 10),
+                parseInt(second, 10),
+              );
+            } else {
+              console.warn(`Could not parse time: "${time}"`);
+              invalidCount++;
+              continue;
+            }
+          }
+        }
+      }
+
+      // Final validation - must be a valid date after year 2000
+      if (
+        !dateObj ||
+        isNaN(dateObj.getTime()) ||
+        dateObj.getFullYear() < 2000
+      ) {
+        console.warn(
+          `Invalid date object created from time: "${time}", year: ${dateObj?.getFullYear()}`,
+        );
+        invalidCount++;
+        continue;
+      }
+
+      // Format as "YYYY-MM-DD HH:MM:SS"
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const day = String(dateObj.getDate()).padStart(2, "0");
+      const hours = String(dateObj.getHours()).padStart(2, "0");
+      const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+      const seconds = String(dateObj.getSeconds()).padStart(2, "0");
+      const parsedTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+      validCandles.push({
+        time: parsedTime,
+        open: Number(open) || 0,
+        high: Number(high) || 0,
+        low: Number(low) || 0,
+        close: Number(close) || 0,
+        volume: Number(volume) || 0,
+      });
+    }
+
+    if (invalidCount > 0) {
+      console.warn(
+        `Filtered out ${invalidCount} invalid candles with bad dates`,
+      );
+    }
+
+    if (validCandles.length === 0) {
+      console.error(
+        "No valid candles after filtering! All dates were invalid.",
+      );
+      return {
+        candles: [],
+        error: "No valid historical data found. All timestamps were invalid.",
+      };
+    }
+
+    // Sort by time
+    const candles = validCandles.sort(
+      (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime(),
+    );
+
+    console.log(
+      `Successfully parsed ${candles.length} valid candles out of ${json.data.length} total`,
+    );
+
+    return { candles };
+  } catch (e: any) {
+    const errorMsg =
+      e.message || "Network error while fetching data from Angel One API";
+    console.error("Error fetching Angel historical data:", e);
+    return { candles: [], error: errorMsg };
+  }
+}
+
 // Helper function to calculate log returns
 function calculateLogReturns(prices: number[]): number[] {
   const returns: number[] = [];
@@ -602,6 +532,46 @@ function calculateLogReturns(prices: number[]): number[] {
     }
   }
   return returns;
+}
+
+async function requireSymbolAndFetch(
+  symbol: string,
+  timeframe: string,
+  res: Response,
+): Promise<{ prices: number[]; logReturns: number[]; candles: any[] } | null> {
+  if (!symbol) {
+    res.status(400).json({ error: "Symbol is required" });
+    return null;
+  }
+  const fetched = await fetchPricesAndLogReturns(symbol, timeframe);
+  if ("error" in fetched) {
+    res.status(fetched.status).json({ error: fetched.error });
+    return null;
+  }
+  return fetched;
+}
+
+async function fetchPricesAndLogReturns(
+  symbol: string,
+  timeframe: string,
+): Promise<
+  | { prices: number[]; logReturns: number[]; candles: any[] }
+  | { error: string; status: number }
+> {
+  let result = await fetchYahooFinanceData(symbol, timeframe);
+  if (result.error || result.candles.length === 0) {
+    result = await fetchAngelHistoricalCandles(symbol, timeframe);
+  }
+  if (result.error) {
+    return { error: result.error, status: 404 };
+  }
+  const candles = result.candles;
+  const prices = candles.map((candle) => candle.close);
+  if (prices.length === 0) {
+    return { error: `No data found for ${symbol}`, status: 404 };
+  }
+  const logReturns = calculateLogReturns(prices);
+  return { prices, logReturns, candles };
 }
 
 // Helper function to calculate statistics
@@ -639,6 +609,37 @@ function calculateStatistics(returns: number[]) {
   return { mean, std, skewness, kurtosis, min, max };
 }
 
+async function getNSECookie(): Promise<string> {
+  const resp = await fetch("https://www.nseindia.com/", {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+  });
+  return resp.headers.get("set-cookie") || "";
+}
+
+async function fetchNSEIndex(indexName: string = "NIFTY 500"): Promise<any[]> {
+  const cookie = await getNSECookie();
+  const url = `https://www.nseindia.com/api/equity-stockIndices?index=${encodeURIComponent(indexName)}`;
+  const resp = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      Accept: "application/json,text/plain,*/*",
+      Referer:
+        "https://www.nseindia.com/market-data/live-equity-market?symbol=NIFTY%20500",
+      Cookie: cookie,
+    },
+  });
+  if (!resp.ok) return [];
+  const json: any = await resp.json();
+  return json?.data || [];
+}
+
 // Returns Analysis endpoint
 router.get("/returns", async (req: Request, res: Response): Promise<void> => {
   try {
@@ -669,11 +670,9 @@ router.get("/returns", async (req: Request, res: Response): Promise<void> => {
     const timestamps = candles.map((candle) => candle.time);
 
     if (prices.length === 0) {
-      res
-        .status(404)
-        .json({
-          error: `No historical data found for ${symbol}. The API returned empty data.`,
-        });
+      res.status(404).json({
+        error: `No historical data found for ${symbol}. The API returned empty data.`,
+      });
       return;
     }
 
@@ -811,7 +810,6 @@ router.get(
         } catch (err: any) {
           console.warn(`Error processing ${symbol}:`, err.message);
           failCount++;
-          continue;
         }
       }
 
@@ -821,12 +819,10 @@ router.get(
 
       if (stockReturns.length < 2) {
         console.error(`Insufficient stocks with data: ${stockReturns.length}`);
-        res
-          .status(400)
-          .json({
-            error:
-              "Insufficient data for correlation analysis. Need at least 2 stocks with valid data.",
-          });
+        res.status(400).json({
+          error:
+            "Insufficient data for correlation analysis. Need at least 2 stocks with valid data.",
+        });
         return;
       }
 
@@ -835,11 +831,9 @@ router.get(
 
       if (minLength < 30) {
         console.error(`Insufficient time points after alignment: ${minLength}`);
-        res
-          .status(400)
-          .json({
-            error: `Insufficient time points (${minLength}). Need at least 30 data points per stock for correlation analysis.`,
-          });
+        res.status(400).json({
+          error: `Insufficient time points (${minLength}). Need at least 30 data points per stock for correlation analysis.`,
+        });
         return;
       }
 
@@ -933,7 +927,7 @@ router.get(
       }
 
       const lambdaMax = Math.pow(1 + Math.sqrt(Q), 2); // Upper edge of MP distribution
-      const lambdaMin = Math.pow(1 - Math.sqrt(Q), 2); // Lower edge
+      // const lambdaMin = Math.pow(1 - Math.sqrt(Q), 2); // Lower edge
 
       // Count significant eigenvalues (above RMT threshold)
       const significantEigenvalues = eigenvalues.filter(
@@ -956,11 +950,9 @@ router.get(
     } catch (e: any) {
       console.error("Error calculating correlation:", e);
       console.error("Stack trace:", e.stack);
-      res
-        .status(500)
-        .json({
-          error: `failed_to_calculate_correlation: ${e.message || "Unknown error"}`,
-        });
+      res.status(500).json({
+        error: `failed_to_calculate_correlation: ${e.message || "Unknown error"}`,
+      });
     }
   },
 );
@@ -989,17 +981,84 @@ function calculateCorrelation(x: number[], y: number[]): number {
   return denominator === 0 ? 0 : numerator / denominator;
 }
 
+// Fetch and build a returns matrix for a list of symbols
+async function fetchStockReturnsMatrix(
+  symbols: string[],
+  timeframe: string,
+  minPrices = 30,
+  minReturns = 20,
+): Promise<
+  | { error: string }
+  | {
+      returnsMatrix: number[][];
+      returnSymbols: string[];
+      minLength: number;
+    }
+> {
+  const stockReturns: { symbol: string; returns: number[] }[] = [];
+
+  for (const symbol of symbols) {
+    try {
+      let result = await fetchYahooFinanceData(symbol, timeframe);
+      if (result.error || result.candles.length === 0) {
+        result = await fetchAngelHistoricalCandles(symbol, timeframe);
+      }
+
+      if (result.error) {
+        console.warn(`Skipping ${symbol}: ${result.error}`);
+        continue;
+      }
+
+      const candles = result.candles;
+      if (!candles || candles.length === 0) continue;
+
+      const prices = candles.map((candle: Candle) => candle.close);
+      if (prices.length >= minPrices) {
+        const returns = calculateLogReturns(prices);
+        if (returns.length >= minReturns) {
+          stockReturns.push({ symbol, returns });
+        }
+      }
+    } catch (err: any) {
+      console.warn(`Error processing ${symbol}:`, err.message);
+    }
+  }
+
+  if (stockReturns.length < 2) {
+    return {
+      error:
+        "Insufficient data. Need at least 2 stocks with valid historical data.",
+    };
+  }
+
+  const minLength = Math.min(...stockReturns.map((s) => s.returns.length));
+  const alignedReturns = stockReturns.map((s) => ({
+    symbol: s.symbol,
+    returns: s.returns.slice(-minLength),
+  }));
+
+  const returnsMatrix: number[][] = alignedReturns.map((s) =>
+    s.returns.map((r) => {
+      if (r === null || r === undefined || !isFinite(r) || isNaN(r)) {
+        return 0;
+      }
+      return r;
+    }),
+  );
+  const returnSymbols = alignedReturns.map((s) => s.symbol);
+
+  return { returnsMatrix, returnSymbols, minLength };
+}
+
 // MPT (Modern Portfolio Theory) Optimization endpoint
 router.post("/mpt", async (req: Request, res: Response): Promise<void> => {
   try {
     const { symbols, timeframe, riskFreeRate } = req.body || {};
 
     if (!symbols || !Array.isArray(symbols) || symbols.length < 2) {
-      res
-        .status(400)
-        .json({
-          error: "At least 2 symbols required for portfolio optimization",
-        });
+      res.status(400).json({
+        error: "At least 2 symbols required for portfolio optimization",
+      });
       return;
     }
 
@@ -1008,73 +1067,18 @@ router.post("/mpt", async (req: Request, res: Response): Promise<void> => {
 
     console.log(`MPT optimization for ${symbols.length} stocks (${tf})`);
 
-    // Fetch historical data for all symbols
-    const stockReturns: { symbol: string; returns: number[] }[] = [];
-
-    for (const symbol of symbols) {
-      try {
-        // Try Yahoo Finance first
-        let result = await fetchYahooFinanceData(symbol, tf);
-        if (result.error || result.candles.length === 0) {
-          result = await fetchAngelHistoricalCandles(symbol, tf);
-        }
-
-        if (result.error) {
-          console.warn(`Skipping ${symbol}: ${result.error}`);
-          continue;
-        }
-
-        const candles = result.candles;
-        if (!candles || candles.length === 0) continue;
-
-        const prices = candles.map((candle: Candle) => candle.close);
-        if (prices.length >= 30) {
-          const returns = calculateLogReturns(prices);
-          if (returns.length >= 20) {
-            stockReturns.push({ symbol, returns });
-          }
-        }
-      } catch (err: any) {
-        console.warn(`Error processing ${symbol}:`, err.message);
-        continue;
-      }
-    }
-
-    if (stockReturns.length < 2) {
-      res
-        .status(400)
-        .json({
-          error:
-            "Insufficient data. Need at least 2 stocks with valid historical data.",
-        });
+    const matrixResult = await fetchStockReturnsMatrix(symbols, tf);
+    if ("error" in matrixResult) {
+      res.status(400).json({ error: matrixResult.error });
       return;
     }
-
-    // Align returns to same length
-    const minLength = Math.min(...stockReturns.map((s) => s.returns.length));
-    const alignedReturns = stockReturns.map((s) => ({
-      symbol: s.symbol,
-      returns: s.returns.slice(-minLength),
-    }));
-
-    // Build returns matrix: each row is an asset, each column is a time period
-    // Filter out any NaN, Infinity, or null values
-    const returnsMatrix: number[][] = alignedReturns.map((s) =>
-      s.returns.map((r) => {
-        if (r === null || r === undefined || !isFinite(r) || isNaN(r)) {
-          return 0;
-        }
-        return r;
-      }),
-    );
-    const returnSymbols = alignedReturns.map((s) => s.symbol);
+    const { returnsMatrix, returnSymbols, minLength } = matrixResult;
 
     console.log(
       `Sending MPT request to ML service: ${returnSymbols.length} assets, ${minLength} time periods`,
     );
 
     // Call ML service
-    const mlServiceUrl = process.env.ML_SERVICE_URL || "http://localhost:8000";
     const mlResp = await fetch(`${mlServiceUrl}/dsfm/mpt`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1102,11 +1106,9 @@ router.post("/mpt", async (req: Request, res: Response): Promise<void> => {
     }
   } catch (e: any) {
     console.error("Error in MPT optimization:", e);
-    res
-      .status(500)
-      .json({
-        error: `failed_to_optimize_portfolio: ${e.message || "Unknown error"}`,
-      });
+    res.status(500).json({
+      error: `failed_to_optimize_portfolio: ${e.message || "Unknown error"}`,
+    });
   }
 });
 
@@ -1118,11 +1120,9 @@ router.post(
       const { symbols, timeframe, riskAversion, tau } = req.body || {};
 
       if (!symbols || !Array.isArray(symbols) || symbols.length < 2) {
-        res
-          .status(400)
-          .json({
-            error: "At least 2 symbols required for portfolio optimization",
-          });
+        res.status(400).json({
+          error: "At least 2 symbols required for portfolio optimization",
+        });
         return;
       }
 
@@ -1134,74 +1134,18 @@ router.post(
         `Black-Litterman optimization for ${symbols.length} stocks (${tf})`,
       );
 
-      // Fetch historical data for all symbols
-      const stockReturns: { symbol: string; returns: number[] }[] = [];
-
-      for (const symbol of symbols) {
-        try {
-          // Try Yahoo Finance first
-          let result = await fetchYahooFinanceData(symbol, tf);
-          if (result.error || result.candles.length === 0) {
-            result = await fetchAngelHistoricalCandles(symbol, tf);
-          }
-
-          if (result.error) {
-            console.warn(`Skipping ${symbol}: ${result.error}`);
-            continue;
-          }
-
-          const candles = result.candles;
-          if (!candles || candles.length === 0) continue;
-
-          const prices = candles.map((candle: Candle) => candle.close);
-          if (prices.length >= 30) {
-            const returns = calculateLogReturns(prices);
-            if (returns.length >= 20) {
-              stockReturns.push({ symbol, returns });
-            }
-          }
-        } catch (err: any) {
-          console.warn(`Error processing ${symbol}:`, err.message);
-          continue;
-        }
-      }
-
-      if (stockReturns.length < 2) {
-        res
-          .status(400)
-          .json({
-            error:
-              "Insufficient data. Need at least 2 stocks with valid historical data.",
-          });
+      const matrixResult = await fetchStockReturnsMatrix(symbols, tf);
+      if ("error" in matrixResult) {
+        res.status(400).json({ error: matrixResult.error });
         return;
       }
-
-      // Align returns to same length
-      const minLength = Math.min(...stockReturns.map((s) => s.returns.length));
-      const alignedReturns = stockReturns.map((s) => ({
-        symbol: s.symbol,
-        returns: s.returns.slice(-minLength),
-      }));
-
-      // Build returns matrix
-      // Filter out any NaN, Infinity, or null values
-      const returnsMatrix: number[][] = alignedReturns.map((s) =>
-        s.returns.map((r) => {
-          if (r === null || r === undefined || !isFinite(r) || isNaN(r)) {
-            return 0;
-          }
-          return r;
-        }),
-      );
-      const returnSymbols = alignedReturns.map((s) => s.symbol);
+      const { returnsMatrix, returnSymbols, minLength } = matrixResult;
 
       console.log(
         `Sending Black-Litterman request to ML service: ${returnSymbols.length} assets, ${minLength} time periods`,
       );
 
       // Call ML service
-      const mlServiceUrl =
-        process.env.ML_SERVICE_URL || "http://localhost:8000";
       const mlResp = await fetch(`${mlServiceUrl}/dsfm/black-litterman`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1234,17 +1178,15 @@ router.post(
       }
     } catch (e: any) {
       console.error("Error in Black-Litterman optimization:", e);
-      res
-        .status(500)
-        .json({
-          error: `failed_to_optimize_portfolio: ${e.message || "Unknown error"}`,
-        });
+      res.status(500).json({
+        error: `failed_to_optimize_portfolio: ${e.message || "Unknown error"}`,
+      });
     }
   },
 );
 
 // PCA Analysis endpoint
-router.get("/pca", async (req: Request, res: Response): Promise<void> => {
+router.get("/pca", async (_req: Request, res: Response): Promise<void> => {
   try {
     res.json({
       message: "PCA analysis endpoint - implementation in progress",
@@ -1258,7 +1200,7 @@ router.get("/pca", async (req: Request, res: Response): Promise<void> => {
 });
 
 // Network Analysis endpoint
-router.get("/network", async (req: Request, res: Response): Promise<void> => {
+router.get("/network", async (_req: Request, res: Response): Promise<void> => {
   try {
     res.json({
       message: "Network analysis endpoint - implementation in progress",
@@ -1278,44 +1220,18 @@ router.get("/adf-test", async (req: Request, res: Response): Promise<void> => {
     const symbol = String(req.query.symbol || "");
     const timeframe = String(req.query.timeframe || "1M");
 
-    if (!symbol) {
-      res.status(400).json({ error: "Symbol is required" });
-      return;
-    }
-
-    // Try Yahoo Finance first
-    let result = await fetchYahooFinanceData(symbol, timeframe);
-    if (result.error || result.candles.length === 0) {
-      result = await fetchAngelHistoricalCandles(symbol, timeframe);
-    }
-
-    if (result.error) {
-      res.status(404).json({ error: result.error });
-      return;
-    }
-
-    const candles = result.candles;
-    const prices = candles.map((candle) => candle.close);
-    if (prices.length === 0) {
-      res.status(404).json({ error: `No data found for ${symbol}` });
-      return;
-    }
-
-    const logReturns = calculateLogReturns(prices);
+    const fetched = await requireSymbolAndFetch(symbol, timeframe, res);
+    if (!fetched) return;
+    const {logReturns } = fetched;
     if (logReturns.length < 10) {
-      res
-        .status(400)
-        .json({
-          error:
-            "Insufficient data for ADF test (need at least 10 data points)",
-        });
+      res.status(400).json({
+        error: "Insufficient data for ADF test (need at least 10 data points)",
+      });
       return;
     }
 
     // Try to use ML service for proper ADF test
     try {
-      const mlServiceUrl =
-        process.env.ML_SERVICE_URL || "http://localhost:8000";
       const mlResp = await fetch(`${mlServiceUrl}/dsfm/adf-test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1400,30 +1316,10 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
     const timeframe = String(req.query.timeframe || "1M");
     const maxLags = Number(req.query.maxLags || 20);
 
-    if (!symbol) {
-      res.status(400).json({ error: "Symbol is required" });
-      return;
-    }
-
     // Try Yahoo Finance first
-    let result = await fetchYahooFinanceData(symbol, timeframe);
-    if (result.error || result.candles.length === 0) {
-      result = await fetchAngelHistoricalCandles(symbol, timeframe);
-    }
-
-    if (result.error) {
-      res.status(404).json({ error: result.error });
-      return;
-    }
-
-    const candles = result.candles;
-    const prices = candles.map((candle) => candle.close);
-    if (prices.length === 0) {
-      res.status(404).json({ error: `No data found for ${symbol}` });
-      return;
-    }
-
-    const logReturns = calculateLogReturns(prices);
+    const fetched = await requireSymbolAndFetch(symbol, timeframe, res);
+    if (!fetched) return;
+    const { logReturns } = fetched;
 
     // Adjust maxLags if we don't have enough data
     const adjustedMaxLags = Math.min(
@@ -1432,19 +1328,15 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
     );
 
     if (logReturns.length < 5) {
-      res
-        .status(400)
-        .json({
-          error:
-            "Insufficient data for ACF/PACF calculation (need at least 5 data points)",
-        });
+      res.status(400).json({
+        error:
+          "Insufficient data for ACF/PACF calculation (need at least 5 data points)",
+      });
       return;
     }
 
     // Try to use ML service for proper ACF/PACF
     try {
-      const mlServiceUrl =
-        process.env.ML_SERVICE_URL || "http://localhost:8000";
       const mlResp = await fetch(`${mlServiceUrl}/dsfm/acf-pacf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1548,7 +1440,6 @@ router.post("/arima", async (req: Request, res: Response): Promise<void> => {
       if (!result.error) {
         candles = result.candles;
         prices = candles.map((candle) => candle.close);
-        timeframe = "1Y";
       }
     }
 
@@ -1566,8 +1457,6 @@ router.post("/arima", async (req: Request, res: Response): Promise<void> => {
     }
 
     try {
-      const mlServiceUrl =
-        process.env.ML_SERVICE_URL || "http://localhost:8000";
       const mlResp = await fetch(`${mlServiceUrl}/dsfm/arima`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1595,7 +1484,7 @@ router.post("/arima", async (req: Request, res: Response): Promise<void> => {
       console.error("ML service ARIMA error:", e.message);
       res.status(503).json({
         error: "ml_service_unavailable",
-        message: `ML service is not available. ${process.env.ML_SERVICE_URL ? `URL: ${process.env.ML_SERVICE_URL}. ` : "Set ML_SERVICE_URL in backend env for production. "}Error: ${e.message}`,
+        message: `ML service is not available. ${mlServiceUrl ? `URL: ${mlServiceUrl}. ` : "Set ML_SERVICE_URL in backend env for production. "}Error: ${e.message}`,
       });
       return;
     }
@@ -1650,7 +1539,6 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
       if (!result.error) {
         candles = result.candles;
         prices = candles.map((candle) => candle.close);
-        timeframe = "1Y";
       }
     }
 
@@ -1668,8 +1556,6 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
     }
 
     try {
-      const mlServiceUrl =
-        process.env.ML_SERVICE_URL || "http://localhost:8000";
       const mlResp = await fetch(`${mlServiceUrl}/dsfm/garch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1697,7 +1583,7 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
       console.error("ML service GARCH error:", e.message);
       res.status(503).json({
         error: "ml_service_unavailable",
-        message: `ML service is not available. ${process.env.ML_SERVICE_URL ? `URL: ${process.env.ML_SERVICE_URL}. ` : "Set ML_SERVICE_URL in backend env for production. "}Error: ${e.message}`,
+        message: `ML service is not available. ${mlServiceUrl ? `URL: ${mlServiceUrl}. ` : "Set ML_SERVICE_URL in backend env for production. "}Error: ${e.message}`,
       });
       return;
     }
@@ -1738,20 +1624,16 @@ router.post("/lstm", async (req: Request, res: Response): Promise<void> => {
     const prices = candles.map((candle) => candle.close);
 
     if (prices.length < lookback + 20) {
-      res
-        .status(400)
-        .json({
-          error:
-            "Insufficient data for LSTM model (need at least 30 data points)",
-        });
+      res.status(400).json({
+        error:
+          "Insufficient data for LSTM model (need at least 30 data points)",
+      });
       return;
     }
 
     const logReturns = calculateLogReturns(prices);
 
     try {
-      const mlServiceUrl =
-        process.env.ML_SERVICE_URL || "http://localhost:8000";
       const mlResp = await fetch(`${mlServiceUrl}/dsfm/lstm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1805,8 +1687,6 @@ router.post(
       }
 
       try {
-        const mlServiceUrl =
-          process.env.ML_SERVICE_URL || "http://localhost:8000";
         const mlResp = await fetch(`${mlServiceUrl}/dsfm/sentiment/finbert`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1858,8 +1738,6 @@ router.post(
       }
 
       try {
-        const mlServiceUrl =
-          process.env.ML_SERVICE_URL || "http://localhost:8000";
         const mlResp = await fetch(
           `${mlServiceUrl}/dsfm/sentiment/rule-based`,
           {

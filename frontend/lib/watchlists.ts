@@ -11,7 +11,7 @@ class WatchlistHttpService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.API_URL || "";
+    this.baseUrl = process.env.BACKEND_URL || "";
   }
 
   subscribe(

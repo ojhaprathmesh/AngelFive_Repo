@@ -6,6 +6,7 @@ packages:
 
 onlyBuiltDependencies:
   - '@firebase/util'
-  - sharp
+  - esbuild
   - protobufjs
+  - sharp
   - unrs-resolver

@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/api/ml/:path*",
-        destination: `${process.env.NEXT_PUBLIC_ML_URL || "http://localhost:8000"}/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_ML_SERVICE_URL || "http://localhost:8000"}/:path*`,
       },
     ];
   },

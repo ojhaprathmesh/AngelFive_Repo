@@ -1623,7 +1623,7 @@ export function ReturnsAnalysis() {
                           <p className="font-semibold mb-2">
                             Add these to{" "}
                             <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
-                              backend/.env.local
+                              backend/.env
                             </code>
                             :
                           </p>

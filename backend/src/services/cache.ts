@@ -14,121 +14,106 @@
 type FetchFn<T> = () => Promise<T>;
 
 interface CacheEntry<T> {
-  data: T;
-  fetchedAt: number;
-  ttl: number;
-  revalidating: boolean;
+    data: T;
+    fetchedAt: number;
+    ttl: number;
+    revalidating: boolean;
 }
 
 class SWRCacheService {
-  private static instance: SWRCacheService;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private store = new Map<string, CacheEntry<any>>();
+    private static instance: SWRCacheService;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private store = new Map<string, CacheEntry<any>>();
 
-  static getInstance(): SWRCacheService {
-    if (!SWRCacheService.instance) {
-      SWRCacheService.instance = new SWRCacheService();
-    }
-    return SWRCacheService.instance;
-  }
-
-  /**
-   * Get data from cache using SWR strategy.
-   *
-   * @param key       - Unique cache key (e.g. "performers:1M", "candles:NSE:99926000:ONE_DAY")
-   * @param fetchFn   - Async function that fetches fresh data from the source
-   * @param ttlMs     - Time-to-live in milliseconds before data is considered stale
-   * @returns         - Cached (possibly stale) data, or freshly fetched data if cache is cold
-   */
-  async get<T>(key: string, fetchFn: FetchFn<T>, ttlMs: number): Promise<T> {
-    const entry = this.store.get(key) as CacheEntry<T> | undefined;
-
-    // ── COLD CACHE: nothing stored yet → fetch and block ──────────────────
-    if (!entry) {
-      console.log(`[SWRCache] COLD  | ${key}`);
-      const data = await fetchFn();
-      this.store.set(key, {
-        data,
-        fetchedAt: Date.now(),
-        ttl: ttlMs,
-        revalidating: false,
-      });
-      return data;
+    static getInstance(): SWRCacheService {
+        if (!SWRCacheService.instance) {
+            SWRCacheService.instance = new SWRCacheService();
+        }
+        return SWRCacheService.instance;
     }
 
-    const age = Date.now() - entry.fetchedAt;
-    const isStale = age > entry.ttl;
+    /**
+     * Get data from cache using SWR strategy.
+     *
+     * @param key       - Unique cache key (e.g. "performers:1M", "candles:NSE:99926000:ONE_DAY")
+     * @param fetchFn   - Async function that fetches fresh data from the source
+     * @param ttlMs     - Time-to-live in milliseconds before data is considered stale
+     * @returns         - Cached (possibly stale) data, or freshly fetched data if cache is cold
+     */
+    async get<T>(key: string, fetchFn: FetchFn<T>, ttlMs: number): Promise<T> {
+        const entry = this.store.get(key) as CacheEntry<T> | undefined;
 
-    // ── HOT CACHE: still fresh → return immediately ────────────────────────
-    if (!isStale) {
-      console.log(
-        `[SWRCache] HIT   | ${key} | age ${(age / 1000).toFixed(1)}s`,
-      );
-      return entry.data as T;
+        // ── COLD CACHE: nothing stored yet → fetch and block ──────────────────
+        if (!entry) {
+            console.log(`[SWRCache] COLD  | ${key}`);
+            const data = await fetchFn();
+            this.store.set(key, {
+                data,
+                fetchedAt: Date.now(),
+                ttl: ttlMs,
+                revalidating: false,
+            });
+            return data;
+        }
+
+        const age = Date.now() - entry.fetchedAt;
+        const isStale = age > entry.ttl;
+
+        // ── HOT CACHE: still fresh → return immediately ────────────────────────
+        if (!isStale) {
+            console.log(
+                `[SWRCache] HIT   | ${key} | age ${(age / 1000).toFixed(1)}s`,
+            );
+            return entry.data as T;
+        }
+
+        // ── STALE CACHE: serve old data, revalidate in background ─────────────
+        console.log(
+            `[SWRCache] STALE | ${key} | age ${(age / 1000).toFixed(1)}s → revalidating`,
+        );
+
+        if (!entry.revalidating) {
+            entry.revalidating = true;
+            // Fire and forget — do NOT await
+            fetchFn()
+                .then((freshData) => {
+                    this.store.set(key, {
+                        data: freshData,
+                        fetchedAt: Date.now(),
+                        ttl: ttlMs,
+                        revalidating: false,
+                    });
+                    console.log(`[SWRCache] FRESH | ${key} | revalidation complete`);
+                })
+                .catch((err) => {
+                    console.error(
+                        `[SWRCache] ERROR | ${key} | revalidation failed:`,
+                        err,
+                    );
+                    // Keep stale data, allow retry on next request
+                    entry.revalidating = false;
+                });
+        }
+
+        return entry.data as T;
     }
 
-    // ── STALE CACHE: serve old data, revalidate in background ─────────────
-    console.log(
-      `[SWRCache] STALE | ${key} | age ${(age / 1000).toFixed(1)}s → revalidating`,
-    );
 
-    if (!entry.revalidating) {
-      entry.revalidating = true;
-      // Fire and forget — do NOT await
-      fetchFn()
-        .then((freshData) => {
-          this.store.set(key, {
-            data: freshData,
-            fetchedAt: Date.now(),
-            ttl: ttlMs,
-            revalidating: false,
-          });
-          console.log(`[SWRCache] FRESH | ${key} | revalidation complete`);
-        })
-        .catch((err) => {
-          console.error(
-            `[SWRCache] ERROR | ${key} | revalidation failed:`,
-            err,
-          );
-          // Keep stale data, allow retry on next request
-          entry.revalidating = false;
-        });
+    /** Debug: list all keys and their ages */
+    status(): Array<{
+        key: string;
+        ageSeconds: number;
+        stale: boolean;
+        revalidating: boolean;
+    }> {
+        const now = Date.now();
+        return Array.from(this.store.entries()).map(([key, entry]) => ({
+            key,
+            ageSeconds: Math.floor((now - entry.fetchedAt) / 1000),
+            stale: now - entry.fetchedAt > entry.ttl,
+            revalidating: entry.revalidating,
+        }));
     }
-
-    return entry.data as T;
-  }
-
-  /** Manually invalidate a cache key (useful after writes or forced refresh) */
-  invalidate(key: string): void {
-    this.store.delete(key);
-    console.log(`[SWRCache] INVALIDATED | ${key}`);
-  }
-
-  /** Invalidate all keys matching a prefix */
-  invalidatePrefix(prefix: string): void {
-    for (const key of this.store.keys()) {
-      if (key.startsWith(prefix)) {
-        this.store.delete(key);
-        console.log(`[SWRCache] INVALIDATED | ${key}`);
-      }
-    }
-  }
-
-  /** Debug: list all keys and their ages */
-  status(): Array<{
-    key: string;
-    ageSeconds: number;
-    stale: boolean;
-    revalidating: boolean;
-  }> {
-    const now = Date.now();
-    return Array.from(this.store.entries()).map(([key, entry]) => ({
-      key,
-      ageSeconds: Math.floor((now - entry.fetchedAt) / 1000),
-      stale: now - entry.fetchedAt > entry.ttl,
-      revalidating: entry.revalidating,
-    }));
-  }
 }
 
 export const swrCache = SWRCacheService.getInstance();
@@ -136,21 +121,21 @@ export const swrCache = SWRCacheService.getInstance();
 // ─── TTL Constants (ms) ────────────────────────────────────────────────────
 
 export const TTL = {
-  /** Live index prices (SENSEX, NIFTY LTP) */
-  LIVE_PRICE: 15_000, // 15 seconds
+    /** Live index prices (SENSEX, NIFTY LTP) */
+    LIVE_PRICE: 15_000, // 15 seconds
 
-  /** Top Performers list (changes every few minutes) */
-  PERFORMERS: 60_000, // 1 minute
+    /** Top Performers list (changes every few minutes) */
+    PERFORMERS: 60_000, // 1 minute
 
-  /** Discovery data: most bought, top movers, pocket friendly */
-  DISCOVERY: 60_000, // 1 minute
+    /** Discovery data: most bought, top movers, pocket friendly */
+    DISCOVERY: 60_000, // 1 minute
 
-  /** Index overview chart — intraday candles */
-  CHART_INTRADAY: 60_000, // 1 minute
+    /** Index overview chart — intraday candles */
+    CHART_INTRADAY: 60_000, // 1 minute
 
-  /** Index overview chart — daily/weekly candles (historical bulk) */
-  CHART_HISTORICAL: 5 * 60_000, // 5 minutes
+    /** Index overview chart — daily/weekly candles (historical bulk) */
+    CHART_HISTORICAL: 5 * 60_000, // 5 minutes
 
-  /** NSE instrument master list */
-  INSTRUMENT_MASTER: 12 * 60 * 60_000, // 12 hours
+    /** NSE instrument master list */
+    INSTRUMENT_MASTER: 12 * 60 * 60_000, // 12 hours
 };

@@ -302,7 +302,10 @@ export class FirebaseClientAuth {
             // Sign in with the custom token returned from backend
             if (data.data?.token) {
                 const { signInWithCustomToken } = await import("firebase/auth");
-                await signInWithCustomToken(auth, data.data.token);
+                const userCredential = await signInWithCustomToken(auth, data.data.token);
+
+                // Force token refresh so ID token is immediately valid for API calls
+                await userCredential.user.getIdToken(true);
 
                 return {
                     success: true,

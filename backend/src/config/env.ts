@@ -19,6 +19,7 @@ interface Env {
     // Firebase Admin Config
     FIREBASE_PRIVATE_KEY: string;
     FIREBASE_CLIENT_EMAIL: string;
+    GOOGLE_CLIENT_ID: string;
 
     // SmartAPI Config
     SMARTAPI_CLIENT_CODE: string;
@@ -70,6 +71,7 @@ export const ENV: Env = {
     // Firebase Admin Config
     FIREBASE_PRIVATE_KEY: requiredEnv("FIREBASE_PRIVATE_KEY").replace(/\\n/g, "\n"),
     FIREBASE_CLIENT_EMAIL: requiredEnv("FIREBASE_CLIENT_EMAIL"),
+    GOOGLE_CLIENT_ID: requiredEnv("GOOGLE_CLIENT_ID"),
 
     // SmartAPI Config
     SMARTAPI_CLIENT_CODE: requiredEnv("SMARTAPI_CLIENT_CODE"),

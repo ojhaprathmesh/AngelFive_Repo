@@ -1,6 +1,7 @@
 import { firebaseAuth, firebaseFirestore } from "../config/firebase";
 import { UserRecord } from "firebase-admin/auth";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { createHash } from "crypto";
 
 // Standardized user data schema following Firebase best practices
 export interface UserProfile {
@@ -51,14 +52,37 @@ export class FirebaseAuthService {
     private static instance: FirebaseAuthService;
     private readonly usersCollection = "users";
 
-    private constructor() {
-    }
+    private constructor() { }
 
     public static getInstance(): FirebaseAuthService {
         if (!FirebaseAuthService.instance) {
             FirebaseAuthService.instance = new FirebaseAuthService();
         }
         return FirebaseAuthService.instance;
+    }
+
+    /**
+     * Generates a deterministic document ID from a name + uid.
+     * Format: "prathmesh-ojha-a3kR9mZx"
+     * The name prefix is human-readable; the 8-char base62 hash suffix guarantees uniqueness.
+     *
+     * Example: ("Prathmesh Ojha", "NqyoREKDTaga6...") → "prathmesh-ojha-a3kR9mZx"
+     */
+    private generateSlug(name: string, uid: string): string {
+        const nameSlug = name
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9\s]/g, "")
+            .replace(/\s+/g, "-");
+
+        const hash = createHash("sha256").update(uid).digest();
+        const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let hashSuffix = "";
+        for (let i = 0; i < 8; i++) {
+            hashSuffix += chars[hash[i] % 62];
+        }
+
+        return `${nameSlug}-${hashSuffix}`;
     }
 
     /**
@@ -118,7 +142,6 @@ export class FirebaseAuthService {
                 };
             }
 
-            // Update last login time
             await this.updateLastLoginTime(userRecord.uid);
 
             // Get user profile from Firestore
@@ -143,17 +166,21 @@ export class FirebaseAuthService {
      */
     async getUserProfile(uid: string): Promise<UserProfile | null> {
         try {
-            const [userRecord, userDoc] = await Promise.all([
+            const [userRecord, snap] = await Promise.all([
                 firebaseAuth.getUser(uid),
-                firebaseFirestore.collection(this.usersCollection).doc(uid).get(),
+                firebaseFirestore
+                    .collection(this.usersCollection)
+                    .where("uid", "==", uid)
+                    .limit(1)
+                    .get(),
             ]);
 
-            if (!userDoc.exists) {
-                // Create profile if it doesn't exist
+            if (snap.empty) {
+                // Profile doesn't exist yet — create it on the fly
                 return await this.createUserProfile(userRecord);
             }
 
-            const userData = userDoc.data();
+            const userData = snap.docs[0].data();
             return this.mapToUserProfile(userRecord, userData);
         } catch (error) {
             console.error("Error getting user profile:", error);
@@ -162,29 +189,36 @@ export class FirebaseAuthService {
     }
 
     /**
-     * Update user profile
+     * Update user profile.
+     * Finds the document by uid field first, then updates it.
      */
     async updateUserProfile(
         uid: string,
         updates: Partial<UserProfile>,
     ): Promise<boolean> {
         try {
-            const updateData = {
+            const snap = await firebaseFirestore
+                .collection(this.usersCollection)
+                .where("uid", "==", uid)
+                .limit(1)
+                .get();
+
+            if (snap.empty) {
+                console.warn(`No profile found for uid: ${uid}`);
+                return false;
+            }
+
+            await snap.docs[0].ref.update({
                 ...updates,
                 updatedAt: FieldValue.serverTimestamp(),
-            };
+            });
 
-            await firebaseFirestore
-                .collection(this.usersCollection)
-                .doc(uid)
-                .update(updateData);
             return true;
         } catch (error) {
             console.error("Error updating user profile:", error);
             return false;
         }
     }
-
 
     /**
      * Check if email exists
@@ -202,13 +236,16 @@ export class FirebaseAuthService {
     }
 
     /**
-     * Create user profile in Firestore
+     * Create user profile in Firestore.
+     * Document ID is a deterministic 8-char base62 slug derived from the uid.
+     * The uid is stored as a field inside the document for querying.
      */
     public async createUserProfile(
         userRecord: UserRecord,
         fullName?: string,
     ): Promise<UserProfile> {
         const now = Timestamp.now();
+        const docId = this.generateSlug(fullName || userRecord.displayName || "user", userRecord.uid);
 
         const userProfile: UserProfile = {
             uid: userRecord.uid,
@@ -238,17 +275,21 @@ export class FirebaseAuthService {
         // Save to Firestore
         await firebaseFirestore
             .collection(this.usersCollection)
-            .doc(userRecord.uid)
+            .doc(docId)
             .set(userProfile);
+
+        // Create default watchlist subcollection under slug doc ID
         const wlCol = firebaseFirestore
             .collection(this.usersCollection)
-            .doc(userRecord.uid)
+            .doc(docId)
             .collection("watchlists");
+
         const defDoc = wlCol.doc("default");
         await defDoc.set(
             { name: "Default", createdAt: FieldValue.serverTimestamp() },
             { merge: true },
         );
+
         const symCol = defDoc.collection("symbols");
         const symSnap = await symCol.limit(1).get();
         if (symSnap.empty) {
@@ -285,9 +326,9 @@ export class FirebaseAuthService {
      */
     private async updateLastLoginTime(uid: string): Promise<void> {
         try {
-            await firebaseFirestore.collection(this.usersCollection).doc(uid).update({
-                lastLoginAt: FieldValue.serverTimestamp(),
-                updatedAt: FieldValue.serverTimestamp(),
+            await this.updateUserProfile(uid, {
+                lastLoginAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
             });
         } catch (error) {
             console.error("Error updating last login time:", error);

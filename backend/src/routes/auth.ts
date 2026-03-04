@@ -1,8 +1,9 @@
 import { Request, Response, Router } from "express";
 import { body, validationResult } from "express-validator";
-import { authService } from "../services/auth";
 import { getAuth } from "firebase-admin/auth";
 import { Timestamp } from "firebase-admin/firestore";
+import { authService } from "../services/auth";
+import { ENV } from "../config/env";
 
 // Extend Express Request type to include user
 interface AuthRequest extends Request {
@@ -14,25 +15,6 @@ interface AuthRequest extends Request {
 
 const router: Router = Router();
 
-// Authentication request interfaces
-interface LoginRequest {
-    submissionType: "LOGIN";
-    email: string;
-    password: string;
-    fullName: null;
-    confirmPassword: null;
-    timestamp: string;
-}
-
-interface SignupRequest {
-    submissionType: "SIGNUP";
-    email: string;
-    password: string;
-    fullName: string;
-    confirmPassword: string;
-    timestamp: string;
-}
-
 // Enhanced validation middleware for Firebase integration
 const loginValidation = [
     body("email")
@@ -42,9 +24,6 @@ const loginValidation = [
     body("password")
         .isLength({ min: 8 })
         .withMessage("Password must be at least 8 characters long"),
-    body("submissionType")
-        .equals("LOGIN")
-        .withMessage("Invalid submission type for login"),
 ];
 
 const signupValidation = [
@@ -68,9 +47,6 @@ const signupValidation = [
         }
         return true;
     }),
-    body("submissionType")
-        .equals("SIGNUP")
-        .withMessage("Invalid submission type for signup"),
 ];
 
 // Logging utility for authentication events
@@ -93,68 +69,55 @@ const logSubmission = (
 };
 
 // Login endpoint with Firebase authentication
-router.post(
-    "/login",
-    loginValidation,
-    async (req: Request, res: Response): Promise<Response> => {
-        try {
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                logSubmission(
-                    req,
-                    "LOGIN",
-                    "ERROR",
-                    `Validation failed: ${errors.array().map((e) => e.msg).join(", ")}`,
-                );
-                return res.status(400).json({
-                    status: "error",
-                    message: "Validation failed",
-                    errors: errors.array(),
-                    timestamp: new Date().toISOString(),
-                });
+router.post("/login", loginValidation, async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ status: "error", message: "Validation failed", errors: errors.array() });
+        }
+
+        const { email, password } = req.body;
+
+        // Use Firebase REST API to verify password (Admin SDK cannot do this)
+        const firebaseApiKey = ENV.FIREBASE_API_KEY; // your web API key
+        const signInRes = await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseApiKey}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password, returnSecureToken: true }),
             }
+        );
 
-            const { email } = req.body as LoginRequest;
-            const authResult = await authService.signInUser(email);
-
-            if (!authResult.success) {
-                logSubmission(req, "LOGIN", "ERROR", authResult.error);
-                let statusCode = 401;
-                if (authResult.errorCode === "auth/user-disabled") statusCode = 403;
-                return res.status(statusCode).json({
-                    status: "error",
-                    message: authResult.error || "Authentication failed",
-                    errorCode: authResult.errorCode,
-                    timestamp: new Date().toISOString(),
-                });
-            }
-
-            const userRecord = await getAuth().getUserByEmail(email);
-            const customToken = await getAuth().createCustomToken(userRecord.uid);
-            logSubmission(req, "LOGIN", "SUCCESS", "User logged in successfully");
-
-            return res.json({
-                status: "success",
-                message: "Login successful",
-                data: {
-                    token: customToken,
-                    user: authResult.user,
-                },
-                timestamp: new Date().toISOString(),
-            });
-        } catch (error) {
-            console.error("Login error:", error);
-            logSubmission(req, "LOGIN", "ERROR",
-                `Server error: ${error instanceof Error ? error.message : "Unknown error"}`
-            );
-            return res.status(500).json({
+        if (!signInRes.ok) {
+            const errData = await signInRes.json() as { error?: { message?: string } };
+            const msg = errData?.error?.message;
+            return res.status(401).json({
                 status: "error",
-                message: "Internal server error during login",
-                timestamp: new Date().toISOString(),
+                message: msg === "INVALID_PASSWORD" || msg === "EMAIL_NOT_FOUND"
+                    ? "Invalid email or password"
+                    : "Authentication failed",
+                errorCode: "auth/invalid-credentials",
             });
         }
-    },
-);
+
+        const signInData = await signInRes.json() as { localId: string };
+        const uid = signInData.localId;
+
+        // Create custom token for frontend to use with signInWithCustomToken
+        const customToken = await getAuth().createCustomToken(uid);
+        const userProfile = await authService.getUserProfile(uid);
+
+        return res.json({
+            status: "success",
+            message: "Login successful",
+            data: { token: customToken, user: userProfile },
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        return res.status(500).json({ status: "error", message: "Internal server error during login" });
+    }
+});
 
 // Signup endpoint with Firebase authentication
 router.post(
@@ -182,7 +145,7 @@ router.post(
                 });
             }
 
-            const { email, password, fullName } = req.body as SignupRequest;
+            const { email, password, fullName } = req.body;
 
             // Check if user already exists
             const emailExists = await authService.emailExists(email);
@@ -431,7 +394,7 @@ router.post(
                 });
             }
 
-            const { email, password, fullName } = req.body as SignupRequest;
+            const { email, password, fullName } = req.body;
 
             try {
                 // Check if user already exists
@@ -610,7 +573,7 @@ router.post(
             };
 
             // (Optional but recommended) Verify the token audience matches your OAuth client ID
-            const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+            const clientId = ENV.GOOGLE_CLIENT_ID;
             if (clientId && googlePayload.aud !== clientId) {
                 return res.status(401).json({
                     status: "error",

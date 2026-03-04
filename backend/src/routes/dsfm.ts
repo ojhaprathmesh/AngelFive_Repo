@@ -1,7 +1,9 @@
 import speakeasy from "speakeasy";
-import { fetchNSEIndex } from "../lib/nse";
 import express, { Request, Response } from "express";
+
 import { ENV } from "../config/env";
+import { fetchNSEIndex } from "../lib/nse";
+import { mlFetch } from "../utils/mlFetch";
 
 type Candle = {
     time: string;
@@ -1050,7 +1052,7 @@ router.post("/mpt", async (req: Request, res: Response): Promise<void> => {
         );
 
         // Call ML service
-        const mlResp = await fetch(`${mlServiceUrl}/dsfm/mpt`, {
+        const mlResp = await mlFetch(`${mlServiceUrl}/dsfm/mpt`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -1117,7 +1119,7 @@ router.post(
             );
 
             // Call ML service
-            const mlResp = await fetch(`${mlServiceUrl}/dsfm/black-litterman`, {
+            const mlResp = await mlFetch(`${mlServiceUrl}/dsfm/black-litterman`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1203,7 +1205,7 @@ router.get("/adf-test", async (req: Request, res: Response): Promise<void> => {
 
         // Try to use ML service for proper ADF test
         try {
-            const mlResp = await fetch(`${mlServiceUrl}/dsfm/adf-test`, {
+            const mlResp = await mlFetch(`${mlServiceUrl}/dsfm/adf-test`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ returns: logReturns }),
@@ -1308,7 +1310,7 @@ router.get("/acf-pacf", async (req: Request, res: Response): Promise<void> => {
 
         // Try to use ML service for proper ACF/PACF
         try {
-            const mlResp = await fetch(`${mlServiceUrl}/dsfm/acf-pacf`, {
+            const mlResp = await mlFetch(`${mlServiceUrl}/dsfm/acf-pacf`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1428,7 +1430,7 @@ router.post("/arima", async (req: Request, res: Response): Promise<void> => {
         }
 
         try {
-            const mlResp = await fetch(`${mlServiceUrl}/dsfm/arima`, {
+            const mlResp = await mlFetch(`${mlServiceUrl}/dsfm/arima`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ returns: logReturns, order }),
@@ -1527,7 +1529,7 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
         }
 
         try {
-            const mlResp = await fetch(`${mlServiceUrl}/dsfm/garch`, {
+            const mlResp = await mlFetch(`${mlServiceUrl}/dsfm/garch`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ returns: logReturns, order }),
@@ -1605,7 +1607,7 @@ router.post("/lstm", async (req: Request, res: Response): Promise<void> => {
         const logReturns = calculateLogReturns(prices);
 
         try {
-            const mlResp = await fetch(`${mlServiceUrl}/dsfm/lstm`, {
+            const mlResp = await mlFetch(`${mlServiceUrl}/dsfm/lstm`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1658,7 +1660,7 @@ router.post(
             }
 
             try {
-                const mlResp = await fetch(`${mlServiceUrl}/dsfm/sentiment/finbert`, {
+                const mlResp = await mlFetch(`${mlServiceUrl}/dsfm/sentiment/finbert`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ text }),
@@ -1709,7 +1711,7 @@ router.post(
             }
 
             try {
-                const mlResp = await fetch(
+                const mlResp = await mlFetch(
                     `${mlServiceUrl}/dsfm/sentiment/rule-based`,
                     {
                         method: "POST",

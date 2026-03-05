@@ -7,6 +7,7 @@ import { JetBrains_Mono } from "next/font/google";
 import React from "react";
 import { Toaster } from "sonner";
 
+import { KeepAlive } from "@/components/keep-alive";
 import { AuthProvider } from "@/contexts/auth-context";
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default function RootLayout({
         <html lang="en" className={jetbrainsMono.variable}>
             <body className="font-mono antialiased">
                 <AuthProvider>
+                    <KeepAlive />
                     {children}
                     <Toaster
                         position="bottom-right"

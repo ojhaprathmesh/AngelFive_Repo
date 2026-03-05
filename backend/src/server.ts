@@ -7,10 +7,10 @@ import helmet from "helmet";
 import morgan from "morgan";
 
 import { ENV } from "./config/env";
-import authRoutes from "./routes/auth";
-import dsfmRoutes from "./routes/dsfm";
-import marketRoutes from "./routes/market";
-import watchlistRoutes from "./routes/watchlists";
+import authRouter from "./routes/auth";
+import dsfmRouter from "./routes/dsfm";
+import marketRouter from "./routes/market";
+import watchlistRouter from "./routes/watchlists";
 
 const app: Express = express();
 const PORT = ENV.PORT;
@@ -69,14 +69,16 @@ app.use(express.urlencoded({ extended: true }));
 /*                                  ROUTES                                    */
 /* -------------------------------------------------------------------------- */
 
-app.use("/api/auth", authRoutes);
-app.use("/api/market", marketRoutes);
-app.use("/api/watchlists", watchlistRoutes);
-app.use("/api/dsfm", dsfmRoutes);
+app.use("/api/auth", authRouter);
+app.use("/api/dsfm", dsfmRouter);
+app.use("/api/market", marketRouter);
+app.use("/api/watchlists", watchlistRouter);
 
 /* -------------------------------------------------------------------------- */
 /*                             BASIC & HEALTH ROUTES                          */
 /* -------------------------------------------------------------------------- */
+let mlStatus: "ok" | "down" | "unknown" = "unknown";
+let lastChecked: number | null = null;
 
 app.get("/", (_req: Request, res: Response) => {
     res.status(200).json({
@@ -87,22 +89,28 @@ app.get("/", (_req: Request, res: Response) => {
     });
 });
 
-// 🔥 Render Health Check Endpoint
-app.get("/health", async (_req: Request, res: Response) => {
-    try {
-        res.status(200).json({
-            status: "healthy",
-            uptime: process.uptime(),
-            timestamp: new Date().toISOString(),
-            memory: process.memoryUsage(),
-            environment: ENV.NODE_ENV,
-        });
-    } catch (error) {
-        res.status(503).json({
-            status: "unhealthy",
-            timestamp: new Date().toISOString(),
-        });
-    }
+app.get("/health", (_req: Request, res: Response) => {
+    // Respond immediately
+    res.status(200).json({
+        status: "ok",
+        services: {
+            backend: "ok",
+            ml: mlStatus
+        },
+        lastMlCheck: lastChecked
+    });
+
+    // Background ML health check
+    void (async () => {
+        try {
+            const resp = await fetch(`${ENV.ML_SERVICE_URL}/health`);
+            mlStatus = resp.ok ? "ok" : "down";
+        } catch {
+            mlStatus = "down";
+        } finally {
+            lastChecked = Date.now();
+        }
+    })(); // Immediately Invoked Async Arrow Function (IIFE)
 });
 
 app.get("/api/test", (req: Request, res: Response) => {

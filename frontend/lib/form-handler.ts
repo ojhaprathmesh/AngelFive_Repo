@@ -1,5 +1,6 @@
-import { toast } from "sonner";
 import { redirect } from "next/navigation";
+import { toast } from "sonner";
+
 import { AuthResult, FirebaseClientAuth } from "./firebase";
 import { capitalize } from "./utils";
 

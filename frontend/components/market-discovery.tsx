@@ -1,11 +1,12 @@
 "use client";
 
+import { AlertCircle, TrendingDown, TrendingUp } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { type MarketData } from "@/lib/market-data";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, TrendingDown, TrendingUp } from "lucide-react";
+import { type MarketData } from "@/lib/market-data";
 
 interface PerformerItem {
     symbol: string;

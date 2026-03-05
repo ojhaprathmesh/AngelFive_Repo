@@ -1,7 +1,8 @@
 import { Request, Response, Router } from "express";
 import { getAuth } from "firebase-admin/auth";
-import { firebaseFirestore } from "../config/firebase";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+
+import { firebaseFirestore } from "../config/firebase";
 
 const router: Router = Router();
 

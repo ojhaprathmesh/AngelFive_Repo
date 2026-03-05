@@ -1,5 +1,6 @@
-import { auth } from "./firebase";
 import { Timestamp } from "firebase/firestore";
+
+import { auth } from "./firebase";
 
 export interface WatchlistItem {
     id: string;

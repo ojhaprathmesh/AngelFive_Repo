@@ -1,6 +1,5 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     BusinessDay,
     CandlestickSeries,
@@ -12,9 +11,10 @@ import {
     LineSeries,
     Time,
 } from "lightweight-charts";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Activity, AlertCircle, Circle, Moon, MousePointer2, Move, Sun, ZoomIn, ZoomOut, } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -23,6 +23,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface WatchlistChartProps {
     symbol: string;

@@ -1,17 +1,16 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { ENV } from "./config/env";
-
-import express, { Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
+import express, { Express, NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 
+import { ENV } from "./config/env";
 import authRoutes from "./routes/auth";
+import dsfmRoutes from "./routes/dsfm";
 import marketRoutes from "./routes/market";
 import watchlistRoutes from "./routes/watchlists";
-import dsfmRoutes from "./routes/dsfm";
 
 const app: Express = express();
 const PORT = ENV.PORT;

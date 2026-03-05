@@ -1,11 +1,13 @@
+import "./globals.css";
+
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
-import { Toaster } from "sonner";
-import { AuthProvider } from "@/contexts/auth-context";
-import "./globals.css";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Analytics } from "@vercel/analytics/react";
 import React from "react";
+import { Toaster } from "sonner";
+
+import { AuthProvider } from "@/contexts/auth-context";
 
 export const metadata: Metadata = {
     title: "AngelFive - Smart Financial Data Management",

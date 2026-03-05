@@ -22,7 +22,7 @@ interface CacheEntry<T> {
 
 class SWRCacheService {
     private static instance: SWRCacheService;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     private store = new Map<string, CacheEntry<any>>();
 
     static getInstance(): SWRCacheService {

@@ -1,5 +1,5 @@
-import { TradingChart } from "@/components/trading-chart";
 import MarketDiscovery from "@/components/market-discovery";
+import { TradingChart } from "@/components/trading-chart";
 
 export default function MarketPage() {
     return (

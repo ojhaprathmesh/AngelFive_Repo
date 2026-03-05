@@ -1,10 +1,5 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "@/contexts/auth-context";
-import { type WatchlistItem, watchlistService } from "@/lib/watchlists";
-import { marketDataService } from "@/lib/market-data";
-import { Button } from "@/components/ui/button";
 import {
     Check,
     ChevronLeft,
@@ -19,9 +14,15 @@ import {
     TrendingUp,
     X,
 } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
 import { WatchlistChart } from "@/components/watchlist-chart";
 import { StockOverviewPanel } from "@/components/watchlist-stock-overview";
+import { useAuth } from "@/contexts/auth-context";
+import { marketDataService } from "@/lib/market-data";
+import { type WatchlistItem, watchlistService } from "@/lib/watchlists";
 
 interface MarketIndex {
     name: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { format } from "date-fns";
 import {
     AreaSeries,
     CandlestickSeries,
@@ -12,12 +12,13 @@ import {
     Time,
     UTCTimestamp,
 } from "lightweight-charts";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { type MarketData as LiveMarketData, marketDataService, } from "@/lib/market-data";
-import { format } from "date-fns";
 import { Activity, AlertCircle, BarChart3, TrendingDown, TrendingUp, } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { type MarketData as LiveMarketData, marketDataService, } from "@/lib/market-data";
 
 interface MarketData {
     symbol: string;
@@ -614,8 +615,8 @@ export function TradingChart() {
                                             </span>
                                             <Badge
                                                 className={`text-[11px] ${isPositiveChange
-                                                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                                                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                                    : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                                                     }`}
                                             >
                                                 {isPositiveChange ? "+" : ""}

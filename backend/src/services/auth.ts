@@ -1,7 +1,8 @@
-import { firebaseAuth, firebaseFirestore } from "../config/firebase";
+import { createHash } from "crypto";
 import { UserRecord } from "firebase-admin/auth";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
-import { createHash } from "crypto";
+
+import { firebaseAuth, firebaseFirestore } from "../config/firebase";
 
 // Standardized user data schema following Firebase best practices
 export interface UserProfile {
@@ -52,7 +53,8 @@ export class FirebaseAuthService {
     private static instance: FirebaseAuthService;
     private readonly usersCollection = "users";
 
-    private constructor() { }
+    private constructor() {
+    }
 
     public static getInstance(): FirebaseAuthService {
         if (!FirebaseAuthService.instance) {

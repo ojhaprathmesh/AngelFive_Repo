@@ -1,14 +1,15 @@
 "use client";
 
+import { AreaSeries, ColorType, createChart, HistogramSeries, LineSeries, Time, } from "lightweight-charts";
+import { Activity, BarChart3, CheckCircle, Info, TrendingDown, TrendingUp, XCircle, } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Activity, BarChart3, CheckCircle, Info, TrendingDown, TrendingUp, XCircle, } from "lucide-react";
-import { AreaSeries, ColorType, createChart, HistogramSeries, LineSeries, Time, } from "lightweight-charts";
 
 interface ReturnsData {
     symbol: string;

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { ChevronRight, Link as LinkIcon, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { marketDataService } from "@/lib/market-data";
 
 interface OptionQuickListProps {
@@ -153,8 +154,8 @@ export function OptionQuickList({ isOpen, onClose }: OptionQuickListProps) {
                                 key={tab}
                                 onClick={() => setSelectedTab(tab)}
                                 className={`text-sm font-medium transition-colors relative pb-2 -mb-3.25 ${selectedTab === tab
-                                        ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
-                                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                    ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+                                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                                     }`}
                             >
                                 {tab.replace("NIFTY", " NIFTY").trim()}
@@ -171,8 +172,8 @@ export function OptionQuickList({ isOpen, onClose }: OptionQuickListProps) {
                             key={date}
                             onClick={() => setExpiryDate(date)}
                             className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap border transition-colors ${expiryDate === date
-                                    ? "bg-white dark:bg-gray-800 border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm"
-                                    : "bg-transparent border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800"
+                                ? "bg-white dark:bg-gray-800 border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm"
+                                : "bg-transparent border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800"
                                 }`}
                         >
                             {date}
@@ -236,8 +237,8 @@ function OptionCard({ data }: { data: OptionData }) {
                     <Badge
                         variant="secondary"
                         className={`text-[10px] h-5 px-1.5 rounded ${isITM
-                                ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-100 dark:border-green-900"
-                                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+                            ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-100 dark:border-green-900"
+                            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700"
                             }`}
                     >
                         {isITM ? "ITM" : "OTM"}

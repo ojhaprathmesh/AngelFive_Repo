@@ -1,14 +1,14 @@
 "use client";
-
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
+
+import { GoogleSignInButton } from "@/components/google-signin-button";
+import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { type AuthRequest, authService } from "@/lib/firebase";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { GoogleSignInButton } from "@/components/google-signin-button";
 
 export function SignupForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);

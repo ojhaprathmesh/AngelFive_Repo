@@ -1,5 +1,5 @@
-import speakeasy from "speakeasy";
 import express, { Request, Response } from "express";
+import speakeasy from "speakeasy";
 
 import { ENV } from "../config/env";
 import { fetchNSEIndex } from "../lib/nse";

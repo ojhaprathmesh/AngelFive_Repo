@@ -1,22 +1,5 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { marketDataService } from "@/lib/market-data";
 import {
     Activity,
     AlertCircle,
@@ -31,7 +14,25 @@ import {
     TrendingUp,
     User,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/auth-context";
+import { marketDataService } from "@/lib/market-data";
 
 interface MarketData {
     symbol: string;
@@ -338,8 +339,8 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
                                         title={link.label}
                                         aria-label={link.label}
                                         className={`transition-all duration-200 ease-out touch-target ${link.active
-                                                ? "px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
-                                                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                                            ? "px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+                                            : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
                                             }`}
                                     >
                                         <Icon className="h-5 w-5" />

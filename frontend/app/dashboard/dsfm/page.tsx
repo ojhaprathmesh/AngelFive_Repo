@@ -1,12 +1,13 @@
 "use client";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart3, Layers, Network, PieChart, TrendingUp } from "lucide-react";
+
 import { CorrelationAnalysis } from "@/components/dsfm/correlation-analysis";
 import { NetworkAnalysis } from "@/components/dsfm/network-analysis";
 import { PCAAnalysis } from "@/components/dsfm/pca-analysis";
 import { PortfolioOptimization } from "@/components/dsfm/portfolio-optimization";
 import { ReturnsAnalysis } from "@/components/dsfm/returns-analysis";
-import { BarChart3, Layers, Network, PieChart, TrendingUp } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function DSFMPage() {
     return (

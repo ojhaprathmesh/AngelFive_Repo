@@ -1,6 +1,5 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
 import {
     AreaSeries,
     CandlestickSeries,
@@ -11,15 +10,6 @@ import {
     LineSeries,
     UTCTimestamp,
 } from "lightweight-charts";
-import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { marketDataService } from "@/lib/market-data";
 import {
     Activity,
     BarChart3,
@@ -42,6 +32,17 @@ import {
     ZoomIn,
     ZoomOut,
 } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { marketDataService } from "@/lib/market-data";
 
 type ChartKind = "Area" | "Candles";
 type SizeKey =

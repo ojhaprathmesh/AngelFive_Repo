@@ -1,10 +1,11 @@
 "use client";
 
+import { TrendingDown, TrendingUp } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { marketDataService } from "@/lib/market-data";
 
 interface IndexData {
@@ -134,8 +135,8 @@ export function MarketOverview() {
                     <Card
                         key={index.symbol}
                         className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedIndex === index.symbol
-                                ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950"
-                                : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                            ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-800"
                             }`}
                         onClick={() => setSelectedIndex(index.symbol)}
                     >
@@ -171,8 +172,8 @@ export function MarketOverview() {
                                     <Badge
                                         variant="secondary"
                                         className={`text-xs ${index.isPositive
-                                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                                             }`}
                                     >
                                         {index.isPositive ? "+" : ""}

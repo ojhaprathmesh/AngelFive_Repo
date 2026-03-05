@@ -1,12 +1,13 @@
 "use client";
 
-import {useEffect, useRef, useState} from "react";
-import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Skeleton} from "@/components/ui/skeleton";
-import {Badge} from "@/components/ui/badge";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
-import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import { useEffect, useRef, useState } from "react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Sensex 30 Stocks (Official BSE Sensex constituents)
 const SENSEX_STOCKS = [
@@ -431,7 +432,7 @@ export function PortfolioOptimization() {
                                 onValueChange={(value) => setSelectedIndex(value)}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select index"/>
+                                    <SelectValue placeholder="Select index" />
                                 </SelectTrigger>
 
                                 <SelectContent>
@@ -449,7 +450,7 @@ export function PortfolioOptimization() {
                                 onValueChange={(value) => setTimeframe(value)}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select timeframe"/>
+                                    <SelectValue placeholder="Select timeframe" />
                                 </SelectTrigger>
 
                                 <SelectContent>
@@ -518,7 +519,7 @@ export function PortfolioOptimization() {
                                 try {
                                     const resp = await fetch("/api/dsfm/mpt", {
                                         method: "POST",
-                                        headers: {"Content-Type": "application/json"},
+                                        headers: { "Content-Type": "application/json" },
                                         body: JSON.stringify({
                                             symbols: selectedSymbols,
                                             timeframe,
@@ -531,7 +532,7 @@ export function PortfolioOptimization() {
                                     } else {
                                         const errorData = await resp
                                             .json()
-                                            .catch(() => ({error: `HTTP ${resp.status}`}));
+                                            .catch(() => ({ error: `HTTP ${resp.status}` }));
                                         alert(
                                             `MPT Error: ${errorData.error || errorData.message || "Unknown error"}`,
                                         );
@@ -559,7 +560,7 @@ export function PortfolioOptimization() {
                                 try {
                                     const resp = await fetch("/api/dsfm/black-litterman", {
                                         method: "POST",
-                                        headers: {"Content-Type": "application/json"},
+                                        headers: { "Content-Type": "application/json" },
                                         body: JSON.stringify({
                                             symbols: selectedSymbols,
                                             timeframe,
@@ -573,7 +574,7 @@ export function PortfolioOptimization() {
                                     } else {
                                         const errorData = await resp
                                             .json()
-                                            .catch(() => ({error: `HTTP ${resp.status}`}));
+                                            .catch(() => ({ error: `HTTP ${resp.status}` }));
                                         alert(
                                             `Black-Litterman Error: ${errorData.error || errorData.message || "Unknown error"}`,
                                         );
@@ -594,7 +595,7 @@ export function PortfolioOptimization() {
                     </div>
 
                     {loadingMPT || loadingBL ? (
-                        <Skeleton className="h-64 w-full"/>
+                        <Skeleton className="h-64 w-full" />
                     ) : (
                         <Tabs
                             value={activeTab}
@@ -625,9 +626,9 @@ export function PortfolioOptimization() {
                                         <CardContent className="space-y-4">
                                             <div className="grid grid-cols-3 gap-4 text-sm">
                                                 <div>
-                          <span className="text-gray-600 dark:text-gray-400">
-                            Expected Return:
-                          </span>
+                                                    <span className="text-gray-600 dark:text-gray-400">
+                                                        Expected Return:
+                                                    </span>
                                                     <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
                                                         {(
                                                             mptResult.optimal_portfolio?.expected_return * 100
@@ -636,9 +637,9 @@ export function PortfolioOptimization() {
                                                     </p>
                                                 </div>
                                                 <div>
-                          <span className="text-gray-600 dark:text-gray-400">
-                            Volatility:
-                          </span>
+                                                    <span className="text-gray-600 dark:text-gray-400">
+                                                        Volatility:
+                                                    </span>
                                                     <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
                                                         {(
                                                             mptResult.optimal_portfolio?.volatility * 100
@@ -647,9 +648,9 @@ export function PortfolioOptimization() {
                                                     </p>
                                                 </div>
                                                 <div>
-                          <span className="text-gray-600 dark:text-gray-400">
-                            Sharpe Ratio:
-                          </span>
+                                                    <span className="text-gray-600 dark:text-gray-400">
+                                                        Sharpe Ratio:
+                                                    </span>
                                                     <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">
                                                         {mptResult.optimal_portfolio?.sharpe_ratio?.toFixed(
                                                             3,
@@ -709,25 +710,25 @@ export function PortfolioOptimization() {
                                         <CardContent className="space-y-4">
                                             <div className="grid grid-cols-3 gap-4 text-sm">
                                                 <div>
-                          <span className="text-gray-600 dark:text-gray-400">
-                            Expected Return:
-                          </span>
+                                                    <span className="text-gray-600 dark:text-gray-400">
+                                                        Expected Return:
+                                                    </span>
                                                     <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">
                                                         {(blResult.expected_return * 100)?.toFixed(2)}%
                                                     </p>
                                                 </div>
                                                 <div>
-                          <span className="text-gray-600 dark:text-gray-400">
-                            Volatility:
-                          </span>
+                                                    <span className="text-gray-600 dark:text-gray-400">
+                                                        Volatility:
+                                                    </span>
                                                     <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">
                                                         {(blResult.volatility * 100)?.toFixed(2)}%
                                                     </p>
                                                 </div>
                                                 <div>
-                          <span className="text-gray-600 dark:text-gray-400">
-                            Sharpe Ratio:
-                          </span>
+                                                    <span className="text-gray-600 dark:text-gray-400">
+                                                        Sharpe Ratio:
+                                                    </span>
                                                     <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">
                                                         {blResult.sharpe_ratio?.toFixed(3)}
                                                     </p>
@@ -776,11 +777,11 @@ export function PortfolioOptimization() {
                                     </CardHeader>
                                     <CardContent>
                                         {mptResult?.efficient_frontier &&
-                                        mptResult.efficient_frontier.length > 0 ? (
+                                            mptResult.efficient_frontier.length > 0 ? (
                                             <div
                                                 ref={efficientFrontierChartRef}
                                                 className="w-full border rounded-lg bg-white dark:bg-gray-900 p-4"
-                                                style={{height: "400px", minHeight: "400px"}}
+                                                style={{ height: "400px", minHeight: "400px" }}
                                             />
                                         ) : (
                                             <div className="text-center py-8 text-gray-500">

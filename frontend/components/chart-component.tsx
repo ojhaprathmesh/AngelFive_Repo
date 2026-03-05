@@ -21,18 +21,16 @@ import {
     Highlighter,
     LineChart,
     Lock,
-    Moon,
     MousePointer2,
     Redo2,
     Ruler,
-    Sun,
     Trash2,
     Undo2,
     Unlock,
     ZoomIn,
     ZoomOut,
 } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -60,7 +58,7 @@ type IndicatorKey = "EMA" | "SMA" | "RSI";
 type ToolKey =
     | "pointer-cross"
     | "pointer-dot"
-    | "trendline"
+    | "trend-line"
     | "ray"
     | "info"
     | "abcd"
@@ -90,8 +88,11 @@ export default function ChartComponent({
     const indicatorRefs = useRef<Record<string, ISeriesApi<"Line"> | null>>({});
     const overlayRef = useRef<HTMLCanvasElement | null>(null);
 
-    const [dark, setDark] = useState<boolean>(false);
     const [kind, setKind] = useState<ChartKind>("Candles");
+    const kindRef = useRef<ChartKind>(kind);
+    useEffect(() => {
+        kindRef.current = kind;
+    }, [kind]);
     const [size, setSize] = useState<SizeKey>("1d");
     const [indicator, setIndicator] = useState<IndicatorKey | null>(null);
     const [indicatorCfg, setIndicatorCfg] = useState<{
@@ -104,7 +105,7 @@ export default function ChartComponent({
     const [visible, setVisible] = useState<boolean>(true);
     const [lastZoom, setLastZoom] = useState<"in" | "out">("in");
     const pointerGroup: ToolKey[] = ["pointer-cross", "pointer-dot"];
-    const lineGroup: ToolKey[] = ["trendline", "ray", "info"];
+    const lineGroup: ToolKey[] = ["trend-line", "ray", "info"];
     const patternGroup: ToolKey[] = ["xabcd", "abcd"];
     const paintGroup: ToolKey[] = ["brush", "highlighter"];
     const isGroupSelected = (group: ToolKey[]) => group.includes(tool);
@@ -242,7 +243,7 @@ export default function ChartComponent({
     }
 
     type DrawAction =
-        | { type: "trendline"; p1: DrawPoint; p2: DrawPoint }
+        | { type: "trend-line"; p1: DrawPoint; p2: DrawPoint }
         | { type: "ray"; p1: DrawPoint; p2: DrawPoint }
         | { type: "info"; p1: DrawPoint; p2: DrawPoint }
         | { type: "xabcd"; p1: DrawPoint; p2: DrawPoint }
@@ -250,196 +251,15 @@ export default function ChartComponent({
         | { type: "highlighter"; path: DrawPoint[]; size?: number }
         | { type: "measure"; p1: DrawPoint; p2: DrawPoint };
     const [actions, setActions] = useState<DrawAction[]>([]);
-    const [redos, setRedos] = useState<DrawAction[]>([]);
+    const [redoes, setRedoes] = useState<DrawAction[]>([]);
 
-    useEffect(() => {
-        const savedTheme = localStorage.getItem("chartTheme");
-        setDark(savedTheme === "dark");
-    }, []);
-
-    useEffect(() => {
-        localStorage.setItem("chartTheme", dark ? "dark" : "light");
-        if (!chartRef.current) return;
-        chartRef.current.applyOptions({
-            layout: {
-                background: { type: ColorType.Solid, color: "transparent" },
-                textColor: dark ? "#e5e7eb" : "#111827",
-            },
-            grid: {
-                horzLines: { color: dark ? "#1f2937" : "#e5e7eb" },
-                vertLines: { color: dark ? "#1f2937" : "#e5e7eb" },
-            },
-        });
-    }, [dark]);
-
-    useEffect(() => {
-        if (!rootRef.current) return;
-        const chart = createChart(rootRef.current, {
-            layout: {
-                background: { type: ColorType.Solid, color: "transparent" },
-                textColor: dark ? "#e5e7eb" : "#111827",
-            },
-            rightPriceScale: { borderColor: dark ? "#374151" : "#e5e7eb" },
-            timeScale: { borderColor: dark ? "#374151" : "#e5e7eb" },
-            crosshair: { mode: 1 },
-        });
-        chartRef.current = chart;
-        const s =
-            kind === "Area"
-                ? chart.addSeries(AreaSeries, {})
-                : chart.addSeries(CandlestickSeries, {});
-        seriesRef.current = s;
-        const canvas = document.createElement("canvas");
-        canvas.style.position = "absolute";
-        canvas.style.left = "0";
-        canvas.style.top = "0";
-        canvas.style.right = "0";
-        canvas.style.bottom = "0";
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
-        canvas.style.pointerEvents = "auto";
-        rootRef.current.appendChild(canvas);
-        overlayRef.current = canvas;
-        const resize = () => {
-            const el = rootRef.current;
-            if (!el) return;
-            const w = el.clientWidth;
-            const h = el.clientHeight;
-            canvas.width = Math.max(1, Math.floor(w));
-            canvas.height = Math.max(1, Math.floor(h));
-            if (chartRef.current)
-                chartRef.current.resize(canvas.width, canvas.height);
-            drawOverlay();
-        };
-        resize();
-        const onResize = () => resize();
-        window.addEventListener("resize", onResize);
-        let ro: ResizeObserver | null = null;
-        try {
-            ro = new ResizeObserver(onResize);
-            if (rootRef.current) ro.observe(rootRef.current);
-        } catch {
-        }
-        return () => {
-            window.removeEventListener("resize", onResize);
-            if (ro) ro.disconnect();
-            chart.remove();
-            chartRef.current = null;
-            overlayRef.current = null;
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!chartRef.current) return;
-        const chart = chartRef.current;
-        seriesRef.current?.priceScale()?.applyOptions({});
-        const prev = seriesRef.current;
-        if (prev) chart.removeSeries(prev);
-        const s =
-            kind === "Area"
-                ? chart.addSeries(AreaSeries, {})
-                : chart.addSeries(CandlestickSeries, {});
-        seriesRef.current = s;
-        applySeriesData();
-    }, [kind]);
-
-    const fetchCandles = async () => {
-        try {
-            const now = new Date();
-            const toDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-            // Use symbol prop if provided, otherwise default to YESBANK-EQ
-            const symbolToUse = symbol || "YESBANK-EQ";
-            // Format symbol:
-            // - If it has colon (NSE:TCS), use as is
-            // - If it has -EQ suffix, use as is
-            // - Otherwise, add -EQ for NSE stocks
-            let formattedSymbol = symbolToUse;
-            if (!symbolToUse.includes(":") && !symbolToUse.includes("-")) {
-                formattedSymbol = `${symbolToUse}-EQ`;
-            }
-            console.log(
-                "[ChartComponent] Fetching candles for symbol:",
-                formattedSymbol,
-            );
-            const tokenInfo = await marketDataService.getSymbolToken(formattedSymbol);
-            if (!tokenInfo) {
-                console.warn(
-                    "[ChartComponent] Token info not found for symbol:",
-                    formattedSymbol,
-                );
-                return [] as Candle[];
-            }
-            console.log("[ChartComponent] Token info:", tokenInfo);
-            let baseInterval = "ONE_DAY";
-            if (size === "1m") baseInterval = "ONE_MINUTE";
-            if (size === "5m") baseInterval = "FIVE_MINUTE";
-            if (size === "15m") baseInterval = "FIFTEEN_MINUTE";
-            if (size === "1h" || size === "2h" || size === "3h" || size === "4h")
-                baseInterval = "ONE_HOUR";
-            if (size === "1d" || size === "1wk" || size === "1month")
-                baseInterval = "ONE_DAY";
-            const from = new Date();
-            if (size === "1m" || size === "5m" || size === "15m")
-                from.setDate(from.getDate() - 5);
-            else if (size === "1h" || size === "2h" || size === "3h" || size === "4h")
-                from.setMonth(from.getMonth() - 1);
-            else if (size === "1d") from.setFullYear(from.getFullYear() - 1);
-            else if (size === "1wk" || size === "1month")
-                from.setFullYear(from.getFullYear() - 5);
-            const fromDate = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")} ${String(from.getHours()).padStart(2, "0")}:${String(from.getMinutes()).padStart(2, "0")}`;
-            console.log("[ChartComponent] Fetching candle data:", {
-                exchange: tokenInfo.exchange,
-                token: tokenInfo.token,
-                interval: baseInterval,
-                fromDate,
-                toDate,
-            });
-            const raw = await marketDataService.getCandleData(
-                tokenInfo.exchange,
-                tokenInfo.token,
-                baseInterval,
-                fromDate,
-                toDate,
-            );
-            console.log("[ChartComponent] Received", raw.length, "candles");
-            const base = raw.map((c) => ({
-                time: Math.floor(new Date(c[0]).getTime() / 1000),
-                open: c[1],
-                high: c[2],
-                low: c[3],
-                close: c[4],
-            }));
-            if (size === "2h" || size === "3h" || size === "4h") {
-                const group = size === "2h" ? 2 : size === "3h" ? 3 : 4;
-                return aggregate(base, group * 3600);
-            }
-            if (size === "1wk") return aggregate(base, 7 * 24 * 3600);
-            if (size === "1month") return aggregateMonthly(base);
-            console.log(
-                "[ChartComponent] Returning",
-                base.length,
-                "processed candles",
-            );
-            return base;
-        } catch (error) {
-            console.error("[ChartComponent] Error fetching candles:", error);
-            return [] as Candle[];
-        }
-    };
-
-    const aggregate = (candles: Candle[], secs: number): Candle[] => {
+    const aggregate = useCallback((candles: Candle[], secs: number): Candle[] => {
         const out: Candle[] = [];
         let bucket: Candle | null = null;
         let start = 0;
         for (const c of candles) {
             if (!bucket) {
-                bucket = {
-                    time: c.time,
-                    open: c.open,
-                    high: c.high,
-                    low: c.low,
-                    close: c.close,
-                };
+                bucket = { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close };
                 start = c.time;
             } else {
                 bucket.high = Math.max(bucket.high, c.high);
@@ -453,9 +273,9 @@ export default function ChartComponent({
         }
         if (bucket) out.push(bucket);
         return out;
-    };
+    }, []);
 
-    const aggregateMonthly = (candles: Candle[]): Candle[] => {
+    const aggregateMonthly = useCallback((candles: Candle[]): Candle[] => {
         const out: Candle[] = [];
         let bucket: Candle | null = null;
         let currentMonth = -1;
@@ -464,81 +284,19 @@ export default function ChartComponent({
             const m = d.getUTCFullYear() * 12 + d.getUTCMonth();
             if (m !== currentMonth) {
                 if (bucket) out.push(bucket);
-                bucket = {
-                    time: c.time,
-                    open: c.open,
-                    high: c.high,
-                    low: c.low,
-                    close: c.close,
-                };
+                bucket = { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close };
                 currentMonth = m;
-            } else {
-                if (bucket) {
-                    bucket.high = Math.max(bucket.high, c.high);
-                    bucket.low = Math.min(bucket.low, c.low);
-                    bucket.close = c.close;
-                }
+            } else if (bucket) {
+                bucket.high = Math.max(bucket.high, c.high);
+                bucket.low = Math.min(bucket.low, c.low);
+                bucket.close = c.close;
             }
         }
         if (bucket) out.push(bucket);
         return out;
-    };
+    }, []);
 
-    const applySeriesData = async () => {
-        console.log(
-            "[ChartComponent] applySeriesData called, symbol:",
-            symbol,
-            "size:",
-            size,
-        );
-        const candles = await fetchCandles();
-        console.log("[ChartComponent] Got", candles.length, "candles");
-        setData(candles);
-        if (!seriesRef.current) {
-            console.warn("[ChartComponent] Series ref is null, cannot set data");
-            return;
-        }
-        if (candles.length === 0) {
-            console.warn("[ChartComponent] No candles to display");
-            return;
-        }
-        try {
-            if (kind === "Area") {
-                seriesRef.current.setData(
-                    candles.map((c) => ({
-                        time: c.time as UTCTimestamp,
-                        value: c.close,
-                    })),
-                );
-            } else {
-                seriesRef.current.setData(
-                    candles.map((c) => ({
-                        time: c.time as UTCTimestamp,
-                        open: c.open,
-                        high: c.high,
-                        low: c.low,
-                        close: c.close,
-                    })),
-                );
-            }
-            chartRef.current?.timeScale().fitContent();
-            drawOverlay();
-            computeIndicators();
-            console.log("[ChartComponent] Chart data applied successfully");
-        } catch (error) {
-            console.error("[ChartComponent] Error applying series data:", error);
-        }
-    };
-
-    useEffect(() => {
-        applySeriesData();
-    }, [size, symbol]);
-
-    useEffect(() => {
-        computeIndicators();
-    }, [indicator, indicatorCfg, data]);
-
-    const sma = (period: number) => {
+    const sma = useCallback((period: number) => {
         const vals = data.map((d) => d.close);
         const res: { time: number; value: number }[] = [];
         for (let i = period - 1; i < vals.length; i++) {
@@ -547,9 +305,9 @@ export default function ChartComponent({
             res.push({ time: data[i].time, value: sum / period });
         }
         return res;
-    };
+    }, [data]);
 
-    const ema = (period: number) => {
+    const ema = useCallback((period: number) => {
         const vals = data.map((d) => d.close);
         const res: { time: number; value: number }[] = [];
         const k = 2 / (period + 1);
@@ -560,9 +318,9 @@ export default function ChartComponent({
             res.push({ time: data[i].time, value: e });
         }
         return res.slice(period - 1);
-    };
+    }, [data]);
 
-    const rsi = (period: number) => {
+    const rsi = useCallback((period: number) => {
         const res: { time: number; value: number }[] = [];
         let gains = 0;
         let losses = 0;
@@ -582,9 +340,9 @@ export default function ChartComponent({
             losses = avgLoss * period;
         }
         return res;
-    };
+    }, [data]);
 
-    const computeIndicators = () => {
+    const computeIndicators = useCallback(() => {
         if (!chartRef.current) return;
         const chart = chartRef.current;
         Object.keys(indicatorRefs.current).forEach((k) => {
@@ -596,26 +354,30 @@ export default function ChartComponent({
         const cfg = indicatorCfg[indicator];
         let points: { time: number; value: number }[] = [];
         if (indicator === "SMA") points = sma(cfg);
-        if (indicator === "EMA") points = ema(cfg);
-        if (indicator === "RSI") points = rsi(cfg);
-        const s = chart.addSeries(LineSeries, {
+        else if (indicator === "EMA") points = ema(cfg);
+        else if (indicator === "RSI") points = rsi(cfg);
+        const series = chart.addSeries(LineSeries, {
             color: indicator === "RSI" ? "#f59e0b" : "#22c55e",
             lineWidth: 2,
         });
-        indicatorRefs.current[indicator] = s;
-        s.setData(
+        indicatorRefs.current[indicator] = series;
+        series.setData(
             points.map((p) => ({ time: p.time as UTCTimestamp, value: p.value })),
         );
-    };
+    }, [indicator, indicatorCfg, sma, ema, rsi]);
 
-    const drawOverlay = () => {
+    // Stable ref so the resize closure can always call the latest version
+    const drawOverlayRef = useRef<() => void>(() => {
+    });
+
+    const drawOverlay = useCallback(() => {
         if (!overlayRef.current) return;
         const ctx = overlayRef.current.getContext("2d");
         if (!ctx) return;
         ctx.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height);
         if (!visible) return;
         actions.forEach((a: DrawAction) => {
-            if (a.type === "trendline") {
+            if (a.type === "trend-line") {
                 ctx.strokeStyle = "#3b82f6";
                 ctx.lineWidth = 2;
                 ctx.beginPath();
@@ -666,11 +428,211 @@ export default function ChartComponent({
                 ctx.stroke();
             }
         });
-    };
+    }, [actions, visible]);
 
+    // Keep the ref in sync so resize closure always has the latest drawOverlay
+    useEffect(() => {
+        drawOverlayRef.current = drawOverlay;
+    }, [drawOverlay]);
+
+    // Redraw whenever actions or visibility changes
     useEffect(() => {
         drawOverlay();
-    }, [actions, visible]);
+    }, [drawOverlay]);
+
+    const fetchCandles = useCallback(async () => {
+        try {
+            const now = new Date();
+            const toDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+            const symbolToUse = symbol || "YESBANK-EQ";
+            let formattedSymbol = symbolToUse;
+            if (!symbolToUse.includes(":") && !symbolToUse.includes("-")) {
+                formattedSymbol = `${symbolToUse}-EQ`;
+            }
+            console.log("[ChartComponent] Fetching candles for symbol:", formattedSymbol);
+            const tokenInfo = await marketDataService.getSymbolToken(formattedSymbol);
+            if (!tokenInfo) {
+                console.warn("[ChartComponent] Token info not found for symbol:", formattedSymbol);
+                return [] as Candle[];
+            }
+            console.log("[ChartComponent] Token info:", tokenInfo);
+            let baseInterval = "ONE_DAY";
+            if (size === "1m") baseInterval = "ONE_MINUTE";
+            if (size === "5m") baseInterval = "FIVE_MINUTE";
+            if (size === "15m") baseInterval = "FIFTEEN_MINUTE";
+            if (size === "1h" || size === "2h" || size === "3h" || size === "4h")
+                baseInterval = "ONE_HOUR";
+            if (size === "1d" || size === "1wk" || size === "1month")
+                baseInterval = "ONE_DAY";
+            const from = new Date();
+            if (size === "1m" || size === "5m" || size === "15m")
+                from.setDate(from.getDate() - 5);
+            else if (size === "1h" || size === "2h" || size === "3h" || size === "4h")
+                from.setMonth(from.getMonth() - 1);
+            else if (size === "1d") from.setFullYear(from.getFullYear() - 1);
+            else if (size === "1wk" || size === "1month")
+                from.setFullYear(from.getFullYear() - 5);
+            const fromDate = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")} ${String(from.getHours()).padStart(2, "0")}:${String(from.getMinutes()).padStart(2, "0")}`;
+            console.log("[ChartComponent] Fetching candle data:", {
+                exchange: tokenInfo.exchange,
+                token: tokenInfo.token,
+                interval: baseInterval,
+                fromDate,
+                toDate,
+            });
+            const raw = await marketDataService.getCandleData(
+                tokenInfo.exchange,
+                tokenInfo.token,
+                baseInterval,
+                fromDate,
+                toDate,
+            );
+            console.log("[ChartComponent] Received", raw.length, "candles");
+            const base = raw.map((c) => ({
+                time: Math.floor(new Date(c[0]).getTime() / 1000),
+                open: c[1],
+                high: c[2],
+                low: c[3],
+                close: c[4],
+            }));
+            if (size === "2h" || size === "3h" || size === "4h") {
+                const group = size === "2h" ? 2 : size === "3h" ? 3 : 4;
+                return aggregate(base, group * 3600);
+            }
+            if (size === "1wk") return aggregate(base, 7 * 24 * 3600);
+            if (size === "1month") return aggregateMonthly(base);
+            console.log("[ChartComponent] Returning", base.length, "processed candles");
+            return base;
+        } catch (error) {
+            console.error("[ChartComponent] Error fetching candles:", error);
+            return [] as Candle[];
+        }
+    }, [symbol, size, aggregate, aggregateMonthly]);
+
+    const applySeriesData = useCallback(async () => {
+        console.log("[ChartComponent] applySeriesData called, symbol:", symbol, "size:", size);
+        const candles = await fetchCandles();
+        console.log("[ChartComponent] Got", candles.length, "candles");
+        setData(candles);
+        if (!seriesRef.current) {
+            console.warn("[ChartComponent] Series ref is null, cannot set data");
+            return;
+        }
+        if (candles.length === 0) {
+            console.warn("[ChartComponent] No candles to display");
+            return;
+        }
+        try {
+            if (kind === "Area") {
+                seriesRef.current.setData(
+                    candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close })),
+                );
+            } else {
+                seriesRef.current.setData(
+                    candles.map((c) => ({
+                        time: c.time as UTCTimestamp,
+                        open: c.open,
+                        high: c.high,
+                        low: c.low,
+                        close: c.close,
+                    })),
+                );
+            }
+            chartRef.current?.timeScale().fitContent();
+            drawOverlay();
+            computeIndicators();
+            console.log("[ChartComponent] Chart data applied successfully");
+        } catch (error) {
+            console.error("[ChartComponent] Error applying series data:", error);
+        }
+    }, [symbol, size, kind, fetchCandles, drawOverlay, computeIndicators]);
+
+    // ── Chart init (mount only) ───────────────────────────────────────────────
+
+    useEffect(() => {
+        if (!rootRef.current) return;
+        const chart = createChart(rootRef.current, {
+            layout: {
+                background: { type: ColorType.Solid, color: "transparent" },
+                textColor: "#111827",
+            },
+            rightPriceScale: { borderColor: "#e5e7eb" },
+            timeScale: { borderColor: "#e5e7eb" },
+            crosshair: { mode: 1 },
+        });
+        chartRef.current = chart;
+        seriesRef.current =
+            kindRef.current === "Area"
+                ? chart.addSeries(AreaSeries, {})
+                : chart.addSeries(CandlestickSeries, {});
+        const canvas = document.createElement("canvas");
+        canvas.style.position = "absolute";
+        canvas.style.left = "0";
+        canvas.style.top = "0";
+        canvas.style.right = "0";
+        canvas.style.bottom = "0";
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        canvas.style.pointerEvents = "auto";
+        rootRef.current.appendChild(canvas);
+        overlayRef.current = canvas;
+        const resize = () => {
+            const el = rootRef.current;
+            if (!el) return;
+            const w = el.clientWidth;
+            const h = el.clientHeight;
+            canvas.width = Math.max(1, Math.floor(w));
+            canvas.height = Math.max(1, Math.floor(h));
+            if (chartRef.current)
+                chartRef.current.resize(canvas.width, canvas.height);
+            drawOverlayRef.current();
+        };
+        resize();
+        const onResize = () => resize();
+        window.addEventListener("resize", onResize);
+        let ro: ResizeObserver | null = null;
+        try {
+            ro = new ResizeObserver(onResize);
+            if (rootRef.current) ro.observe(rootRef.current);
+        } catch {
+            // ResizeObserver not available
+        }
+        return () => {
+            window.removeEventListener("resize", onResize);
+            if (ro) ro.disconnect();
+            chart.remove();
+            chartRef.current = null;
+            overlayRef.current = null;
+        };
+    }, []);
+
+    // ── Re-create series when chart kind changes ──────────────────────────────
+
+    useEffect(() => {
+        if (!chartRef.current) return;
+        const chart = chartRef.current;
+        const prev = seriesRef.current;
+        if (prev) chart.removeSeries(prev);
+        seriesRef.current =
+            kind === "Area"
+                ? chart.addSeries(AreaSeries, {})
+                : chart.addSeries(CandlestickSeries, {});
+        void applySeriesData();
+    }, [kind, applySeriesData]);
+
+    // ── Reload data when symbol or size changes ───────────────────────────────
+
+    useEffect(() => {
+        void applySeriesData();
+    }, [size, symbol, applySeriesData]);
+
+    // ── Recompute indicators when their config or data changes ────────────────
+
+    useEffect(() => {
+        computeIndicators();
+    }, [computeIndicators]);
+
+    // ── Drawing canvas mouse events ───────────────────────────────────────────
 
     useEffect(() => {
         const canvas = overlayRef.current;
@@ -685,7 +647,7 @@ export default function ChartComponent({
             if (locked) return;
             const p = getPos(e);
             if (
-                tool === "trendline" ||
+                tool === "trend-line" ||
                 tool === "ray" ||
                 tool === "measure" ||
                 tool === "info"
@@ -694,7 +656,7 @@ export default function ChartComponent({
                 current =
                     tool === "info"
                         ? { type: "info", p1: p, p2: p }
-                        : { type: tool as "trendline" | "ray" | "measure", p1: p, p2: p };
+                        : { type: tool as "trend-line" | "ray" | "measure", p1: p, p2: p };
             } else if (tool === "brush" || tool === "highlighter") {
                 drawing = true;
                 current = {
@@ -712,12 +674,12 @@ export default function ChartComponent({
             } else {
                 current.p2 = p;
             }
-            drawOverlay();
+            drawOverlayRef.current();
         };
         const up = () => {
             if (!drawing || !current) return;
             setActions((prev) => [...prev, current as DrawAction]);
-            setRedos([]);
+            setRedoes([]);
             drawing = false;
             current = null;
         };
@@ -736,13 +698,13 @@ export default function ChartComponent({
         const next = actions.slice(0, -1);
         const last = actions[actions.length - 1];
         setActions(next);
-        setRedos((r) => [...r, last]);
+        setRedoes((r) => [...r, last]);
     };
 
     const redo = () => {
-        if (redos.length === 0) return;
-        const last = redos[redos.length - 1];
-        setRedos(redos.slice(0, -1));
+        if (redoes.length === 0) return;
+        const last = redoes[redoes.length - 1];
+        setRedoes(redoes.slice(0, -1));
         setActions((a) => [...a, last]);
     };
 
@@ -779,7 +741,7 @@ export default function ChartComponent({
     };
 
     return (
-        <div className={dark ? "dark h-full" : "h-full"}>
+        <div className="h-full">
             <div className="flex flex-col h-full gap-3">
                 <div
                     className="flex items-center justify-between border-b pb-2"
@@ -787,19 +749,6 @@ export default function ChartComponent({
                     aria-label="Chart controls"
                 >
                     <div className="flex items-center gap-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDark((v) => !v)}
-                            aria-label="Toggle theme"
-                            title="Theme"
-                        >
-                            {dark ? (
-                                <Moon className="h-4 w-4" />
-                            ) : (
-                                <Sun className="h-4 w-4" />
-                            )}
-                        </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
@@ -953,9 +902,9 @@ export default function ChartComponent({
                             variant="ghost"
                             size="sm"
                             onClick={redo}
-                            disabled={redos.length === 0}
+                            disabled={redoes.length === 0}
                             title="Redo"
-                            aria-disabled={redos.length === 0}
+                            aria-disabled={redoes.length === 0}
                         >
                             <Redo2 className="h-4 w-4" />
                         </Button>
@@ -1009,8 +958,8 @@ export default function ChartComponent({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent side="right">
                                 <DropdownMenuLabel>Lines</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => setTool("trendline")}>
-                                    <IconTrend /> Trendline
+                                <DropdownMenuItem onClick={() => setTool("trend-line")}>
+                                    <IconTrend /> TrendLine
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setTool("ray")}>
                                     <IconRay /> Ray
@@ -1112,7 +1061,7 @@ export default function ChartComponent({
                             onClick={() => {
                                 if (window.confirm("Delete all drawings?")) {
                                     setActions([]);
-                                    setRedos([]);
+                                    setRedoes([]);
                                 }
                             }}
                             title="Delete all"

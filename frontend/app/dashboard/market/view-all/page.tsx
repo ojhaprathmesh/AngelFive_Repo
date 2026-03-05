@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -249,25 +249,7 @@ export default function ViewAllPage() {
 
     // ── Fetch ──────────────────────────────────────────────────────────────────
 
-    useEffect(() => {
-        setItems([]);
-        setLoading(true);
-        setError(null);
-
-        if (section === "top-performers") {
-            void fetchPerformers(perfTf);
-        } else {
-            void fetchSection();
-        }
-    }, [section]);
-
-    useEffect(() => {
-        if (section === "top-performers") {
-            void fetchPerformers(perfTf);
-        }
-    }, [perfTf]);
-
-    async function fetchSection() {
+    const fetchSection = useCallback(async () => {
         try {
             const resp = await fetch("/api/market/discovery");
             if (!resp.ok) {
@@ -297,9 +279,9 @@ export default function ViewAllPage() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [section]);
 
-    async function fetchPerformers(tf: PerfTf) {
+    const fetchPerformers = useCallback(async (tf: PerfTf) => {
         setPerfLoading(true);
         setLoading(true);
         try {
@@ -328,7 +310,25 @@ export default function ViewAllPage() {
             setPerfLoading(false);
             setLoading(false);
         }
-    }
+    }, []);
+
+    useEffect(() => {
+        setItems([]);
+        setLoading(true);
+        setError(null);
+
+        if (section === "top-performers") {
+            void fetchPerformers(perfTf);
+        } else {
+            void fetchSection();
+        }
+    }, [section, fetchSection, fetchPerformers, perfTf]);
+
+    useEffect(() => {
+        if (section === "top-performers") {
+            void fetchPerformers(perfTf);
+        }
+    }, [perfTf, section, fetchPerformers]);
 
     function mapQuotes(
         arr: Array<{

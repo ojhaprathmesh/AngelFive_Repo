@@ -2,7 +2,7 @@
 
 import { AreaSeries, ColorType, createChart, HistogramSeries, LineSeries, Time, } from "lightweight-charts";
 import { Activity, BarChart3, CheckCircle, Info, TrendingDown, TrendingUp, XCircle, } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,11 +65,14 @@ export function ReturnsAnalysis() {
     const [loadingRuleSentiment, setLoadingRuleSentiment] = useState(false);
     const [sentimentText, setSentimentText] = useState<string>("");
 
+    const selectedSymbolRef = useRef<string>("");
     const priceChartRef = useRef<HTMLDivElement>(null);
     const returnsChartRef = useRef<HTMLDivElement>(null);
     const arimaChartRef = useRef<HTMLDivElement>(null);
     const garchVolChartRef = useRef<HTMLDivElement>(null);
     const lstmChartRef = useRef<HTMLDivElement>(null);
+
+    selectedSymbolRef.current = selectedSymbol;
 
     useEffect(() => {
         const popularStocks = [
@@ -103,7 +106,7 @@ export function ReturnsAnalysis() {
             "COALINDIA",
         ];
         setSymbols(popularStocks);
-        if (!selectedSymbol) {
+        if (!selectedSymbolRef.current) {
             setSelectedSymbol(popularStocks[0]);
         }
     }, []);
@@ -116,11 +119,161 @@ export function ReturnsAnalysis() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedSymbol, timeframe]);
 
+    const renderArimaChart = useCallback((forecast: number[]) => {
+        if (!arimaChartRef.current || !forecast || forecast.length === 0) return;
+        arimaChartRef.current.innerHTML = "";
+        if (arimaChartRef.current.clientWidth === 0) {
+            setTimeout(() => renderArimaChart(forecast), 100);
+            return;
+        }
+        const chart = createChart(arimaChartRef.current, {
+            layout: {
+                background: { type: ColorType.Solid, color: "transparent" },
+                textColor: "#374151",
+            },
+            width: arimaChartRef.current.clientWidth,
+            height: 240,
+            grid: {
+                vertLines: { color: "#e5e7eb" },
+                horzLines: { color: "#e5e7eb" },
+            },
+        });
+        const baseTs = Math.floor(
+            new Date("2000-01-01T00:00:00Z").getTime() / 1000,
+        );
+        chart.applyOptions({
+            timeScale: {
+                timeVisible: true,
+                tickMarkFormatter: (t: Time | number) => {
+                    const ts = typeof t === "number" ? t : 0;
+                    const idx = ts ? Math.max(0, Math.round((ts - baseTs) / 86400)) : 0;
+                    return `Step ${idx}`;
+                },
+            },
+            localization: { timeFormatter: () => "" },
+        });
+        const series = chart.addSeries(LineSeries, {
+            color: "#3b82f6",
+            lineWidth: 2,
+            priceScaleId: "",
+        });
+        const chartData = forecast.map((v, i) => ({
+            time: (baseTs + i * 86400) as Time,
+            value: v,
+        }));
+        series.setData(chartData);
+        chart.timeScale().fitContent();
+    }, []);
+
+    const renderGarchVolChart = useCallback((vols: number[], forecast?: number[]) => {
+        if (!garchVolChartRef.current || !vols || vols.length === 0) return;
+        garchVolChartRef.current.innerHTML = "";
+        if (garchVolChartRef.current.clientWidth === 0) {
+            setTimeout(() => renderGarchVolChart(vols, forecast), 100);
+            return;
+        }
+        const chart = createChart(garchVolChartRef.current, {
+            layout: {
+                background: { type: ColorType.Solid, color: "transparent" },
+                textColor: "#374151",
+            },
+            width: garchVolChartRef.current.clientWidth,
+            height: 240,
+            grid: {
+                vertLines: { color: "#e5e7eb" },
+                horzLines: { color: "#e5e7eb" },
+            },
+        });
+        const baseTs = Math.floor(
+            new Date("2000-01-01T00:00:00Z").getTime() / 1000,
+        );
+        chart.applyOptions({
+            timeScale: {
+                timeVisible: true,
+                tickMarkFormatter: (t: Time | number) => {
+                    const ts = typeof t === "number" ? t : 0;
+                    const idx = ts ? Math.max(0, Math.round((ts - baseTs) / 86400)) : 0;
+                    return `Step ${idx}`;
+                },
+            },
+            localization: { timeFormatter: () => "" },
+        });
+        const histSeries = chart.addSeries(HistogramSeries, {
+            color: "#8b5cf6",
+            priceFormat: { type: "volume" },
+            priceScaleId: "",
+        });
+        const histData = vols.map((v, i) => ({
+            time: (baseTs + i * 86400) as Time,
+            value: v,
+        }));
+        histSeries.setData(histData);
+        if (forecast && forecast.length > 0) {
+            const line = chart.addSeries(LineSeries, {
+                color: "#ef4444",
+                lineWidth: 2,
+                priceScaleId: "",
+            });
+            const lineData = forecast.map((v, i) => ({
+                time: (baseTs + (vols.length + i) * 86400) as Time,
+                value: v,
+            }));
+            line.setData(lineData);
+        }
+        chart.timeScale().fitContent();
+    }, []);
+
+    const renderLstmChart = useCallback((forecast: number[]) => {
+        if (!lstmChartRef.current || !forecast || forecast.length === 0) return;
+        lstmChartRef.current.innerHTML = "";
+        if (lstmChartRef.current.clientWidth === 0) {
+            setTimeout(() => renderLstmChart(forecast), 100);
+            return;
+        }
+        const chart = createChart(lstmChartRef.current, {
+            layout: {
+                background: { type: ColorType.Solid, color: "transparent" },
+                textColor: "#374151",
+            },
+            width: lstmChartRef.current.clientWidth,
+            height: 240,
+            grid: {
+                vertLines: { color: "#e5e7eb" },
+                horzLines: { color: "#e5e7eb" },
+            },
+        });
+        const baseTs = Math.floor(
+            new Date("2000-01-01T00:00:00Z").getTime() / 1000,
+        );
+        chart.applyOptions({
+            timeScale: {
+                timeVisible: true,
+                tickMarkFormatter: (t: Time | number) => {
+                    const ts = typeof t === "number" ? t : 0;
+                    const idx = ts ? Math.max(0, Math.round((ts - baseTs) / 86400)) : 0;
+                    return `Step ${idx}`;
+                },
+            },
+            localization: { timeFormatter: () => "" },
+        });
+        const series = chart.addSeries(LineSeries, {
+            color: "#8b5cf6",
+            lineWidth: 2,
+            priceScaleId: "",
+        });
+        const chartData = forecast.map((v, i) => ({
+            time: (baseTs + i * 86400) as Time,
+            value: v,
+        }));
+        series.setData(chartData);
+        chart.timeScale().fitContent();
+    }, []);
+
     useEffect(() => {
         if (arimaResult && Array.isArray(arimaResult.forecast)) {
             setTimeout(() => renderArimaChart(arimaResult.forecast), 100);
         }
-    }, [arimaResult]);
+    }, [arimaResult, renderArimaChart]);
 
     useEffect(() => {
         if (garchResult && Array.isArray(garchResult.conditionalVolatility)) {
@@ -133,13 +286,13 @@ export function ReturnsAnalysis() {
                 100,
             );
         }
-    }, [garchResult]);
+    }, [garchResult, renderGarchVolChart]);
 
     useEffect(() => {
         if (lstmResult && Array.isArray(lstmResult.forecast)) {
             setTimeout(() => renderLstmChart(lstmResult.forecast), 100);
         }
-    }, [lstmResult]);
+    }, [lstmResult, renderLstmChart]);
 
     const fetchReturnsData = async () => {
         if (!selectedSymbol) return;
@@ -345,156 +498,6 @@ export function ReturnsAnalysis() {
                 value: ret * 100, // Convert to percentage
             };
         });
-        series.setData(chartData);
-        chart.timeScale().fitContent();
-    };
-
-    const renderArimaChart = (forecast: number[]) => {
-        if (!arimaChartRef.current || !forecast || forecast.length === 0) return;
-        arimaChartRef.current.innerHTML = "";
-        if (arimaChartRef.current.clientWidth === 0) {
-            setTimeout(() => renderArimaChart(forecast), 100);
-            return;
-        }
-        const chart = createChart(arimaChartRef.current, {
-            layout: {
-                background: { type: ColorType.Solid, color: "transparent" },
-                textColor: "#374151",
-            },
-            width: arimaChartRef.current.clientWidth,
-            height: 240,
-            grid: {
-                vertLines: { color: "#e5e7eb" },
-                horzLines: { color: "#e5e7eb" },
-            },
-        });
-        const baseTs = Math.floor(
-            new Date("2000-01-01T00:00:00Z").getTime() / 1000,
-        );
-        chart.applyOptions({
-            timeScale: {
-                timeVisible: true,
-                tickMarkFormatter: (t: Time | number) => {
-                    const ts = typeof t === "number" ? t : 0;
-                    const idx = ts ? Math.max(0, Math.round((ts - baseTs) / 86400)) : 0;
-                    return `Step ${idx}`;
-                },
-            },
-            localization: { timeFormatter: () => "" },
-        });
-        const series = chart.addSeries(LineSeries, {
-            color: "#3b82f6",
-            lineWidth: 2,
-            priceScaleId: "",
-        });
-        const chartData = forecast.map((v, i) => ({
-            time: (baseTs + i * 86400) as Time,
-            value: v,
-        }));
-        series.setData(chartData);
-        chart.timeScale().fitContent();
-    };
-
-    const renderGarchVolChart = (vols: number[], forecast?: number[]) => {
-        if (!garchVolChartRef.current || !vols || vols.length === 0) return;
-        garchVolChartRef.current.innerHTML = "";
-        if (garchVolChartRef.current.clientWidth === 0) {
-            setTimeout(() => renderGarchVolChart(vols, forecast), 100);
-            return;
-        }
-        const chart = createChart(garchVolChartRef.current, {
-            layout: {
-                background: { type: ColorType.Solid, color: "transparent" },
-                textColor: "#374151",
-            },
-            width: garchVolChartRef.current.clientWidth,
-            height: 240,
-            grid: {
-                vertLines: { color: "#e5e7eb" },
-                horzLines: { color: "#e5e7eb" },
-            },
-        });
-        const baseTs = Math.floor(
-            new Date("2000-01-01T00:00:00Z").getTime() / 1000,
-        );
-        chart.applyOptions({
-            timeScale: {
-                timeVisible: true,
-                tickMarkFormatter: (t: Time | number) => {
-                    const ts = typeof t === "number" ? t : 0;
-                    const idx = ts ? Math.max(0, Math.round((ts - baseTs) / 86400)) : 0;
-                    return `Step ${idx}`;
-                },
-            },
-            localization: { timeFormatter: () => "" },
-        });
-        const histSeries = chart.addSeries(HistogramSeries, {
-            color: "#8b5cf6",
-            priceFormat: { type: "volume" },
-            priceScaleId: "",
-        });
-        const histData = vols.map((v, i) => ({
-            time: (baseTs + i * 86400) as Time,
-            value: v,
-        }));
-        histSeries.setData(histData);
-        if (forecast && forecast.length > 0) {
-            const line = chart.addSeries(LineSeries, {
-                color: "#ef4444",
-                lineWidth: 2,
-                priceScaleId: "",
-            });
-            const lineData = forecast.map((v, i) => ({
-                time: (baseTs + (vols.length + i) * 86400) as Time,
-                value: v,
-            }));
-            line.setData(lineData);
-        }
-        chart.timeScale().fitContent();
-    };
-
-    const renderLstmChart = (forecast: number[]) => {
-        if (!lstmChartRef.current || !forecast || forecast.length === 0) return;
-        lstmChartRef.current.innerHTML = "";
-        if (lstmChartRef.current.clientWidth === 0) {
-            setTimeout(() => renderLstmChart(forecast), 100);
-            return;
-        }
-        const chart = createChart(lstmChartRef.current, {
-            layout: {
-                background: { type: ColorType.Solid, color: "transparent" },
-                textColor: "#374151",
-            },
-            width: lstmChartRef.current.clientWidth,
-            height: 240,
-            grid: {
-                vertLines: { color: "#e5e7eb" },
-                horzLines: { color: "#e5e7eb" },
-            },
-        });
-        const baseTs = Math.floor(
-            new Date("2000-01-01T00:00:00Z").getTime() / 1000,
-        );
-        chart.applyOptions({
-            timeScale: {
-                timeVisible: true,
-                tickMarkFormatter: (t: Time | number) => {
-                    const ts = typeof t === "number" ? t : 0;
-                    const idx = ts ? Math.max(0, Math.round((ts - baseTs) / 86400)) : 0;
-                    return `Step ${idx}`;
-                },
-            },
-            localization: { timeFormatter: () => "" },
-        });
-        const series = chart.addSeries(LineSeries, {
-            color: "#8b5cf6",
-            lineWidth: 2,
-            priceScaleId: "",
-        });
-        const chartData = forecast.map((v, i) => ({
-            time: (baseTs + i * 86400) as Time,
-            value: v,
-        }));
         series.setData(chartData);
         chart.timeScale().fitContent();
     };

@@ -116,7 +116,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
             }
         };
 
-        fetchMarketData();
+        void fetchMarketData();
 
         // Start auto-refresh for both indices
         marketService.startAutoRefresh("BSE:SENSEX", 30000, (data, error) => {
@@ -146,7 +146,7 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
         return () => {
             marketService.stopAllAutoRefresh();
         };
-    }, []);
+    }, [marketService]);
 
     const { signOut } = useAuth();
 

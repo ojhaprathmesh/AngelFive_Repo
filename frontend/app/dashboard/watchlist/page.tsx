@@ -184,7 +184,7 @@ export default function WatchlistPage() {
             },
         );
         return () => unsub();
-    }, [uid]);
+    }, [selectedId, uid]);
 
     useEffect(() => {
         const el = tabsRef.current;

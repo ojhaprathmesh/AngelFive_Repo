@@ -68,7 +68,7 @@ export class FirebaseAuthService {
      * Format: "prathmesh-ojha-a3kR9mZx"
      * The name prefix is human-readable; the 8-char base62 hash suffix guarantees uniqueness.
      *
-     * Example: ("Prathmesh Ojha", "NqyoREKDTaga6...") → "prathmesh-ojha-a3kR9mZx"
+     * Example: ("Prathmesh Ojha", "iAmAHash1234...") → "prathmesh-ojha-a3kR9mZx"
      */
     private generateSlug(name: string, uid: string): string {
         const nameSlug = name

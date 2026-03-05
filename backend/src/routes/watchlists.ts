@@ -39,7 +39,7 @@ function mapWatchlistDocs(docs: FirebaseFirestore.QueryDocumentSnapshot[]): Watc
     });
 }
 
-function sortWatchlists(items: WatchlistDoc[]): Omit<WatchlistDoc, "_orderIndex">[] {
+function sortWatchlist(items: WatchlistDoc[]): Omit<WatchlistDoc, "_orderIndex">[] {
     return items
         .sort((a, b) => {
             const aDef = a.name.toLowerCase() === "default" ? -1 : 0;
@@ -136,7 +136,7 @@ router.get("/stream", async (req: Request, res: Response): Promise<void> => {
                     return;
                 }
                 const items = mapWatchlistDocs(snap.docs);
-                const sorted = sortWatchlists(items);
+                const sorted = sortWatchlist(items);
                 res.write(`data: ${JSON.stringify({ items: sorted })}\n\n`);
             });
 
@@ -209,7 +209,7 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
             return;
         }
         const items = mapWatchlistDocs(snap.docs);
-        const sorted = sortWatchlists(items);
+        const sorted = sortWatchlist(items);
         res.json({ items: sorted });
     } catch (error: any) {
         res

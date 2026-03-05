@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import { Request, Response, Router } from "express";
 import speakeasy from "speakeasy";
 
 import { ENV } from "../config/env";
@@ -18,19 +18,19 @@ interface InstrumentEntry {
     token: string | number;
     symbol?: string;
     name?: string;
-    tradingsymbol?: string;
-    instrumenttype?: string;
-    exch_seg?: string;
+    tradingSymbol?: string;
+    instrumentType?: string;
+    exchangeSeg?: string;
 }
 
 interface SmartAPICandleResponse {
     status: boolean;
     message: string;
-    errorcode: string;
+    errorCode: string;
     data?: Array<[string, number, number, number, number, number]>;
 }
 
-const router = express.Router();
+const router: Router = Router();
 
 let instrumentCache: InstrumentEntry[] | null = null;
 let instrumentCacheTime = 0;
@@ -80,11 +80,11 @@ async function getSymbolToken(
     const upper = symbol.toUpperCase();
     const exchangeUpper = exchange.toUpperCase();
     const match = instruments.find((item) => {
-        if (item.exch_seg?.toUpperCase() !== exchangeUpper) return false;
+        if (item.exchangeSeg?.toUpperCase() !== exchangeUpper) return false;
         const candidates = [
             item.symbol?.toUpperCase(),
             item.name?.toUpperCase(),
-            item.tradingsymbol?.toUpperCase(),
+            item.tradingSymbol?.toUpperCase(),
         ];
         return candidates.some(
             (candidate) => candidate === upper || candidate === `${upper}-EQ`,
@@ -140,7 +140,7 @@ async function getJwtToken(): Promise<string | null> {
                     "X-UserType": "USER",
                 },
                 body: JSON.stringify({
-                    clientcode: clientCode,
+                    clientCode: clientCode,
                     password: password,
                     totp: totp,
                 }),
@@ -346,10 +346,10 @@ async function fetchAngelHistoricalCandles(
 
     const body = {
         exchange: tokenInfo.exchange,
-        symboltoken: tokenInfo.token,
+        symbolToken: tokenInfo.token,
         interval,
-        fromdate: formatDateTime(fromDate),
-        todate: formatDateTime(now),
+        fromDate: formatDateTime(fromDate),
+        toDate: formatDateTime(now),
     };
 
     try {
@@ -729,7 +729,7 @@ router.get(
             }
 
             const allStocks = rows
-                .map((r: any) => String(r?.symbol || r?.tradingsymbol || ""))
+                .map((r: any) => String(r?.symbol || r?.tradingSymbol || ""))
                 .filter((s) => s.length > 0 && !s.includes("NIFTY"));
 
             console.log(`Found ${allStocks.length} stocks in NIFTY 50`);

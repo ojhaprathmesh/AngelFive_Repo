@@ -48,7 +48,7 @@ export async function getSmartApiJwtToken(): Promise<string | null> {
                     "X-UserType": "USER",
                 },
                 body: JSON.stringify({
-                    clientcode: ENV.SMARTAPI_CLIENT_CODE,
+                    clientCode: ENV.SMARTAPI_CLIENT_CODE,
                     password: ENV.SMARTAPI_PASSWORD,
                     totp,
                 }),
@@ -189,10 +189,10 @@ export async function fetchSmartApiCandles(
                 },
                 body: JSON.stringify({
                     exchange,
-                    symboltoken: symbolToken,
+                    symbolToken: symbolToken,
                     interval,
-                    fromdate: fromDate,
-                    todate: toDate,
+                    fromDate: fromDate,
+                    toDate: toDate,
                 }),
             },
         );

@@ -1,10 +1,10 @@
-import express, { Request, Response } from "express";
+import { Request, Response, Router } from "express";
 
 import { fetchNSEIndex, getNSECookie } from "../lib/nse";
 import { fetchSmartApiCandles, fetchSmartApiQuotes, hasSmartApiCredentials, } from "../lib/smartapi";
 import { swrCache, TTL } from "../services/cache";
 
-const router = express.Router();
+const router: Router = Router();
 
 type Quote = {
     symbol: string;
@@ -25,7 +25,7 @@ interface SmartApiItem {
 interface SmartApiGainersResponse {
     status: boolean;
     message?: string;
-    errorcode?: string;
+    errorCode?: string;
     data?: SmartApiItem[];
 }
 
@@ -802,10 +802,9 @@ router.get("/cache-status", (_req: Request, res: Response) => {
     res.json({ entries: swrCache.status() });
 });
 
-export default router;
 router.post("/gainers-losers", async (req: Request, res: Response) => {
     try {
-        const { datatype = "PercPriceGainers", expirytype = "NEAR" } =
+        const { datatype = "PercPriceGainers", expiryType = "NEAR" } =
             req.body || {};
         const url =
             "https://apiconnect.angelone.in/rest/secure/angelbroking/marketData/v1/gainersLosers";
@@ -828,7 +827,7 @@ router.post("/gainers-losers", async (req: Request, res: Response) => {
                         "X-PrivateKey": apiKey,
                         Authorization: `Bearer ${jwt}`,
                     },
-                    body: JSON.stringify({ datatype, expirytype }),
+                    body: JSON.stringify({ datatype, expiryType }),
                 });
                 if (resp.ok) {
                     smartData = (await resp.json()) as SmartApiGainersResponse;
@@ -864,3 +863,5 @@ router.post("/gainers-losers", async (req: Request, res: Response) => {
         return res.status(500).json({ error: "failed_to_fetch_gainers_losers" });
     }
 });
+
+export default router;

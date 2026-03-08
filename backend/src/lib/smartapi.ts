@@ -14,10 +14,7 @@ let jwtTokenExpiry = 0;
 /* ---------------------------------- */
 
 function generateTOTP(secret: string): string {
-    return speakeasy.totp({
-        secret,
-        encoding: "base32",
-    });
+    return (speakeasy.totp as any)({ secret, encoding: "base32", window: 1 });
 }
 
 /* ---------------------------------- */
@@ -48,7 +45,7 @@ export async function getSmartApiJwtToken(): Promise<string | null> {
                     "X-UserType": "USER",
                 },
                 body: JSON.stringify({
-                    clientCode: ENV.SMARTAPI_CLIENT_CODE,
+                    clientcode: ENV.SMARTAPI_CLIENT_CODE,
                     password: ENV.SMARTAPI_PASSWORD,
                     totp,
                 }),

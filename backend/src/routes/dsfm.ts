@@ -1,8 +1,8 @@
 import { Request, Response, Router } from "express";
-import speakeasy from "speakeasy";
 
 import { ENV } from "../config/env";
 import { fetchNSEIndex } from "../lib/nse";
+import { getSmartApiJwtToken } from "../lib/smartapi";
 import { mlFetch } from "../utils/mlFetch";
 
 type Candle = {
@@ -36,14 +36,7 @@ let instrumentCache: InstrumentEntry[] | null = null;
 let instrumentCacheTime = 0;
 const INSTRUMENT_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
 
-// JWT token cache
-let jwtTokenCache: string | null = null;
-let jwtTokenExpiry: number = 0;
-
 const smartAPIkey = ENV.SMARTAPI_API_KEY;
-const clientCode = ENV.SMARTAPI_CLIENT_CODE;
-const password = ENV.SMARTAPI_PASSWORD;
-const totpSecret = ENV.SMARTAPI_TOTP_SECRET;
 const localIp = ENV.SMARTAPI_LOCAL_IP;
 const publicIp = ENV.SMARTAPI_PUBLIC_IP;
 const mac = ENV.SMARTAPI_MAC_ADDRESS;
@@ -96,82 +89,6 @@ async function getSymbolToken(
     }
     console.warn(`Symbol token not found for ${symbol} on ${exchangeUpper}`);
     return null;
-}
-
-/**
- * Generate TOTP using Speakeasy
- * SmartAPI requires base32 secret
- */
-function generateTOTP(secret: string): string {
-    return speakeasy.totp({
-        secret,
-        encoding: "base32",
-    });
-}
-
-// Get or generate JWT token
-async function getJwtToken(): Promise<string | null> {
-    // Check if token is still valid (with 5 minute buffer)
-    if (jwtTokenCache && Date.now() < jwtTokenExpiry - 300000) {
-        return jwtTokenCache;
-    }
-
-    if (!smartAPIkey || !clientCode || !password || !totpSecret) {
-        console.error("Missing SmartAPI credentials for JWT token generation");
-        return null;
-    }
-
-    try {
-        // Generate TOTP
-        const totp = generateTOTP(totpSecret);
-
-        const response = await fetch(
-            "https://apiconnect.angelone.in/rest/auth/angelbroking/user/v1/loginByPassword",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-PrivateKey": smartAPIkey,
-                    Accept: "application/json",
-                    "X-SourceID": "WEB",
-                    "X-ClientLocalIP": localIp,
-                    "X-ClientPublicIP": publicIp,
-                    "X-MACAddress": mac,
-                    "X-UserType": "USER",
-                },
-                body: JSON.stringify({
-                    clientCode: clientCode,
-                    password: password,
-                    totp: totp,
-                }),
-            },
-        );
-
-        if (!response.ok) {
-            console.error(
-                `SmartAPI login failed: ${response.status} ${response.statusText}`,
-            );
-            return null;
-        }
-
-        const data: any = await response.json();
-
-        if (!data.status || !data.data?.jwtToken) {
-            console.error("SmartAPI login failed:", data.message || "Login failed");
-            return null;
-        }
-
-        jwtTokenCache = data.data.jwtToken;
-        jwtTokenExpiry = Date.now() + 3600000; // 1 hour expiry
-
-        console.log("✅ SmartAPI JWT Token generated successfully");
-        return jwtTokenCache;
-    } catch (error: any) {
-        console.error("❌ SmartAPI JWT Token generation failed:", error.message);
-        jwtTokenCache = null;
-        jwtTokenExpiry = 0;
-        return null;
-    }
 }
 
 const timeframeMap = {
@@ -332,7 +249,7 @@ async function fetchAngelHistoricalCandles(
     }
 
     // Get JWT token (will generate if needed)
-    const jwt = await getJwtToken();
+    const jwt = await getSmartApiJwtToken();
     if (!jwt) {
         const errorMsg =
             "Failed to generate SmartAPI JWT token. Please check SMARTAPI_CLIENT_CODE, SMARTAPI_PASSWORD, and SMARTAPI_TOTP_SECRET in your .env file.";

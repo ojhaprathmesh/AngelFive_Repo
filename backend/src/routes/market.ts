@@ -83,57 +83,48 @@ router.get("/discovery", async (_req: Request, res: Response) => {
     }
 });
 
-async function fetchNSEHistoricalPrice(
+async function fetchSmartApiHistoricalPrice(
     symbol: string,
-    fromDate: string,
+    fromDate: string, // already DD-MM-YYYY from caller
     toDate: string,
 ): Promise<{ startPrice: number; endPrice: number } | null> {
     try {
-        const cookie = await getNSECookie();
-        // NSE historical equity API - use proper encoded series and DD-MM-YYYY dates
-        const seriesParam = encodeURIComponent('["EQ"]');
-        const url = `https://www.nseindia.com/api/historical/cm/equity?symbol=${encodeURIComponent(symbol)}&series=${seriesParam}&from=${fromDate}&to=${toDate}`;
-        const resp = await fetch(url, {
-            headers: {
-                "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                Accept: "application/json,text/plain,*/*",
-                Referer: `https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(symbol)}`,
-                Cookie: cookie,
-            },
+        const instruments = await loadInstrumentMaster();
+        const upper = symbol.toUpperCase();
+        const match = instruments.find((item: any) => {
+            if (item.exch_seg?.toUpperCase() !== "NSE") return false;
+            const candidates = [
+                item.symbol?.toUpperCase(),
+                item.tradingsymbol?.toUpperCase(),
+            ];
+            return candidates.some((c) => c === upper || c === `${upper}-EQ`);
         });
-        if (!resp.ok) {
-            console.log(
-                `[Historical] Failed for ${symbol}: ${resp.status} ${resp.statusText}`,
-            );
-            return null;
-        }
-        const json: any = await resp.json();
-        const data = json?.data || [];
-        if (data.length === 0) {
-            console.log(`[Historical] No data for ${symbol}`);
+
+        if (!match?.token) {
+            console.log(`[Historical] Token not found for ${symbol}`);
             return null;
         }
 
-        // Sort by date
-        const sorted = data.sort(
-            (a: any, b: any) =>
-                new Date(a.CH_TIMESTAMP).getTime() - new Date(b.CH_TIMESTAMP).getTime(),
+        // Convert DD-MM-YYYY → YYYY-MM-DD HH:MM for SmartAPI
+        const toSmartDate = (ddmmyyyy: string, eod: boolean) => {
+            const [dd, mm, yyyy] = ddmmyyyy.split("-");
+            return `${yyyy}-${mm}-${dd} ${eod ? "23:59" : "00:00"}`;
+        };
+
+        const candles = await fetchSmartApiCandles(
+            "NSE",
+            String(match.token),
+            "ONE_DAY",
+            toSmartDate(fromDate, false),
+            toSmartDate(toDate, true),
         );
 
-        const first = sorted[0];
-        const last = sorted[sorted.length - 1];
-        const startPrice = Number(
-            first.CH_CLOSING_PRICE || first.CH_OPENING_PRICE || 0,
-        );
-        const endPrice = Number(last.CH_CLOSING_PRICE || 0);
+        if (!candles || candles.length === 0) return null;
 
-        if (startPrice <= 0 || endPrice <= 0) {
-            console.log(
-                `[Historical] Invalid prices for ${symbol}: start=${startPrice}, end=${endPrice}`,
-            );
-            return null;
-        }
+        const startPrice = candles[0][4]; // close of first candle
+        const endPrice = candles[candles.length - 1][4]; // close of last candle
+
+        if (startPrice <= 0 || endPrice <= 0) return null;
 
         return { startPrice, endPrice };
     } catch (e) {
@@ -195,7 +186,7 @@ async function fetchPerformersData(
         if (performers.length >= 8) break;
 
         const stock = validStocks[i];
-        const historical = await fetchNSEHistoricalPrice(
+        const historical = await fetchSmartApiHistoricalPrice(
             stock.symbol,
             fromDateStr,
             toDateStr,

@@ -59,7 +59,10 @@ export async function getSmartApiJwtToken(): Promise<string | null> {
 
         const data: any = await response.json();
 
-        if (!data.status || !data.data?.jwtToken) return null;
+        if (!data.status || !data.data?.jwtToken) {
+            console.error("[SmartAPI] Login failed:", data.message, data.errorCode);
+            return null;
+        }
 
         jwtTokenCache = data.data.jwtToken;
         jwtTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour

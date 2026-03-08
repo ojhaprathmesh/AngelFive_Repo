@@ -14,7 +14,7 @@ import {
 import { Activity, AlertCircle, Circle, Moon, MousePointer2, Move, Sun, ZoomIn, ZoomOut, } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -105,10 +105,8 @@ export function WatchlistChart({
                 return [];
             }
         },
-        [],
+        [timeframe],
     );
-
-    // Calculate EMA
     const calculateEMA = useCallback(
         (data: any[], period: number): { time: Time; value: number }[] => {
             if (data.length < period) return [];
@@ -154,21 +152,6 @@ export function WatchlistChart({
         },
         [showEMA, emaPeriod, calculateEMA],
     );
-
-    // Format symbol for API
-    const formatSymbol = (sym: string, exch: string) => {
-        let cleanSymbol = sym;
-        if (sym.includes(":")) {
-            cleanSymbol = sym.split(":")[1];
-        }
-        if (cleanSymbol.includes("-")) {
-            return cleanSymbol;
-        }
-        if (exch === "NSE") {
-            return `${cleanSymbol}-EQ`;
-        }
-        return `${cleanSymbol}-EQ`;
-    };
 
     // Initialize chart - simplified and reliable
     const initializeChart = useCallback(() => {
@@ -418,9 +401,11 @@ export function WatchlistChart({
                 const candles = await fetchYahooFinanceData(symbol);
 
                 if (!candles || candles.length === 0) {
-                    throw new Error(
+                    setError(
                         `Unable to fetch chart data for ${symbol} from Yahoo Finance. Please check if the symbol is correct.`,
                     );
+                    setIsLoading(false);
+                    return;
                 }
 
                 console.log(
@@ -568,7 +553,7 @@ export function WatchlistChart({
             }
         };
 
-        loadChart();
+        void loadChart();
 
         return () => {
             console.log(
@@ -720,6 +705,7 @@ export function WatchlistChart({
             <div className="flex items-center justify-center h-full p-4">
                 <Alert variant="destructive" className="max-w-md">
                     <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Chart Error</AlertTitle>
                     <AlertDescription>{error}</AlertDescription>
                 </Alert>
             </div>

@@ -1,19 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function NetworkAnalysis() {
     const [loading, setLoading] = useState(false);
     const [networkData, setNetworkData] = useState<any>(null);
 
-    useEffect(() => {
-        void fetchNetworkData();
-    }, []);
-
-    const fetchNetworkData = async () => {
+    const fetchNetworkData = useCallback(async () => {
         setLoading(true);
         try {
             const resp = await fetch("/api/dsfm/network");
@@ -26,7 +24,11 @@ export function NetworkAnalysis() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        void fetchNetworkData();
+    }, [fetchNetworkData]);
 
     return (
         <div className="space-y-6">
@@ -37,6 +39,17 @@ export function NetworkAnalysis() {
                         Construct financial networks from correlation matrices using Minimum
                         Spanning Tree (MST) to analyze network topology and systemic risk
                     </CardDescription>
+                    <CardAction>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void fetchNetworkData()}
+                            disabled={loading}
+                        >
+                            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                            Refresh
+                        </Button>
+                    </CardAction>
                 </CardHeader>
                 <CardContent>
                     {loading ? (
@@ -53,6 +66,9 @@ export function NetworkAnalysis() {
                         </div>
                     )}
                 </CardContent>
+                <CardFooter className="text-xs text-muted-foreground">
+                    Network topology is derived from the correlation matrix using Minimum Spanning Tree (MST) algorithm.
+                </CardFooter>
             </Card>
         </div>
     );

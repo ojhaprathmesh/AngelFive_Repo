@@ -39,7 +39,6 @@ export function OptionQuickList({ isOpen, onClose }: OptionQuickListProps) {
     const [expiryDate, setExpiryDate] = useState<string>("28 Nov 25");
     const [loading, setLoading] = useState(false);
     const [optionData, setOptionData] = useState<OptionData[]>([]);
-    const [underlyingPrice, setUnderlyingPrice] = useState<number>(0);
 
     // Mock expiry dates
     const expiries = [
@@ -73,8 +72,6 @@ export function OptionQuickList({ isOpen, onClose }: OptionQuickListProps) {
                         : selectedTab === "BANKNIFTY"
                             ? 52000
                             : 24000);
-                setUnderlyingPrice(ltp);
-
                 // Generate strikes
                 const step =
                     selectedTab === "NIFTY" ? 50 : selectedTab === "BANKNIFTY" ? 100 : 50;
@@ -118,7 +115,7 @@ export function OptionQuickList({ isOpen, onClose }: OptionQuickListProps) {
             }
         };
 
-        fetchOptionChain();
+        void fetchOptionChain();
         const interval = setInterval(fetchOptionChain, 5000);
         return () => clearInterval(interval);
     }, [isOpen, selectedTab]);

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -13,17 +13,7 @@ export function CorrelationAnalysis() {
     const [timeframe, setTimeframe] = useState<string>("3M");
     const correlationChartRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        void fetchCorrelationData();
-    }, [timeframe]);
-
-    useEffect(() => {
-        if (correlationData && correlationChartRef.current) {
-            renderCorrelationHeatmap(correlationData);
-        }
-    }, [correlationData]);
-
-    const fetchCorrelationData = async () => {
+    const fetchCorrelationData = useCallback(async () => {
         setLoading(true);
         try {
             const resp = await fetch(`/api/dsfm/correlation?timeframe=${timeframe}`);
@@ -44,7 +34,17 @@ export function CorrelationAnalysis() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [timeframe]);
+
+    useEffect(() => {
+        void fetchCorrelationData();
+    }, [fetchCorrelationData]);
+
+    useEffect(() => {
+        if (correlationData && correlationChartRef.current) {
+            renderCorrelationHeatmap(correlationData);
+        }
+    }, [correlationData]);
 
     const renderCorrelationHeatmap = (data: any) => {
         if (
@@ -150,21 +150,15 @@ export function CorrelationAnalysis() {
                         Analyze pairwise correlations between NIFTY 50 stocks to understand
                         market relationships
                     </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex gap-4 items-end flex-wrap">
-                        <div className="w-48">
-                            <label className="text-sm font-semibold mb-2 block text-gray-700 dark:text-gray-300">
-                                Timeframe
-                            </label>
+                    <CardAction>
+                        <div className="flex gap-3 items-center flex-wrap">
                             <Select
                                 value={timeframe}
                                 onValueChange={(value) => setTimeframe(value)}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger className="w-36">
                                     <SelectValue placeholder="Select timeframe" />
                                 </SelectTrigger>
-
                                 <SelectContent>
                                     <SelectItem value="1M">1 Month</SelectItem>
                                     <SelectItem value="3M">3 Months</SelectItem>
@@ -172,18 +166,18 @@ export function CorrelationAnalysis() {
                                     <SelectItem value="1Y">1 Year</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <Button
+                                onClick={fetchCorrelationData}
+                                disabled={loading}
+                                className="bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                            >
+                                {loading ? "Loading..." : "Analyze Correlations"}
+                            </Button>
                         </div>
-                        <Button
-                            onClick={fetchCorrelationData}
-                            disabled={loading}
-                            className="bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
-                        >
-                            {loading ? "Loading..." : "Analyze Correlations"}
-                        </Button>
-                        <div className="ml-auto text-sm text-gray-500">
-                            Analyzing all 50 NIFTY 50 stocks
-                        </div>
-                    </div>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <p className="text-sm text-gray-500">Analyzing all 50 NIFTY 50 stocks</p>
 
                     {loading ? (
                         <Skeleton className="h-96 w-full" />
@@ -191,26 +185,24 @@ export function CorrelationAnalysis() {
                         <div className="space-y-4">
                             <Card>
                                 <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <CardTitle>Correlation Matrix Heatmap</CardTitle>
-                                            <CardDescription className="mt-1">
-                                                Pairwise correlations between stock returns. Green =
-                                                positive, Red = negative correlation.
-                                            </CardDescription>
-                                        </div>
+                                    <CardTitle>Correlation Matrix Heatmap</CardTitle>
+                                    <CardDescription>
+                                        Pairwise correlations between stock returns. Green =
+                                        positive, Red = negative correlation.
+                                    </CardDescription>
+                                    <CardAction>
                                         <div className="flex items-center gap-2 text-sm">
                                             <span className="text-gray-600 dark:text-gray-400">
                                                 Color Scale:
                                             </span>
-                                            <div className="flex gap-1">
+                                            <div className="flex gap-1 items-center">
                                                 <div
                                                     className="w-12 h-6 rounded"
                                                     style={{
                                                         background:
                                                             "linear-gradient(to right, rgba(239,68,68,1), rgba(239,68,68,0))",
                                                     }}
-                                                ></div>
+                                                />
                                                 <span className="text-xs text-gray-500">0</span>
                                                 <div
                                                     className="w-12 h-6 rounded"
@@ -218,10 +210,10 @@ export function CorrelationAnalysis() {
                                                         background:
                                                             "linear-gradient(to right, rgba(34,197,94,0), rgba(34,197,94,1))",
                                                     }}
-                                                ></div>
+                                                />
                                             </div>
                                         </div>
-                                    </div>
+                                    </CardAction>
                                 </CardHeader>
                                 <CardContent>
                                     <div

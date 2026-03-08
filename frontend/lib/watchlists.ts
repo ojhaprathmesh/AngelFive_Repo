@@ -9,7 +9,7 @@ export interface WatchlistItem {
 }
 
 class WatchlistHttpService {
-    private baseUrl: string;
+    private readonly baseUrl: string;
 
     constructor() {
         this.baseUrl = process.env.BACKEND_URL || "";

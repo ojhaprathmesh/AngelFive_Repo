@@ -9,54 +9,19 @@ import {
     IChartApi,
     ISeriesApi,
     LineStyle,
-    Time,
     UTCTimestamp,
 } from "lightweight-charts";
 import { Activity, AlertCircle, BarChart3, TrendingDown, TrendingUp, } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { type MarketData as LiveMarketData, marketDataService, } from "@/lib/market-data";
 
-interface MarketData {
-    symbol: string;
-    price: number;
-    change: number;
-    changePercent: number;
-    open?: number;
-    high?: number;
-    low?: number;
-    close?: number;
-    volume?: number;
-    lastUpdated?: string;
-}
-
-interface ChartData {
-    time: Time;
-    value: number;
-    open?: number;
-    high?: number;
-    low?: number;
-    close?: number;
-}
-
 type TimeFrame = "1D" | "5D" | "1M" | "6M" | "1Y" | "5Y" | "Max";
 type ChartType = "Area" | "Candles";
 type IndexType = "SENSEX" | "NIFTY" | "BANKNIFTY" | "INDIAVIX" | "FINNIFTY";
-
-interface IndexData {
-    symbol: string;
-    price: number;
-    change: number;
-    changePercent: number;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    dayRange: { low: number; high: number };
-}
 
 export function TradingChart() {
     const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -73,7 +38,6 @@ export function TradingChart() {
         null,
     );
     const [error, setError] = useState<string | null>(null);
-    const [chartData, setChartData] = useState<ChartData[]>([]);
     const [indexState, setIndexState] = useState<
         Record<IndexType, LiveMarketData | null>
     >({
@@ -83,7 +47,6 @@ export function TradingChart() {
         INDIAVIX: null,
         FINNIFTY: null,
     });
-    const [chartColor, setChartColor] = useState<"green" | "red">("green");
 
     // Persist chart type selection across sessions
     useEffect(() => {
@@ -136,9 +99,6 @@ export function TradingChart() {
             close: 0,
             dayRange: { low: 0, high: 0 },
         };
-    const isPositive = currentData.change >= 0;
-    const TrendIcon = isPositive ? TrendingUp : TrendingDown;
-
     // Initialize chart
     const initializeChart = useCallback(() => {
         if (!chartContainerRef.current) return;
@@ -214,17 +174,15 @@ export function TradingChart() {
         setTimeout(removeBranding, 0);
         setTimeout(removeBranding, 250);
 
-        // Add series based on chart type
         if (chartType === "Area") {
-            const areaSeries = chart.addSeries(AreaSeries, {
+            seriesRef.current = chart.addSeries(AreaSeries, {
                 lineColor: "#9ca3af",
                 topColor: "rgba(156, 163, 175, 0.3)",
                 bottomColor: "rgba(156, 163, 175, 0.05)",
                 lineWidth: 2,
             });
-            seriesRef.current = areaSeries;
         } else {
-            const candlestickSeries = chart.addSeries(CandlestickSeries, {
+            seriesRef.current = chart.addSeries(CandlestickSeries, {
                 upColor: "#22c55e",
                 downColor: "#ef4444",
                 borderUpColor: "#22c55e",
@@ -232,11 +190,9 @@ export function TradingChart() {
                 wickUpColor: "#22c55e",
                 wickDownColor: "#ef4444",
             });
-            seriesRef.current = candlestickSeries;
         }
 
         // Chart starts empty - real data is loaded by the fetch effect
-        setChartData([]);
 
         // Handle resize
         const handleResize = () => {
@@ -250,7 +206,7 @@ export function TradingChart() {
 
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
-    }, [chartType, selectedIndex, timeFrame]);
+    }, [chartType]);
 
     // Initialize chart on mount and when dependencies change
     useEffect(() => {
@@ -292,7 +248,7 @@ export function TradingChart() {
                 setError("Failed to fetch market data");
             }
         };
-        load();
+        void load();
         const i = setInterval(load, 60000);
         return () => clearInterval(i);
     }, []);
@@ -457,7 +413,6 @@ export function TradingChart() {
                     const firstOpen = mapped[0].open ?? mapped[0].value;
                     const lastClose =
                         mapped[mapped.length - 1].close ?? mapped[mapped.length - 1].value;
-                    setChartColor(lastClose >= firstOpen ? "green" : "red");
 
                     // Update area series colors to reflect chart-period direction
                     if (seriesRef.current && chartType === "Area") {
@@ -499,7 +454,6 @@ export function TradingChart() {
                         setTimeFrame(tfList[idx + 1]);
                     }
                 } else {
-                    setChartData(mapped);
                     setChartDataEmpty(false);
                     setAutoSwitchedFrom(null);
                 }
@@ -528,7 +482,7 @@ export function TradingChart() {
                 setChartDataLoading(false);
             }
         };
-        run();
+        void run();
     }, [selectedIndex, timeFrame, chartType]);
 
     const timeFrames: TimeFrame[] = ["1D", "5D", "1M", "6M", "1Y", "5Y", "Max"];
@@ -544,6 +498,7 @@ export function TradingChart() {
         return (
             <Alert className="mx-4">
                 <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Failed to load chart</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
             </Alert>
         );

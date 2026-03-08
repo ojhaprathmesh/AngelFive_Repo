@@ -3,7 +3,7 @@
 import { ArrowDownRight, ArrowUpRight, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -98,7 +98,8 @@ export function StockOverviewPanel({
                     { signal: controller.signal },
                 );
                 if (!resp.ok) {
-                    throw new Error(`Failed to load stock overview (${resp.status})`);
+                    setError(`Failed to load stock overview (${resp.status})`);
+                    return;
                 }
                 const json = await resp.json();
                 setData(json?.data || null);
@@ -115,7 +116,7 @@ export function StockOverviewPanel({
             }
         };
 
-        load();
+        void load();
         return () => controller.abort();
     }, [symbol, exchange]);
 
@@ -177,6 +178,7 @@ export function StockOverviewPanel({
         return (
             <div className="p-6">
                 <Alert variant="destructive">
+                    <AlertTitle>Failed to load stock</AlertTitle>
                     <AlertDescription>{error}</AlertDescription>
                 </Alert>
             </div>
@@ -228,7 +230,7 @@ export function StockOverviewPanel({
                                     {formatNumber(data.pChange, { minimumFractionDigits: 2 })}%)
                                 </div>
                             </div>
-                            <Button variant="outline" size="icon" className="h-9 w-9">
+                            <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Add to watchlist">
                                 <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                             </Button>
                         </div>

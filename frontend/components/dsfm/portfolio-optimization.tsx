@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -117,47 +117,7 @@ export function PortfolioOptimization() {
 
     const [activeTab, setActiveTab] = useState<string>("results");
 
-    // Render efficient frontier chart when tab is active or data changes
-    useEffect(() => {
-        if (
-            activeTab === "frontier" &&
-            mptResult?.efficient_frontier &&
-            mptResult.efficient_frontier.length > 0
-        ) {
-            // Small delay to ensure DOM is ready when tab switches
-            const timer = setTimeout(() => {
-                if (efficientFrontierChartRef.current) {
-                    console.log("Rendering efficient frontier, tab is active");
-                    renderEfficientFrontier(
-                        mptResult.efficient_frontier,
-                        mptResult.optimal_portfolio,
-                    );
-                } else {
-                    console.warn("Chart ref not available when trying to render");
-                }
-            }, 300);
-
-            return () => clearTimeout(timer);
-        }
-    }, [mptResult, activeTab]);
-
-    const handleSelectAll = () => {
-        setSelectedSymbols([...currentStocks]);
-    };
-
-    const handleDeselectAll = () => {
-        setSelectedSymbols([]);
-    };
-
-    const toggleSymbol = (symbol: string) => {
-        if (selectedSymbols.includes(symbol)) {
-            setSelectedSymbols(selectedSymbols.filter((s) => s !== symbol));
-        } else {
-            setSelectedSymbols([...selectedSymbols, symbol]);
-        }
-    };
-
-    const renderEfficientFrontier = (frontier: any[], optimal: any) => {
+    const renderEfficientFrontier = useCallback((frontier: any[], optimal: any) => {
         if (!efficientFrontierChartRef.current) {
             console.warn("Efficient frontier ref not available");
             return;
@@ -264,8 +224,7 @@ export function PortfolioOptimization() {
             svg.appendChild(hLine);
         }
 
-        // Draw efficient frontier curve with smoothing
-        // Use quadratic bezier curves for smoother appearance
+        // Draw efficient frontier curve
         let pathData = "";
         for (let idx = 0; idx < sortedFrontierClean.length; idx++) {
             const p = sortedFrontierClean[idx];
@@ -274,23 +233,7 @@ export function PortfolioOptimization() {
 
             if (idx === 0) {
                 pathData += `M ${x} ${y} `;
-            } else if (idx === sortedFrontierClean.length - 1) {
-                // Last point - just line to
-                pathData += `L ${x} ${y}`;
             } else {
-                // Use smooth curve (quadratic bezier)
-                const prevP = sortedFrontierClean[idx - 1];
-                const nextP = sortedFrontierClean[idx + 1];
-                const prevX = xScale(prevP.volatility);
-                const prevY = yScale(prevP.expected_return);
-                const nextX = xScale(nextP.volatility);
-                const nextY = yScale(nextP.expected_return);
-
-                // Control point for smooth curve
-                const cpX = x;
-                const cpY = y;
-
-                // Use line for now (can switch to Q for bezier if needed)
                 pathData += `L ${x} ${y} `;
             }
         }
@@ -409,6 +352,46 @@ export function PortfolioOptimization() {
 
         efficientFrontierChartRef.current.appendChild(svg);
         console.log("Efficient frontier chart rendered successfully");
+    }, []);
+
+    // Render efficient frontier chart when tab is active or data changes
+    useEffect(() => {
+        if (
+            activeTab === "frontier" &&
+            mptResult?.efficient_frontier &&
+            mptResult.efficient_frontier.length > 0
+        ) {
+            // Small delay to ensure DOM is ready when tab switches
+            const timer = setTimeout(() => {
+                if (efficientFrontierChartRef.current) {
+                    console.log("Rendering efficient frontier, tab is active");
+                    renderEfficientFrontier(
+                        mptResult.efficient_frontier,
+                        mptResult.optimal_portfolio,
+                    );
+                } else {
+                    console.warn("Chart ref not available when trying to render");
+                }
+            }, 300);
+
+            return () => clearTimeout(timer);
+        }
+    }, [mptResult, activeTab, renderEfficientFrontier]);
+
+    const handleSelectAll = () => {
+        setSelectedSymbols([...currentStocks]);
+    };
+
+    const handleDeselectAll = () => {
+        setSelectedSymbols([]);
+    };
+
+    const toggleSymbol = (symbol: string) => {
+        if (selectedSymbols.includes(symbol)) {
+            setSelectedSymbols(selectedSymbols.filter((s) => s !== symbol));
+        } else {
+            setSelectedSymbols([...selectedSymbols, symbol]);
+        }
     };
 
     return (

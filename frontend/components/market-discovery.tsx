@@ -70,7 +70,11 @@ export default function MarketDiscovery() {
             try {
                 setLoading(true);
                 const resp = await fetch(`/api/market/discovery`);
-                if (!resp.ok) throw new Error("bad_response");
+                if (!resp.ok) {
+                    setError("Failed to load discovery data");
+                    setLoading(false);
+                    return;
+                }
                 const lists: DiscoveryResponse = await resp.json();
                 const map = (q: QuoteLike): MarketData => ({
                     symbol: q.symbol,
@@ -93,8 +97,8 @@ export default function MarketDiscovery() {
                 setLoading(false);
             }
         };
-        load();
-        const i = setInterval(load, 60000);
+        void load();
+        const i = setInterval(() => void load(), 60000);
         return () => clearInterval(i);
     }, []);
 
@@ -163,7 +167,7 @@ export default function MarketDiscovery() {
             } catch {
             }
         };
-        loadMovers();
+        void loadMovers();
     }, []);
 
     useEffect(() => {
@@ -195,7 +199,7 @@ export default function MarketDiscovery() {
                 setLoadingPerformers(false);
             }
         };
-        loadPerf();
+        void loadPerf();
     }, [tf]);
 
     const header = (title: string, section?: string) => (

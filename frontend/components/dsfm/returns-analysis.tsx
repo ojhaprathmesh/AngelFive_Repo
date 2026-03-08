@@ -6,8 +6,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, } from "@/components/ui/card";
+import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -548,14 +549,21 @@ export function ReturnsAnalysis() {
                                 </SelectTrigger>
 
                                 <SelectContent>
-                                    <SelectItem value="1W">1 Week</SelectItem>
-                                    <SelectItem value="1M">1 Month</SelectItem>
-                                    <SelectItem value="3M">3 Months</SelectItem>
-                                    <SelectItem value="6M">6 Months</SelectItem>
-                                    <SelectItem value="1Y">1 Year</SelectItem>
-                                    <SelectItem value="2Y">2 Years</SelectItem>
-                                    <SelectItem value="3Y">3 Years</SelectItem>
-                                    <SelectItem value="5Y">5 Years</SelectItem>
+                                    <SelectGroup>
+                                        <SelectLabel>Short term</SelectLabel>
+                                        <SelectItem value="1W">1 Week</SelectItem>
+                                        <SelectItem value="1M">1 Month</SelectItem>
+                                        <SelectItem value="3M">3 Months</SelectItem>
+                                    </SelectGroup>
+                                    <SelectSeparator />
+                                    <SelectGroup>
+                                        <SelectLabel>Long term</SelectLabel>
+                                        <SelectItem value="6M">6 Months</SelectItem>
+                                        <SelectItem value="1Y">1 Year</SelectItem>
+                                        <SelectItem value="2Y">2 Years</SelectItem>
+                                        <SelectItem value="3Y">3 Years</SelectItem>
+                                        <SelectItem value="5Y">5 Years</SelectItem>
+                                    </SelectGroup>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -571,88 +579,88 @@ export function ReturnsAnalysis() {
                             {/* Statistical Measures */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <Card>
-                                    <CardContent className="pt-6">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                    Mean Return
-                                                </p>
-                                                <p className="text-2xl font-bold">
-                                                    {(returnsData.meanReturn * 100).toFixed(2)}%
-                                                </p>
-                                                {returnsData.calculations && (
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        {returnsData.calculations.meanReturn.description}
-                                                    </p>
-                                                )}
-                                            </div>
+                                    <CardHeader>
+                                        <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Mean Return
+                                        </CardTitle>
+                                        <CardAction>
                                             <TrendingUp className="h-8 w-8 text-green-500" />
-                                        </div>
+                                        </CardAction>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-2xl font-bold">
+                                            {(returnsData.meanReturn * 100).toFixed(2)}%
+                                        </p>
                                     </CardContent>
+                                    {returnsData.calculations && (
+                                        <CardFooter className="text-xs text-gray-500">
+                                            {returnsData.calculations.meanReturn.description}
+                                        </CardFooter>
+                                    )}
                                 </Card>
 
                                 <Card>
-                                    <CardContent className="pt-6">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                    Volatility (σ)
-                                                </p>
-                                                <p className="text-2xl font-bold">
-                                                    {(returnsData.volatility * 100).toFixed(2)}%
-                                                </p>
-                                                {returnsData.calculations && (
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        {returnsData.calculations.volatility.description}
-                                                    </p>
-                                                )}
-                                            </div>
+                                    <CardHeader>
+                                        <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Volatility (σ)
+                                        </CardTitle>
+                                        <CardAction>
                                             <Activity className="h-8 w-8 text-blue-500" />
-                                        </div>
+                                        </CardAction>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-2xl font-bold">
+                                            {(returnsData.volatility * 100).toFixed(2)}%
+                                        </p>
                                     </CardContent>
+                                    {returnsData.calculations && (
+                                        <CardFooter className="text-xs text-gray-500">
+                                            {returnsData.calculations.volatility.description}
+                                        </CardFooter>
+                                    )}
                                 </Card>
 
                                 <Card>
-                                    <CardContent className="pt-6">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                    Sharpe Ratio
-                                                </p>
-                                                <p className="text-2xl font-bold">
-                                                    {returnsData.sharpeRatio.toFixed(2)}
-                                                </p>
-                                                {returnsData.calculations && (
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        {returnsData.calculations.sharpeRatio.description}
-                                                    </p>
-                                                )}
-                                            </div>
+                                    <CardHeader>
+                                        <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Sharpe Ratio
+                                        </CardTitle>
+                                        <CardAction>
                                             <BarChart3 className="h-8 w-8 text-purple-500" />
-                                        </div>
+                                        </CardAction>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-2xl font-bold">
+                                            {returnsData.sharpeRatio.toFixed(2)}
+                                        </p>
                                     </CardContent>
+                                    {returnsData.calculations && (
+                                        <CardFooter className="text-xs text-gray-500">
+                                            {returnsData.calculations.sharpeRatio.description}
+                                        </CardFooter>
+                                    )}
                                 </Card>
 
                                 <Card>
-                                    <CardContent className="pt-6">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                    Range
-                                                </p>
-                                                <p className="text-sm font-semibold">
-                                                    {(returnsData.minReturn * 100).toFixed(2)}% to{" "}
-                                                    {(returnsData.maxReturn * 100).toFixed(2)}%
-                                                </p>
-                                                {returnsData.calculations && (
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        {returnsData.calculations.range.description}
-                                                    </p>
-                                                )}
-                                            </div>
+                                    <CardHeader>
+                                        <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Range
+                                        </CardTitle>
+                                        <CardAction>
                                             <TrendingDown className="h-8 w-8 text-red-500" />
-                                        </div>
+                                        </CardAction>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm font-semibold">
+                                            {(returnsData.minReturn * 100).toFixed(2)}% to{" "}
+                                            {(returnsData.maxReturn * 100).toFixed(2)}%
+                                        </p>
                                     </CardContent>
+                                    {returnsData.calculations && (
+                                        <CardFooter className="text-xs text-gray-500">
+                                            {returnsData.calculations.range.description}
+                                        </CardFooter>
+                                    )}
                                 </Card>
                             </div>
 
@@ -865,59 +873,47 @@ export function ReturnsAnalysis() {
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div>
-                                                    <label
-                                                        htmlFor="ar-order"
-                                                        className="text-xs text-gray-600 dark:text-gray-400"
-                                                    >
-                                                        AR order (p)
-                                                    </label>
-
-                                                    <input
-                                                        id="ar-order"
-                                                        type="number"
-                                                        min="0"
-                                                        max="5"
-                                                        defaultValue="1"
-                                                        className="w-full px-2 py-1 border rounded text-sm"
-                                                    />
+                                            <FieldSet>
+                                                <FieldLegend variant="label">ARIMA Parameters</FieldLegend>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <Field>
+                                                        <FieldLabel htmlFor="ar-order">AR order (p)</FieldLabel>
+                                                        <input
+                                                            id="ar-order"
+                                                            type="number"
+                                                            aria-label="AR Order"
+                                                            min="0"
+                                                            max="5"
+                                                            defaultValue="1"
+                                                            className="w-full px-2 py-1 border rounded text-sm"
+                                                        />
+                                                    </Field>
+                                                    <Field>
+                                                        <FieldLabel htmlFor="diff-order">Differencing (d)</FieldLabel>
+                                                        <input
+                                                            id="diff-order"
+                                                            type="number"
+                                                            aria-label="Diff Order"
+                                                            min="0"
+                                                            max="2"
+                                                            defaultValue="0"
+                                                            className="w-full px-2 py-1 border rounded text-sm"
+                                                        />
+                                                    </Field>
+                                                    <Field>
+                                                        <FieldLabel htmlFor="ma-order">MA order (q)</FieldLabel>
+                                                        <input
+                                                            id="ma-order"
+                                                            type="number"
+                                                            aria-label="MA Order"
+                                                            min="0"
+                                                            max="5"
+                                                            defaultValue="1"
+                                                            className="w-full px-2 py-1 border rounded text-sm"
+                                                        />
+                                                    </Field>
                                                 </div>
-                                                <div>
-                                                    <label
-                                                        htmlFor="diff-order"
-                                                        className="text-xs text-gray-600 dark:text-gray-400"
-                                                    >
-                                                        Differencing (d)
-                                                    </label>
-
-                                                    <input
-                                                        id="diff-order"
-                                                        type="number"
-                                                        min="0"
-                                                        max="2"
-                                                        defaultValue="0"
-                                                        className="w-full px-2 py-1 border rounded text-sm"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label
-                                                        htmlFor="ma-order"
-                                                        className="text-xs text-gray-600 dark:text-gray-400"
-                                                    >
-                                                        MA order (q)
-                                                    </label>
-
-                                                    <input
-                                                        id="ma-order"
-                                                        type="number"
-                                                        min="0"
-                                                        max="5"
-                                                        defaultValue="1"
-                                                        className="w-full px-2 py-1 border rounded text-sm"
-                                                    />
-                                                </div>
-                                            </div>
+                                            </FieldSet>
                                             <Button
                                                 onClick={async () => {
                                                     const p = parseInt(
@@ -1042,42 +1038,35 @@ export function ReturnsAnalysis() {
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <label
-                                                        htmlFor="garch-p"
-                                                        className="text-xs text-gray-600 dark:text-gray-400"
-                                                    >
-                                                        GARCH p (ARCH terms)
-                                                    </label>
-
-                                                    <input
-                                                        id="garch-p"
-                                                        type="number"
-                                                        min="1"
-                                                        max="3"
-                                                        defaultValue="1"
-                                                        className="w-full px-2 py-1 border rounded text-sm"
-                                                    />
+                                            <FieldSet>
+                                                <FieldLegend variant="label">GARCH Parameters</FieldLegend>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <Field>
+                                                        <FieldLabel htmlFor="garch-p">GARCH p (ARCH terms)</FieldLabel>
+                                                        <input
+                                                            id="garch-p"
+                                                            type="number"
+                                                            aria-label="GARCH p variable"
+                                                            min="1"
+                                                            max="3"
+                                                            defaultValue="1"
+                                                            className="w-full px-2 py-1 border rounded text-sm"
+                                                        />
+                                                    </Field>
+                                                    <Field>
+                                                        <FieldLabel htmlFor="garch-q">GARCH q (GARCH terms)</FieldLabel>
+                                                        <input
+                                                            id="garch-q"
+                                                            type="number"
+                                                            aria-label="GARCH q variable"
+                                                            min="1"
+                                                            max="3"
+                                                            defaultValue="1"
+                                                            className="w-full px-2 py-1 border rounded text-sm"
+                                                        />
+                                                    </Field>
                                                 </div>
-                                                <div>
-                                                    <label
-                                                        htmlFor="garch-q"
-                                                        className="text-xs text-gray-600 dark:text-gray-400"
-                                                    >
-                                                        GARCH q (GARCH terms)
-                                                    </label>
-
-                                                    <input
-                                                        id="garch-q"
-                                                        type="number"
-                                                        min="1"
-                                                        max="3"
-                                                        defaultValue="1"
-                                                        className="w-full px-2 py-1 border rounded text-sm"
-                                                    />
-                                                </div>
-                                            </div>
+                                            </FieldSet>
                                             <Button
                                                 onClick={async () => {
                                                     const p = parseInt(

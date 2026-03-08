@@ -20,7 +20,9 @@ const PORT = ENV.PORT;
 /* -------------------------------------------------------------------------- */
 
 const allowedOrigins = [
+    "http://localhost:3000",
     "http://localhost:5173",
+    "https://angelfive.vercel.app",
     ...ENV.FRONTEND_URL.split(",").map((u) => u.trim()),
 ];
 
@@ -28,8 +30,6 @@ const allowedOrigins = [
 const allowedOriginPatterns = [
     /^https:\/\/angelfive(-[a-z0-9-]+)?\.vercel\.app$/,
 ];
-
-console.log("Env Variables:", ENV);
 
 app.use(
     cors({

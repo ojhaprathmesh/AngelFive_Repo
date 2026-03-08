@@ -1,5 +1,6 @@
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 
 export default function PortfolioPage() {
     return (
@@ -13,19 +14,22 @@ export default function PortfolioPage() {
                         Track your holdings and performance
                     </p>
                 </div>
-                <div className="rounded-lg border bg-white dark:bg-gray-900 p-6">
-                    <Alert>
-                        <AlertDescription className="text-sm">
-                            Your portfolio is empty. Add holdings to monitor gains, losses,
-                            and allocation.
-                        </AlertDescription>
-                    </Alert>
-                    <div className="mt-4">
+                <Card>
+                    <CardContent>
+                        <Alert>
+                            <AlertTitle>Portfolio Empty</AlertTitle>
+                            <AlertDescription className="text-sm">
+                                Your portfolio is empty. Add holdings to monitor gains, losses,
+                                and allocation.
+                            </AlertDescription>
+                        </Alert>
+                    </CardContent>
+                    <CardFooter>
                         <Button variant="outline" disabled>
                             Add holdings
                         </Button>
-                    </div>
-                </div>
+                    </CardFooter>
+                </Card>
             </div>
         </div>
     );

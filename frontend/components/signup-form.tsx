@@ -1,11 +1,11 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type SubmitEvent,useState } from "react";
 import { toast } from "sonner";
 
 import { GoogleSignInButton } from "@/components/google-signin-button";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { type AuthRequest, authService } from "@/lib/firebase";
@@ -15,11 +15,11 @@ export function SignupForm() {
     const router = useRouter();
     const { refreshUser } = useAuth();
 
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
         setIsSubmitting(true);
 
-        const formData = new FormData(event.currentTarget);
+        const formData = new FormData(event.currentTarget ?? undefined);
         const fullName = formData.get("name") as string;
         const email = formData.get("email") as string;
         const password = formData.get("password") as string;
@@ -64,59 +64,65 @@ export function SignupForm() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-                <Field>
-                    <FieldLabel htmlFor="name">Full Name</FieldLabel>
-                    <Input
-                        id="name"
-                        name="name"
-                        type="text"
-                        autoComplete="name"
-                        required
-                        aria-describedby="name-description"
-                        className="w-full"
-                    />
-                </Field>
+                <FieldGroup>
+                    <Field>
+                        <FieldLabel htmlFor="name">Full Name</FieldLabel>
+                        <Input
+                            id="name"
+                            name="name"
+                            type="text"
+                            autoComplete="name"
+                            required
+                            aria-label="Full name"
+                            aria-describedby="name-description"
+                            className="w-full"
+                        />
+                    </Field>
 
-                <Field>
-                    <FieldLabel htmlFor="email">Email</FieldLabel>
-                    <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        aria-describedby="email-description"
-                        className="w-full"
-                    />
-                </Field>
+                    <Field>
+                        <FieldLabel htmlFor="email">Email</FieldLabel>
+                        <Input
+                            id="email"
+                            name="email"
+                            type="email"
+                            autoComplete="email"
+                            required
+                            aria-label="Email"
+                            aria-describedby="email-description"
+                            className="w-full"
+                        />
+                    </Field>
 
-                <Field>
-                    <FieldLabel htmlFor="password">Password</FieldLabel>
-                    <Input
-                        id="password"
-                        name="password"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        minLength={6}
-                        aria-describedby="password-description"
-                        className="w-full"
-                    />
-                </Field>
+                    <Field>
+                        <FieldLabel htmlFor="password">Password</FieldLabel>
+                        <Input
+                            id="password"
+                            name="password"
+                            type="password"
+                            autoComplete="new-password"
+                            required
+                            minLength={8}
+                            aria-label="Password"
+                            aria-describedby="password-description"
+                            className="w-full"
+                        />
+                    </Field>
 
-                <Field>
-                    <FieldLabel htmlFor="confirmPassword">Confirm Password</FieldLabel>
-                    <Input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        minLength={6}
-                        aria-describedby="confirm-password-description"
-                        className="w-full"
-                    />
-                </Field>
+                    <Field>
+                        <FieldLabel htmlFor="confirmPassword">Confirm Password</FieldLabel>
+                        <Input
+                            id="confirmPassword"
+                            name="confirmPassword"
+                            type="password"
+                            autoComplete="new-password"
+                            required
+                            minLength={8}
+                            aria-label="Confirm password"
+                            aria-describedby="confirm-password-description"
+                            className="w-full"
+                        />
+                    </Field>
+                </FieldGroup>
 
                 <Button type="submit" disabled={isSubmitting} className="w-full">
                     {isSubmitting ? (
@@ -129,16 +135,7 @@ export function SignupForm() {
                     )}
                 </Button>
 
-                <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-gray-300 dark:border-gray-600" />
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                        <span className="px-2 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400">
-                            Or continue with
-                        </span>
-                    </div>
-                </div>
+                <FieldSeparator className="mb-2">Or continue with</FieldSeparator>
 
                 <GoogleSignInButton mode="signup" disabled={isSubmitting} />
             </form>

@@ -17,7 +17,7 @@ interface IndexData {
     isPositive: boolean;
 }
 
-export function MarketOverview() {
+export default function MarketOverview() {
     const [selectedIndex, setSelectedIndex] = useState<string>("SENSEX");
     const [indexData, setIndexData] = useState<IndexData[]>([
         {
@@ -62,12 +62,9 @@ export function MarketOverview() {
         },
     ]);
 
-    const [isLoading, setIsLoading] = useState(false);
-
     // Fetch real market data
     useEffect(() => {
         const fetchMarketData = async () => {
-            setIsLoading(true);
             try {
                 const [sensexData, niftyData] = await Promise.all([
                     marketDataService.getSensexData(),
@@ -102,13 +99,11 @@ export function MarketOverview() {
                 }
             } catch (error) {
                 console.error("Error fetching market data:", error);
-            } finally {
-                setIsLoading(false);
             }
         };
 
-        fetchMarketData();
-        const interval = setInterval(fetchMarketData, 30000); // Update every 30 seconds
+        void fetchMarketData();
+        const interval = setInterval(() => void fetchMarketData(), 30000); // Update every 30 seconds
 
         return () => clearInterval(interval);
     }, []);

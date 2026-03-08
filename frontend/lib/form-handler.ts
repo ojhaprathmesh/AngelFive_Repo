@@ -155,24 +155,18 @@ const authenticateWithFirebase = async (
 ): Promise<AuthResult> => {
     const firebaseAuth = FirebaseClientAuth.getInstance();
 
-    try {
-        if (payload.submissionType === "LOGIN") {
-            return await firebaseAuth.signIn(payload.email, payload.password);
-        } else {
-            // For signup, we need the full name
-            if (!payload.fullName) {
-                throw new Error("Full name is required for signup");
-            }
-            return await firebaseAuth.signUp(
-                payload.email,
-                payload.password,
-                payload.fullName,
-            );
-        }
-    } catch (error) {
-        console.error("Firebase authentication error:", error);
-        throw error;
+    if (payload.submissionType === "LOGIN") {
+        return await firebaseAuth.signIn(payload.email, payload.password);
     }
+
+    if (!payload.fullName) {
+        throw new Error("Full name is required for signup");
+    }
+    return await firebaseAuth.signUp(
+        payload.email,
+        payload.password,
+        payload.fullName,
+    );
 };
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import { User } from "firebase/auth";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 import { authService, UserProfile } from "@/lib/firebase";
 
@@ -47,39 +47,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.setItem("lastActivity", new Date().toISOString());
     };
 
-    // Check for session timeout
-    const checkSessionTimeout = () => {
-        const lastActivityStr = localStorage.getItem("lastActivity");
-        if (!lastActivityStr || !firebaseUser) return;
-
-        const lastActivityTime = new Date(lastActivityStr);
-        const now = new Date();
-        const timeDiff = now.getTime() - lastActivityTime.getTime();
-
-        if (timeDiff > SESSION_TIMEOUT) {
-            handleSignOut();
-            setError("Session expired due to inactivity. Please log in again.");
-        } else {
-            setSessionTimeout(SESSION_TIMEOUT - timeDiff);
-        }
-    };
-
-    // Refresh user profile data
-    const refreshUser = async () => {
-        if (!firebaseUser) return;
-
-        try {
-            setError(null);
-            const userProfile = await authService.getUserProfile(firebaseUser.uid);
-            setUser(userProfile);
-        } catch (error) {
-            console.error("Failed to refresh user profile:", error);
-            setError("Failed to load user profile");
-        }
-    };
-
-    // Handle sign out
-    const handleSignOut = async () => {
+    // Handle sign out — useCallback with [] so checkSessionTimeout can depend on it
+    const handleSignOut = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
@@ -105,6 +74,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setError("Failed to sign out");
         } finally {
             setLoading(false);
+        }
+    }, []);
+
+    // Check for session timeout — depends on firebaseUser and handleSignOut
+    const checkSessionTimeout = useCallback(() => {
+        const lastActivityStr = localStorage.getItem("lastActivity");
+        if (!lastActivityStr || !firebaseUser) return;
+
+        const lastActivityTime = new Date(lastActivityStr);
+        const now = new Date();
+        const timeDiff = now.getTime() - lastActivityTime.getTime();
+
+        if (timeDiff > SESSION_TIMEOUT) {
+            void handleSignOut();
+            setError("Session expired due to inactivity. Please log in again.");
+        } else {
+            setSessionTimeout(SESSION_TIMEOUT - timeDiff);
+        }
+    }, [firebaseUser, handleSignOut]);
+
+    // Refresh user profile data
+    const refreshUser = async () => {
+        if (!firebaseUser) return;
+
+        try {
+            setError(null);
+            const userProfile = await authService.getUserProfile(firebaseUser.uid);
+            setUser(userProfile);
+        } catch (error) {
+            console.error("Failed to refresh user profile:", error);
+            setError("Failed to load user profile");
         }
     };
 
@@ -178,7 +178,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const interval = setInterval(checkSessionTimeout, ACTIVITY_CHECK_INTERVAL);
 
         return () => clearInterval(interval);
-    }, [firebaseUser]);
+    }, [firebaseUser, checkSessionTimeout]);
 
     // Initialize last activity from localStorage
     useEffect(() => {

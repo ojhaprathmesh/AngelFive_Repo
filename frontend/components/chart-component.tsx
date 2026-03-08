@@ -35,9 +35,14 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
+    DropdownMenuCheckboxItem,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { marketDataService } from "@/lib/market-data";
@@ -763,36 +768,34 @@ export default function ChartComponent({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-48">
-                                <div className="px-2 py-1 text-[11px]">Minutes</div>
-                                {(["1m", "5m", "15m"] as SizeKey[]).map((s) => (
-                                    <DropdownMenuItem
-                                        key={s}
-                                        onClick={() => setSize(s)}
-                                        aria-selected={size === s}
-                                    >
-                                        {s.toUpperCase()}
-                                    </DropdownMenuItem>
-                                ))}
-                                <div className="px-2 py-1 text-[11px]">Hours</div>
-                                {(["1h", "2h", "3h", "4h"] as SizeKey[]).map((s) => (
-                                    <DropdownMenuItem
-                                        key={s}
-                                        onClick={() => setSize(s)}
-                                        aria-selected={size === s}
-                                    >
-                                        {s.toUpperCase()}
-                                    </DropdownMenuItem>
-                                ))}
-                                <div className="px-2 py-1 text-[11px]">Days/Weeks/Months</div>
-                                {(["1d", "1wk", "1month"] as SizeKey[]).map((s) => (
-                                    <DropdownMenuItem
-                                        key={s}
-                                        onClick={() => setSize(s)}
-                                        aria-selected={size === s}
-                                    >
-                                        {s.toUpperCase()}
-                                    </DropdownMenuItem>
-                                ))}
+                                <DropdownMenuRadioGroup value={size} onValueChange={(v) => setSize(v as SizeKey)}>
+                                    <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">Minutes</DropdownMenuLabel>
+                                    <DropdownMenuGroup>
+                                        {(["1m", "5m", "15m"] as SizeKey[]).map((s) => (
+                                            <DropdownMenuRadioItem key={s} value={s}>
+                                                {s.toUpperCase()}
+                                            </DropdownMenuRadioItem>
+                                        ))}
+                                    </DropdownMenuGroup>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">Hours</DropdownMenuLabel>
+                                    <DropdownMenuGroup>
+                                        {(["1h", "2h", "3h", "4h"] as SizeKey[]).map((s) => (
+                                            <DropdownMenuRadioItem key={s} value={s}>
+                                                {s.toUpperCase()}
+                                            </DropdownMenuRadioItem>
+                                        ))}
+                                    </DropdownMenuGroup>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">Days / Weeks / Months</DropdownMenuLabel>
+                                    <DropdownMenuGroup>
+                                        {(["1d", "1wk", "1month"] as SizeKey[]).map((s) => (
+                                            <DropdownMenuRadioItem key={s} value={s}>
+                                                {s.toUpperCase()}
+                                            </DropdownMenuRadioItem>
+                                        ))}
+                                    </DropdownMenuGroup>
+                                </DropdownMenuRadioGroup>
                             </DropdownMenuContent>
                         </DropdownMenu>
                         <Button
@@ -823,67 +826,75 @@ export default function ChartComponent({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56">
-                                {(["EMA", "SMA", "RSI"] as IndicatorKey[]).map((k) => (
+                                <DropdownMenuGroup>
+                                    <DropdownMenuLabel>Indicators</DropdownMenuLabel>
+                                    {(["EMA", "SMA", "RSI"] as IndicatorKey[]).map((k) => (
+                                        <DropdownMenuCheckboxItem
+                                            key={k}
+                                            checked={indicator === k}
+                                            onCheckedChange={(checked) =>
+                                                setIndicator(checked ? k : null)
+                                            }
+                                        >
+                                            {k}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                </DropdownMenuGroup>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuGroup>
+                                    <DropdownMenuLabel>Config</DropdownMenuLabel>
                                     <DropdownMenuItem
-                                        key={k}
-                                        onClick={() => setIndicator(k)}
-                                        aria-selected={indicator === k}
+                                        onClick={() =>
+                                            setIndicatorCfg((c) => ({
+                                                ...c,
+                                                EMA: Math.max(2, c.EMA - 1),
+                                            }))
+                                        }
                                     >
-                                        {k}
+                                        EMA −
                                     </DropdownMenuItem>
-                                ))}
-                                <div className="px-2 py-1 text-[11px]">Config</div>
-                                <DropdownMenuItem
-                                    onClick={() =>
-                                        setIndicatorCfg((c) => ({
-                                            ...c,
-                                            EMA: Math.max(2, c.EMA - 1),
-                                        }))
-                                    }
-                                >
-                                    EMA -
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() =>
-                                        setIndicatorCfg((c) => ({ ...c, EMA: c.EMA + 1 }))
-                                    }
-                                >
-                                    EMA +
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() =>
-                                        setIndicatorCfg((c) => ({
-                                            ...c,
-                                            SMA: Math.max(2, c.SMA - 1),
-                                        }))
-                                    }
-                                >
-                                    SMA -
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() =>
-                                        setIndicatorCfg((c) => ({ ...c, SMA: c.SMA + 1 }))
-                                    }
-                                >
-                                    SMA +
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() =>
-                                        setIndicatorCfg((c) => ({
-                                            ...c,
-                                            RSI: Math.max(2, c.RSI - 1),
-                                        }))
-                                    }
-                                >
-                                    RSI -
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() =>
-                                        setIndicatorCfg((c) => ({ ...c, RSI: c.RSI + 1 }))
-                                    }
-                                >
-                                    RSI +
-                                </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIndicatorCfg((c) => ({ ...c, EMA: c.EMA + 1 }))
+                                        }
+                                    >
+                                        EMA +
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIndicatorCfg((c) => ({
+                                                ...c,
+                                                SMA: Math.max(2, c.SMA - 1),
+                                            }))
+                                        }
+                                    >
+                                        SMA −
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIndicatorCfg((c) => ({ ...c, SMA: c.SMA + 1 }))
+                                        }
+                                    >
+                                        SMA +
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIndicatorCfg((c) => ({
+                                                ...c,
+                                                RSI: Math.max(2, c.RSI - 1),
+                                            }))
+                                        }
+                                    >
+                                        RSI −
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIndicatorCfg((c) => ({ ...c, RSI: c.RSI + 1 }))
+                                        }
+                                    >
+                                        RSI +
+                                    </DropdownMenuItem>
+                                </DropdownMenuGroup>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>

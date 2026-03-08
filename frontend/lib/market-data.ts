@@ -72,6 +72,23 @@ class MarketDataService {
         this.cache.set(symbol, { data, timestamp: Date.now() });
     }
 
+    private mapQuote(q: any): MarketData {
+        return {
+            symbol: q.symbol,
+            price: q.price,
+            change: q.change,
+            changePercent: q.changePercent,
+            lastUpdated: q.lastUpdated,
+            open: q.open,
+            high: q.high,
+            low: q.low,
+            close: q.close,
+            volume: q.volume,
+            totBuyQuan: q.totBuyQuan,
+            totSellQuan: q.totSellQuan,
+        };
+    }
+
     public getFallbackData(symbol: string): MarketData {
         const fallbackData: Record<string, MarketData> = {
             "BSE:SENSEX": {
@@ -149,20 +166,7 @@ class MarketDataService {
 
             if (json.quotes?.length > 0) {
                 const quote = json.quotes[0];
-                const data: MarketData = {
-                    symbol: quote.symbol,
-                    price: quote.price,
-                    change: quote.change,
-                    changePercent: quote.changePercent,
-                    lastUpdated: quote.lastUpdated,
-                    open: quote.open,
-                    high: quote.high,
-                    low: quote.low,
-                    close: quote.close,
-                    volume: quote.volume,
-                    totBuyQuan: quote.totBuyQuan,
-                    totSellQuan: quote.totSellQuan,
-                };
+                const data = this.mapQuote(quote);
                 this.setCachedData(symbol, data);
                 return data;
             }
@@ -261,20 +265,7 @@ class MarketDataService {
             const json = await res.json();
 
             if (json.quotes?.length > 0) {
-                return json.quotes.map((q: any) => ({
-                    symbol: q.symbol,
-                    price: q.price,
-                    change: q.change,
-                    changePercent: q.changePercent,
-                    lastUpdated: q.lastUpdated,
-                    open: q.open,
-                    high: q.high,
-                    low: q.low,
-                    close: q.close,
-                    volume: q.volume,
-                    totBuyQuan: q.totBuyQuan,
-                    totSellQuan: q.totSellQuan,
-                }));
+                return json.quotes.map((q: any) => this.mapQuote(q));
             }
         } catch (err) {
             console.error("Error fetching quotes by tokens:", err);
@@ -321,20 +312,7 @@ class MarketDataService {
             const json = await res.json();
 
             if (json.quotes?.length > 0) {
-                return json.quotes.map((q: any) => ({
-                    symbol: q.symbol,
-                    price: q.price,
-                    change: q.change,
-                    changePercent: q.changePercent,
-                    lastUpdated: q.lastUpdated,
-                    open: q.open,
-                    high: q.high,
-                    low: q.low,
-                    close: q.close,
-                    volume: q.volume,
-                    totBuyQuan: q.totBuyQuan,
-                    totSellQuan: q.totSellQuan,
-                }));
+                return json.quotes.map((q: any) => this.mapQuote(q));
             }
         } catch (err) {
             console.error("Error fetching multiple quotes:", err);

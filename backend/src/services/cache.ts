@@ -114,6 +114,28 @@ class SWRCacheService {
             revalidating: entry.revalidating,
         }));
     }
+
+    /** Delete a single cache entry by exact key */
+    delete(key: string): boolean {
+        return this.store.delete(key);
+    }
+
+    /** Clear all entries, or only those whose key starts with a given prefix */
+    clear(prefix?: string): number {
+        if (!prefix) {
+            const count = this.store.size;
+            this.store.clear();
+            return count;
+        }
+        let count = 0;
+        for (const key of this.store.keys()) {
+            if (key.startsWith(prefix)) {
+                this.store.delete(key);
+                count++;
+            }
+        }
+        return count;
+    }
 }
 
 export const swrCache = SWRCacheService.getInstance();

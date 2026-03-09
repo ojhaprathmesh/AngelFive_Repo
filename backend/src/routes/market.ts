@@ -793,6 +793,22 @@ router.get("/cache-status", (_req: Request, res: Response) => {
     res.json({ entries: swrCache.status() });
 });
 
+// Clear cache — DELETE /api/market/cache?key=performers:1W  (single key)
+//               DELETE /api/market/cache?prefix=candles:    (all candle keys)
+//               DELETE /api/market/cache                    (everything)
+router.delete("/cache", (_req: Request, res: Response) => {
+    const key = String(_req.query.key || "").trim();
+    const prefix = String(_req.query.prefix || "").trim();
+
+    if (key) {
+        const deleted = swrCache.delete(key);
+        res.json({ cleared: deleted ? 1 : 0, key });
+    } else {
+        const count = swrCache.clear(prefix || undefined);
+        res.json({ cleared: count, prefix: prefix || "*" });
+    }
+});
+
 router.post("/gainers-losers", async (req: Request, res: Response) => {
     try {
         const { datatype = "PercPriceGainers", expiryType = "NEAR" } =

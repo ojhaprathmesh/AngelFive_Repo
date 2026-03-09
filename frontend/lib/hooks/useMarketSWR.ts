@@ -39,31 +39,22 @@ export interface Candle {
 
 /**
  * Replaces the manual fetch in market-discovery.tsx and view-all/page.tsx
- *
- * Before (manual):
- *   useEffect(() => {
- *     fetch(`/api/market/performers?tf=${tf}`)
- *       .then(r => r.json()).then(d => setPerformers(d.performers))
- *   }, [tf]);
- *
- * After:
- *   const { performers, isLoading, error } = useTopPerformers(tf);
  */
 export function useTopPerformers(tf: PerfTimeframe = "1M") {
     const { data, error, isLoading, isValidating } = useSWR<{
         performers: Performer[];
     }>(`/api/market/performers?tf=${tf}`, fetcher, {
-        refreshInterval: TTL.PERFORMERS, // auto-revalidate every 60s
-        revalidateOnFocus: true, // refresh when tab regains focus
-        revalidateOnReconnect: true, // refresh on network reconnect
-        dedupingInterval: 15_000, // don't re-fetch within 15s
-        keepPreviousData: true, // show old data while loading new tf
+        refreshInterval: TTL.PERFORMERS,
+        revalidateOnFocus: true,
+        revalidateOnReconnect: true,
+        dedupingInterval: 15_000,
+        keepPreviousData: true,
     });
 
     return {
         performers: data?.performers ?? [],
         isLoading,
-        isValidating, // true when background revalidation is happening
+        isValidating,
         error: error?.message ?? null,
     };
 }
@@ -121,7 +112,7 @@ export function useIndexChart(params: {
     // Build stable string key — null if any param is missing (pauses SWR)
     const key =
         exchange && symboltoken && interval && fromdate && todate
-            ? `/api/market/smartapi/candles?exchange=${exchange}&symboltoken=${symboltoken}&interval=${interval}&fromdate=${encodeURIComponent(fromdate)}&todate=${encodeURIComponent(todate)}`
+            ? `/api/market/smartapi/candles?exchange=${exchange}&token=${symboltoken}&interval=${interval}&from=${encodeURIComponent(fromdate)}&to=${encodeURIComponent(todate)}`
             : null;
 
     // Intraday frames get shorter TTL

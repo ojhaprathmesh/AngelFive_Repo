@@ -6,7 +6,6 @@ import {
   BarChart3,
   Bell,
   Bookmark,
-  GalleryVerticalEnd,
   KeyRound,
   LogOut,
   type LucideIcon,
@@ -16,6 +15,7 @@ import {
   TrendingUp,
   User,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -314,12 +314,17 @@ export function DashboardNavbar({ user }: DashboardNavbarProps) {
           {/* Logo */}
           <Link
             href="/dashboard/market"
-            className="touch-target flex items-center space-x-2"
+            className="touch-target flex items-center space-x-2.5"
           >
-            <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg">
-              <GalleryVerticalEnd className="size-4" />
-            </div>
-            <span className="text-responsive-lg hidden font-bold text-gray-900 sm:block dark:text-gray-100">
+            <Image
+              src="/logo.png"
+              alt="AngelFive"
+              width={32}
+              height={32}
+              className="rounded-lg object-contain"
+              priority
+            />
+            <span className="text-responsive-lg hidden font-bold tracking-tight text-gray-900 sm:block dark:text-gray-100">
               AngelFive
             </span>
           </Link>

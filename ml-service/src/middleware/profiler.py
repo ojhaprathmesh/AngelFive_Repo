@@ -29,11 +29,12 @@ class ComputeProfilerMiddleware(BaseHTTPMiddleware):
         elif duration_ms >= 200:
             workload_class = "Medium"
             
-        logger.info(
-            f"[PROFILER] {request.method} {request.url.path} - "
-            f"Class: {workload_class} | Duration: {duration_ms:.2f}ms | "
-            f"MemDiff: {mem_diff_mb:.2f}MB"
-        )
+        if request.url.path not in ("/health", "/docs", "/openapi.json"):
+            logger.info(
+                f"[PROFILER] {request.method} {request.url.path} - "
+                f"Class: {workload_class} | Duration: {duration_ms:.2f}ms | "
+                f"MemDiff: {mem_diff_mb:.2f}MB"
+            )
         
         # Optionally attach custom headers for downstream tracing
         response.headers["X-Compute-Class"] = workload_class

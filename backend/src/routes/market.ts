@@ -136,8 +136,8 @@ async function fetchQuotesForMarketPanels(): Promise<Quote[]> {
     return rows.map(mapNSERowToQuote);
   }
 
-  logger.warn(
-    "[Market] NSE index empty, blocked or lacks prices — using SmartAPI",
+  logger.info(
+    "[Market] NSE index empty, blocked or lacks prices — using SmartAPI fallback",
   );
 
   if (rows && rows.length > 0) {

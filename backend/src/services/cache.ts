@@ -127,6 +127,7 @@ async function redisScan(pattern: string): Promise<string[]> {
 
 class SWRCacheService {
   private static instance: SWRCacheService;
+  private inflight = new Map<string, Promise<any>>();
 
   static getInstance(): SWRCacheService {
     if (!SWRCacheService.instance) {
@@ -169,12 +170,26 @@ class SWRCacheService {
       }
     }
 
-    // ── COLD CACHE ────────────────────────────────────────────────────────────
+    // ── COLD CACHE (Single-Flight Stampede Protection) ───────────────────────
     if (data === undefined) {
+      const existing = this.inflight.get(key);
+      if (existing) {
+        return existing as Promise<T>;
+      }
+
       log("MISS", key);
-      const fresh = await fetchFn();
-      await this._store(key, fresh, ttlMs, useRedis);
-      return fresh;
+      const promise = (async () => {
+        try {
+          const fresh = await fetchFn();
+          await this._store(key, fresh, ttlMs, useRedis);
+          return fresh;
+        } finally {
+          this.inflight.delete(key);
+        }
+      })();
+
+      this.inflight.set(key, promise);
+      return promise;
     }
 
     const ageSec =

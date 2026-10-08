@@ -19,6 +19,7 @@ declare global {
             callback: (response: { credential: string }) => void;
             auto_select?: boolean;
             cancel_on_tap_outside?: boolean;
+            use_fedcm_for_prompt?: boolean;
           }) => void;
           prompt: (momentListener?: (notification: any) => void) => void;
           renderButton: (
@@ -104,6 +105,7 @@ export function GoogleSignInButton({
         callback: handleCredentialResponse,
         auto_select: false,
         cancel_on_tap_outside: true,
+        use_fedcm_for_prompt: true,
       });
     };
 
@@ -140,27 +142,37 @@ export function GoogleSignInButton({
 
     setIsLoading(true);
     window.google.accounts.id.prompt((notification: any) => {
-      if (notification.isNotDisplayed()) {
+      if (
+        typeof notification.isNotDisplayed === "function" &&
+        notification.isNotDisplayed()
+      ) {
         console.warn(
           "Google Sign-In prompt not displayed. Reason:",
-          notification.getNotDisplayedReason(),
+          notification.getNotDisplayedReason?.(),
         );
         toast.error(
           "Google login popup blocked. Please clear site cookies to reset the block.",
         );
         setIsLoading(false);
-      } else if (notification.isSkippedMoment()) {
+      } else if (
+        typeof notification.isSkippedMoment === "function" &&
+        notification.isSkippedMoment()
+      ) {
         console.warn(
           "Google Sign-In prompt skipped. Reason:",
-          notification.getSkippedReason(),
+          notification.getSkippedReason?.(),
         );
         setIsLoading(false);
-      } else if (notification.isDismissedMoment()) {
-        console.warn(
-          "Google Sign-In prompt dismissed. Reason:",
-          notification.getDismissedReason(),
-        );
-        setIsLoading(false);
+      } else if (
+        typeof notification.isDismissedMoment === "function" &&
+        notification.isDismissedMoment()
+      ) {
+        const reason = notification.getDismissedReason?.();
+        // 'credential_returned' means user selected account and callback is in-flight
+        if (reason !== "credential_returned") {
+          console.warn("Google Sign-In prompt dismissed. Reason:", reason);
+          setIsLoading(false);
+        }
       }
     });
   };

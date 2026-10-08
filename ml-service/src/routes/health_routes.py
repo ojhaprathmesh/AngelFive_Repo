@@ -1,4 +1,5 @@
 import os
+import sys
 from datetime import datetime
 from typing import Any
 
@@ -29,7 +30,7 @@ def health_check() -> dict[str, Any]:
         "timestamp": datetime.now().isoformat(),
         "service": "ml-service",
         "version": "3.0.0",
-        "python_version": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "model_warmup": {"finbert": warmup},
     }
 
@@ -45,8 +46,8 @@ def detailed_health_check() -> dict[str, Any]:
         "service": "ml-service",
         "version": "3.0.0",
         "system": {
-            "python_version": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
-            "platform": os.sys.platform,
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            "platform": sys.platform,
             "cpu_count": os.cpu_count(),
             "memory_usage": f"{psutil.virtual_memory().percent}%",
             "disk_usage": f"{psutil.disk_usage('/').percent}%",

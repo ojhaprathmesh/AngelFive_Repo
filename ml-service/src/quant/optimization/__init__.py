@@ -8,6 +8,15 @@ from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt.hierarchical_portfolio import HRPOpt
 from src.quant.contracts import PortfolioWeights, PortfolioMetrics
 
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
 def optimize_mpt(
     expected_returns: pd.Series, 
     cov_matrix: pd.DataFrame, 
@@ -37,12 +46,13 @@ def optimize_mpt(
     perf = ef.portfolio_performance()
     
     metrics = {
-        "expected_return": float(perf[0]),
-        "volatility": float(perf[1]),
-        "sharpe_ratio": float(perf[2])
+        "expected_return": _safe_float(perf[0] if len(perf) > 0 else 0.0),
+        "volatility": _safe_float(perf[1] if len(perf) > 1 else 0.0),
+        "sharpe_ratio": _safe_float(perf[2] if len(perf) > 2 else 0.0)
     }
     
-    return dict(weights), metrics
+    clean_dict: Dict[str, float] = {str(k): _safe_float(v) for k, v in dict(weights).items()}
+    return clean_dict, metrics
 
 def optimize_hrp(returns: pd.DataFrame) -> Tuple[Dict[str, float], Dict[str, float]]:
     """
@@ -55,12 +65,13 @@ def optimize_hrp(returns: pd.DataFrame) -> Tuple[Dict[str, float], Dict[str, flo
     perf = hrp.portfolio_performance()
     
     metrics = {
-        "expected_return": float(perf[0]),
-        "volatility": float(perf[1]),
-        "sharpe_ratio": float(perf[2])
+        "expected_return": _safe_float(perf[0] if len(perf) > 0 else 0.0),
+        "volatility": _safe_float(perf[1] if len(perf) > 1 else 0.0),
+        "sharpe_ratio": _safe_float(perf[2] if len(perf) > 2 else 0.0)
     }
     
-    return dict(weights), metrics
+    clean_dict: Dict[str, float] = {str(k): _safe_float(v) for k, v in dict(weights).items()}
+    return clean_dict, metrics
 
 def optimize_semivariance(
     expected_returns: pd.Series, 
@@ -83,12 +94,13 @@ def optimize_semivariance(
     perf = ef.portfolio_performance()
     
     metrics = {
-        "expected_return": float(perf[0]),
-        "semivariance": float(perf[1]),
-        "sortino_ratio": float(perf[2])
+        "expected_return": _safe_float(perf[0] if len(perf) > 0 else 0.0),
+        "semivariance": _safe_float(perf[1] if len(perf) > 1 else 0.0),
+        "sortino_ratio": _safe_float(perf[2] if len(perf) > 2 else 0.0)
     }
     
-    return dict(weights), metrics
+    clean_dict: Dict[str, float] = {str(k): _safe_float(v) for k, v in dict(weights).items()}
+    return clean_dict, metrics
 
 def generate_efficient_frontier(
     expected_returns: pd.Series, 
@@ -101,17 +113,18 @@ def generate_efficient_frontier(
     """
     min_vol_ef = EfficientFrontier(expected_returns, cov_matrix, weight_bounds=weight_bounds)
     min_vol_ef.min_volatility()
-    min_ret = min_vol_ef.portfolio_performance()[0]
+    perf_min = min_vol_ef.portfolio_performance()
+    min_ret = _safe_float(perf_min[0] if len(perf_min) > 0 else 0.0)
     
-    max_ret = expected_returns.max()
+    max_ret = _safe_float(expected_returns.max())
     
     # Avoid numerical issues
     if max_ret <= min_ret:
         target_returns = [min_ret]
     else:
-        target_returns = np.linspace(min_ret, max_ret, points)
+        target_returns = [_safe_float(x) for x in np.linspace(min_ret, max_ret, points)]
         
-    frontier = []
+    frontier: List[Dict[str, Any]] = []
     
     for target in target_returns:
         try:
@@ -121,10 +134,10 @@ def generate_efficient_frontier(
             perf = ef.portfolio_performance()
             
             frontier.append({
-                "weights": list(w.values()),
-                "expected_return": float(perf[0]),
-                "volatility": float(perf[1]),
-                "sharpe_ratio": float(perf[2])
+                "weights": [_safe_float(v) for v in w.values()],
+                "expected_return": _safe_float(perf[0] if len(perf) > 0 else 0.0),
+                "volatility": _safe_float(perf[1] if len(perf) > 1 else 0.0),
+                "sharpe_ratio": _safe_float(perf[2] if len(perf) > 2 else 0.0)
             })
         except Exception:
             continue

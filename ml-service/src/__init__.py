@@ -21,6 +21,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+class HealthEndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find("GET /health") == -1
+
+
+logging.getLogger("uvicorn.access").addFilter(HealthEndpointFilter())
+
+
 import asyncio
 
 @asynccontextmanager

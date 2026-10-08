@@ -5,6 +5,7 @@ import {
   calculateCorrelation,
   calculateLogReturns,
   calculateStatistics,
+  calculateSymmetricEigenvalues,
 } from "../src/utils/market-data";
 
 describe("Financial Math Utilities", () => {
@@ -78,6 +79,36 @@ describe("Financial Math Utilities", () => {
     it("should return 0 for mismatched lengths or empty series", () => {
       assert.equal(calculateCorrelation([], []), 0);
       assert.equal(calculateCorrelation([1, 2], [1]), 0);
+    });
+  });
+
+  describe("calculateSymmetricEigenvalues", () => {
+    it("should accurately diagonalize a 2x2 correlation matrix: [1, r; r, 1] -> 1+r, 1-r", () => {
+      const r = 0.6;
+      const matrix = [
+        [1.0, r],
+        [r, 1.0],
+      ];
+      const eigenvalues = calculateSymmetricEigenvalues(matrix);
+
+      assert.equal(eigenvalues.length, 2);
+      assert.ok(Math.abs(eigenvalues[0] - (1.0 + r)) < 1e-3);
+      assert.ok(Math.abs(eigenvalues[1] - (1.0 - r)) < 1e-3);
+    });
+
+    it("should preserve the trace invariant: sum(eigenvalues) == N for NxN correlation matrix", () => {
+      const matrix3x3 = [
+        [1.0, 0.4, 0.2],
+        [0.4, 1.0, 0.5],
+        [0.2, 0.5, 1.0],
+      ];
+      const eigenvalues = calculateSymmetricEigenvalues(matrix3x3);
+      const trace = eigenvalues.reduce((a, b) => a + b, 0);
+
+      assert.equal(eigenvalues.length, 3);
+      assert.ok(Math.abs(trace - 3.0) < 1e-3);
+      assert.ok(eigenvalues[0] >= eigenvalues[1]);
+      assert.ok(eigenvalues[1] >= eigenvalues[2]);
     });
   });
 });

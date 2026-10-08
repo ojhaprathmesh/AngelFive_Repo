@@ -519,3 +519,87 @@ export function calculateCorrelation(x: number[], y: number[]): number {
   const denominator = Math.sqrt(sumSqX * sumSqY);
   return denominator === 0 ? 0 : numerator / denominator;
 }
+
+/**
+ * Computes exact real eigenvalues for a real symmetric square matrix (e.g. Correlation/Covariance)
+ * using the Jacobi eigenvalue algorithm with cyclic orthogonal rotations.
+ *
+ * @param matrix Real symmetric square matrix NxN
+ * @param maxIterations Maximum Jacobi sweeps (default 100)
+ * @param tolerance Convergence threshold for off-diagonal magnitudes
+ * @returns Sorted eigenvalues in descending order
+ */
+export function calculateSymmetricEigenvalues(
+  matrix: number[][],
+  maxIterations = 100,
+  tolerance = 1e-9,
+): number[] {
+  const n = matrix.length;
+  if (n === 0) return [];
+  if (n === 1) return [matrix[0][0]];
+
+  // Clone matrix to avoid in-place mutation
+  const A: number[][] = matrix.map((row) => [...row]);
+
+  for (let iter = 0; iter < maxIterations; iter++) {
+    let maxOffDiag = 0;
+    let p = 0;
+    let q = 1;
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const val = Math.abs(A[i][j]);
+        if (val > maxOffDiag) {
+          maxOffDiag = val;
+          p = i;
+          q = j;
+        }
+      }
+    }
+
+    if (maxOffDiag < tolerance) {
+      break; // Matrix is successfully diagonalized
+    }
+
+    const diff = A[q][q] - A[p][p];
+    let t: number;
+    if (Math.abs(A[p][q]) < Math.abs(diff) * 1e-15) {
+      t = A[p][q] / diff;
+    } else {
+      const phi = diff / (2 * A[p][q]);
+      t = 1 / (Math.abs(phi) + Math.sqrt(phi * phi + 1));
+      if (phi < 0) t = -t;
+    }
+
+    const c = 1 / Math.sqrt(t * t + 1);
+    const s = t * c;
+    const tau = s / (1 + c);
+
+    const App = A[p][p];
+    const Aqq = A[q][q];
+    const Apq = A[p][q];
+
+    A[p][p] = App - t * Apq;
+    A[q][q] = Aqq + t * Apq;
+    A[p][q] = 0;
+    A[q][p] = 0;
+
+    for (let i = 0; i < n; i++) {
+      if (i !== p && i !== q) {
+        const Aip = A[i][p];
+        const Aiq = A[i][q];
+        A[i][p] = Aip - s * (Aiq + tau * Aip);
+        A[p][i] = A[i][p];
+        A[i][q] = Aiq + s * (Aip - tau * Aiq);
+        A[q][i] = A[i][q];
+      }
+    }
+  }
+
+  const eigenvalues: number[] = [];
+  for (let i = 0; i < n; i++) {
+    eigenvalues.push(Number(A[i][i].toFixed(4)));
+  }
+
+  return eigenvalues.sort((a, b) => b - a);
+}

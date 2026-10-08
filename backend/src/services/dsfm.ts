@@ -5,6 +5,7 @@ import {
   calculateCorrelation,
   calculateLogReturns,
   calculateStatistics,
+  calculateSymmetricEigenvalues,
   fetchAngelHistoricalCandles,
   fetchPricesAndLogReturns,
   fetchStockReturnsMatrix,
@@ -212,15 +213,8 @@ export async function processCorrelation(timeframe: string) {
   }
   const averageCorrelation = count > 0 ? sumCorr / count : 0;
 
-  const eigenvalues: number[] = [];
-  for (let i = 0; i < correlationMatrix.length; i++) {
-    const rowSum = correlationMatrix[i].reduce(
-      (sum, val) => sum + Math.abs(val),
-      0,
-    );
-    eigenvalues.push(rowSum);
-  }
-  eigenvalues.sort((a, b) => b - a);
+  // Compute exact spectral decomposition of the empirical correlation matrix via Jacobi rotations
+  const eigenvalues = calculateSymmetricEigenvalues(correlationMatrix);
 
   const N = correlationMatrix.length;
   const T = minLength;

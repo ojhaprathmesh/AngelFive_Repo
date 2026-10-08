@@ -1,5 +1,13 @@
 /**
- * SmartAPI service
+ * SmartAPI Market Data Proxy Service
+ *
+ * Security & Architectural Scope:
+ * - Read-Only Market Data Scope: This service is strictly an institutional market-data
+ *   proxy for quotes, candles, and scrip resolution.
+ * - Non-Trading Invariant: No trading, order execution, or user-specific broker mutation
+ *   endpoints are exposed or handled through this shared broker session.
+ * - Single-Session Management: Uses an in-flight promise singleton (`jwtLoginInFlight`)
+ *   and rate-limit backoff cooldowns to protect the upstream broker API.
  */
 
 import speakeasy from "speakeasy";

@@ -7,43 +7,6 @@ import { notificationService } from "../services/notification";
 
 const router: Router = Router();
 
-// DEBUG ROUTE
-router.get("/debug-dump", async (req: Request, res: Response) => {
-  try {
-    const snap = await firebaseFirestore.collectionGroup("notifications").get();
-    const data = snap.docs.map((d) => ({ path: d.ref.path, ...d.data() }));
-    res.json(data);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.get("/debug-query", async (req: Request, res: Response) => {
-  try {
-    const uid = "vi86NqitpHRjxsOC0ih3P1DEoNV2";
-    const snap = await firebaseFirestore
-      .collection("users")
-      .doc(uid)
-      .collection("notifications")
-      .where("archived", "==", false)
-      .get();
-
-    const statsDoc = await firebaseFirestore
-      .collection("users")
-      .doc(uid)
-      .collection("notification_stats")
-      .doc("current")
-      .get();
-
-    res.json({
-      notifications: snap.docs.map((d) => d.data()),
-      stats: statsDoc.exists ? statsDoc.data() : null,
-    });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // Get recent notifications
 router.get("/", verifyToken, async (req: Request, res: Response) => {
   try {

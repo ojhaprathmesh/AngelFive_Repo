@@ -39,3 +39,6 @@ scripts/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# local AI instructions & knowledge graphs
+graphify-out/

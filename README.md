@@ -12,7 +12,7 @@
 
 **AngelFive** is a production-ready financial analytics platform that bridges the gap between raw market data and actionable quantitative insights.
 
-Built using **DSFM (Data Science in Financial Markets)**, it combines real-time data streaming, statistical modeling, machine learning, and portfolio optimization into a unified, broker-style dashboard.
+Built using **DSFM (Data Science in Financial Markets)**, it combines near-real-time market analytics, statistical modeling, machine learning, and portfolio optimization into a unified, broker-style dashboard.
 
 ---
 
@@ -24,21 +24,21 @@ Retail investors typically lack access to institutional-grade tools used by hedg
 
 * Statistical validation (ADF Stationarity, ACF/PACF)
 * ML-driven sentiment (FinBERT NLP)
-* Time-series forecasting (ARIMA, GARCH, LSTM)
+* Time-series forecasting (ARIMA, GARCH, LSTM rollout)
 * Portfolio optimization (Markowitz Efficient Frontier, Black-Litterman)
 
-👉 All inside a highly modular, real-time dashboard engineered for scale.
+👉 All inside a highly modular dashboard engineered for reliability and scale.
 
 ---
 
 ## ✨ Engineering Highlights
 
 * 🧠 **Full-stack Microservices Architecture:** Decoupled Next.js Frontend, Node.js API Gateway, and Python ML computation engine.
-* 📊 **Live Market Data:** Integrates AngelOne SmartAPI and Yahoo Finance with intelligent Redis caching to prevent API rate limits.
+* 📊 **Live Market Data:** Integrates AngelOne SmartAPI and Yahoo Finance with intelligent Redis SWR caching to prevent API rate limits.
 * 🏗️ **Feature-Oriented React Design:** Highly decomposed UI architecture using custom hooks, orchestrators, and strict TypeScript types.
 * 🔐 **Secure & Observable Backend:** Global Pino logging with automatic credentials redaction, Firebase Auth, and explicit CORS/helmet policies.
-* 🤖 **Autonomous CI/CD Pipeline:** Fully automated GitHub Actions workflow including Docker Buildx publishing to GHCR, Trivy security scanning, and autonomous AI-driven PR regression analysis.
-* 🐳 **Containerized Infrastructure:** 100% Dockerized environments using `docker-compose` for absolute dev/prod parity.
+* 🤖 **Automated CI/CD Pipeline:** Fully automated GitHub Actions workflow including Docker Buildx container building, Trivy security scanning, and monorepo lint/type-check suites.
+* 🐳 **Containerized Infrastructure:** 100% Dockerized environments using `docker-compose` with multi-stage builds and BuildKit cache mounts.
 
 ---
 
@@ -101,16 +101,16 @@ flowchart TB
     Router --> MarketSvc
     MarketSvc <-- Cache Check --> Redis
     ML_API --> Optim & TS & NLP
-    UI <-- REST / SSE --> Router
+    UI <-- REST / SSE (Notifications) --> Router
     Router <-- Heavy Compute --> ML_API
     Router <-- Market Data --> A1 & YF
     Router <-- Identity --> FB
 ```
 
 ### 1. Frontend (Next.js 16 + React 19)
-- Operates on a highly componentized, feature-folder pattern (e.g., `components/dsfm/returns-analysis/`).
+- Operates on a highly componentized, feature-folder pattern (e.g., `features/dsfm/components/`).
 - Employs purely presentational UI elements wrapped by orchestrator components mapping custom state hooks.
-- Implements Server-Sent Events (SSE) for zero-latency market and notification streaming.
+- Implements Server-Sent Events (SSE) for Firestore user notification streaming and SWR REST polling for market quotes.
 
 ### 2. Backend (Express.js + Redis)
 - Acts as the central integration layer and rate-limiter.
@@ -120,6 +120,7 @@ flowchart TB
 ### 3. ML Service (FastAPI + Python)
 - Completely unblocks the Node.js event loop by taking over heavy PyTorch/Statsmodels workloads.
 - Uses `gunicorn` with `uvicorn` workers for production multithreading.
+- Uses `uv.lock` with explicit CPU PyTorch index for reproducible, lightweight deployments.
 - Leverages `safetensors` over pickles to prevent arbitrary code execution vulnerabilities.
 
 ---

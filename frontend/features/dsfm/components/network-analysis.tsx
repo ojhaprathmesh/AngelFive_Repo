@@ -1,8 +1,9 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { Network, RefreshCw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -42,7 +43,16 @@ export function NetworkAnalysis() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Network Analysis & Market Dynamics</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Network Analysis & Market Dynamics</CardTitle>
+            <Badge
+              variant="outline"
+              className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            >
+              <Sparkles className="mr-1 h-3 w-3" />
+              Roadmap / Q4 Beta
+            </Badge>
+          </div>
           <CardDescription>
             Construct financial networks from correlation matrices using Minimum
             Spanning Tree (MST) to analyze network topology and systemic risk
@@ -63,16 +73,28 @@ export function NetworkAnalysis() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <Skeleton className="h-96 w-full" />
-          ) : networkData ? (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Network graph and MST visualization coming soon...
-              </p>
-            </div>
+            <Skeleton className="h-72 w-full" />
           ) : (
-            <div className="py-8 text-center text-gray-500">
-              Loading network analysis...
+            <div className="border-border/60 bg-muted/20 flex flex-col items-center justify-center rounded-lg border border-dashed p-10 text-center">
+              <div className="bg-primary/10 text-primary mb-4 rounded-full p-3">
+                <Network className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-semibold">
+                Minimum Spanning Tree & Graph Topology
+              </h3>
+              <p className="text-muted-foreground mt-1.5 max-w-md text-sm">
+                Correlation-distance metric transformation (d_ij = √(2(1 -
+                ρ_ij))) and Kruskal MST graph rendering are staged for graph
+                visualization integration.
+              </p>
+              <div className="mt-5 flex items-center gap-3">
+                <Button variant="outline" size="sm" disabled>
+                  Topology Spec
+                </Button>
+                <span className="text-muted-foreground text-xs">
+                  Status: Staged for next release cycle
+                </span>
+              </div>
             </div>
           )}
         </CardContent>

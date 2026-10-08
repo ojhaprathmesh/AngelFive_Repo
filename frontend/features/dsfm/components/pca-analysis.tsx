@@ -1,7 +1,10 @@
 "use client";
 
+import { Layers, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -38,24 +41,45 @@ export function PCAAnalysis() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Dimensionality Reduction & PCA</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Dimensionality Reduction & PCA</CardTitle>
+            <Badge
+              variant="outline"
+              className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            >
+              <Sparkles className="mr-1 h-3 w-3" />
+              Roadmap / Q4 Beta
+            </Badge>
+          </div>
           <CardDescription>
-            Principal Component Analysis to reduce data dimensions and identify
-            asset groups
+            Principal Component Analysis to reduce asset return dimensions and
+            identify latent market drivers
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <Skeleton className="h-96 w-full" />
-          ) : pcaData ? (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                PCA visualization and component analysis coming soon...
-              </p>
-            </div>
+            <Skeleton className="h-72 w-full" />
           ) : (
-            <div className="py-8 text-center text-gray-500">
-              Loading PCA analysis...
+            <div className="border-border/60 bg-muted/20 flex flex-col items-center justify-center rounded-lg border border-dashed p-10 text-center">
+              <div className="bg-primary/10 text-primary mb-4 rounded-full p-3">
+                <Layers className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-semibold">
+                Principal Component Analysis Engine
+              </h3>
+              <p className="text-muted-foreground mt-1.5 max-w-md text-sm">
+                Eigenvalue decomposition and cumulative variance ratio mapping
+                across NIFTY sector portfolios are currently undergoing
+                backtesting and benchmark verification.
+              </p>
+              <div className="mt-5 flex items-center gap-3">
+                <Button variant="outline" size="sm" disabled>
+                  Decomposition Spec
+                </Button>
+                <span className="text-muted-foreground text-xs">
+                  Status: Staged for next release cycle
+                </span>
+              </div>
             </div>
           )}
         </CardContent>

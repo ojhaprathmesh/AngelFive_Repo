@@ -26,7 +26,7 @@ export const requestLogger = pinoHttp({
 
     // Suppress noisy routes
     if (req.url?.includes("/stream") || req.url?.includes("/health")) {
-      return "debug";
+      return "silent";
     }
     return "info";
   },

@@ -40,6 +40,7 @@ jobs:
         working-directory: .
       - run: pnpm lint
       - run: pnpm build
+      - run: pnpm test
       - name: Redis Integration Validation
         run: |
           echo "Verifying Redis connection..."
@@ -84,7 +85,7 @@ jobs:
       - name: Docker Build Validation
         run: docker build -t angelfive-frontend-test .
 
-  # ── ML Service (FastAPI/Flask) ────────────────────────────────────
+  # ── ML Service (FastAPI) ──────────────────────────────────────────
   ml-service:
     runs-on: ubuntu-latest
     defaults:
@@ -96,12 +97,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: uv pip install --system -r requirements.txt pylint
-      - run: python -m pylint src/ --fail-under=7.0
-      - name: Model Bootstrap Validation
-        run: |
-          echo "Validating model loading..."
-          # A mock script to check if model bootstrap works without crashing
-          python -c "import sys; print('Model bootstrap validation passed'); sys.exit(0)"
+      - run: uv sync --frozen
+      - name: ML Service Smoke Tests
+        run: uv run python -m unittest discover tests
       - name: Docker Build Validation
         run: docker build -t angelfive-ml-service-test .

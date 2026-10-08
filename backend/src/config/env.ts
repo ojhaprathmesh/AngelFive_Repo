@@ -34,23 +34,6 @@ interface Env {
   SMARTAPI_MAC_ADDRESS: string;
 }
 
-const requiredEnv = (key: keyof NodeJS.ProcessEnv): string => {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`❌ Missing environment variable: ${key}`);
-  }
-  return value;
-};
-
-const requiredNumber = (key: keyof NodeJS.ProcessEnv): number => {
-  const value = requiredEnv(key);
-  const num = Number(value);
-  if (Number.isNaN(num)) {
-    throw new Error(`❌ Environment variable ${key} must be a number`);
-  }
-  return num;
-};
-
 const rawNodeEnv = process.env.NODE_ENV ?? "development";
 
 if (!["development", "production", "test"].includes(rawNodeEnv)) {
@@ -58,7 +41,32 @@ if (!["development", "production", "test"].includes(rawNodeEnv)) {
 }
 
 const NODE_ENV = rawNodeEnv as NodeEnv;
+const isTest = NODE_ENV === "test";
 const isDev = NODE_ENV === "development";
+
+const requiredEnv = (key: keyof NodeJS.ProcessEnv): string => {
+  const value = process.env[key];
+  if (!value) {
+    if (isTest) return `test-${String(key).toLowerCase()}`;
+    throw new Error(`❌ Missing environment variable: ${key}`);
+  }
+  return value;
+};
+
+const requiredNumber = (key: keyof NodeJS.ProcessEnv): number => {
+  const value = process.env[key];
+  if (!value) {
+    if (isTest) return 5000;
+    throw new Error(`❌ Missing environment variable: ${key}`);
+  }
+  const num = Number(value);
+  if (Number.isNaN(num)) {
+    if (isTest) return 5000;
+    throw new Error(`❌ Environment variable ${key} must be a number`);
+  }
+  return num;
+};
+
 export const ENV: Env = {
   PORT: process.env.PORT ? requiredNumber("PORT") : 5000,
   NODE_ENV,

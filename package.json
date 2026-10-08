@@ -29,7 +29,7 @@
     "dev": "concurrently \"pnpm --filter backend dev\" \"pnpm --filter frontend dev\" \"pnpm --filter ml-service dev\" --names \"backend,frontend,ml-service\" --prefix-colors \"blue,green,yellow\"",
     "start": "concurrently \"pnpm --filter backend start\" \"pnpm --filter frontend start\" \"pnpm --filter ml-service start\" --names \"backend,frontend,ml-service\" --prefix-colors \"blue,green,yellow\"",
     "build": "pnpm --filter backend build && pnpm --filter frontend build",
-    "test": "pnpm --filter backend test && pnpm --filter ml-service test",
+    "test": "pnpm --filter backend test && (cd ml-service && uv run python -m unittest discover tests)",
     "clean": "pnpm --filter backend clean && pnpm --filter frontend clean && pnpm --filter ml-service clean",
     "install:all": "pnpm install",
     "setup": "pnpm install:all && pnpm --filter backend install && pnpm --filter frontend install && pnpm --filter ml-service install",

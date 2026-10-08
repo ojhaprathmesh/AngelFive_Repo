@@ -23,6 +23,7 @@
     "build": "rimraf dist && tsc --build --force",
     "start": "node dist/server.js",
     "start:worker": "node dist/worker-run.js",
+    "test": "NODE_ENV=test tsx --test tests/**/*.test.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

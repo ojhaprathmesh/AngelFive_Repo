@@ -31,3 +31,9 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
+
+[tool.pyright]
+include = ["src", "tests", "."]
+extraPaths = ["."]
+venvPath = "."
+venv = ".venv"

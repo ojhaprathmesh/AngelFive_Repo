@@ -1,0 +1,33 @@
+[project]
+name = "angelfive-ml-service"
+version = "0.1.0"
+description = "AngelFive quantitative ML and financial analytics service"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi>=0.116.0",
+    "starlette>=1.0.1",
+    "uvicorn[standard]>=0.30.0",
+    "gunicorn>=21.2.0",
+    "numpy",
+    "pandas",
+    "scipy",
+    "statsmodels",
+    "arch",
+    "PyPortfolioOpt",
+    "cvxpy",
+    "torch",
+    "transformers>=4.40.0",
+    "huggingface-hub",
+    "safetensors",
+    "requests",
+    "psutil",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }

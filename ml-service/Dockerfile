@@ -5,31 +5,29 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8000 \
+    TRANSFORMERS_CACHE=/app/model_cache \
+    HF_HOME=/app/model_cache
 
-# Install dependencies needed for compiling native packages
+# 1. Install build tools for native packages (scipy/cvxpy) and curl for healthcheck
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PyTorch CPU first to leverage layer caching and avoid downloading heavy GPU packages
-RUN uv pip install --system --no-cache torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+ENV PATH="/app/.venv/bin:$PATH"
 
-# Install the rest of the requirements
-COPY requirements.txt .
-RUN uv pip install --system --no-cache -r requirements.txt
+# 2. Fast CPU-only install from uv.lock with BuildKit cache mounting
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
 
-# Create a non-root user
-RUN addgroup --system appgroup && adduser --system --group appuser
+# 3. Create non-root user and setup directories
+RUN addgroup --system appgroup && adduser --system --group appuser && \
+    mkdir -p /app/model_cache && chown -R appuser:appgroup /app/model_cache /app/.venv
 
-# Set up model cache directory with proper permissions
-RUN mkdir -p /app/model_cache && chown -R appuser:appgroup /app/model_cache
-ENV TRANSFORMERS_CACHE=/app/model_cache
-ENV HF_HOME=/app/model_cache
-
-# Copy application code
+# 4. Copy application code
 COPY --chown=appuser:appgroup . .
 
 USER appuser
@@ -41,3 +39,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 # Production: gunicorn with uvicorn workers (config in gunicorn.conf.py)
 CMD ["gunicorn", "app:app", "--config", "gunicorn.conf.py"]
+

@@ -201,11 +201,10 @@ async function fetchDiscoveryData() {
   const source: "nse" | "smartapi" | "none" =
     rawQuotes.length > 0 ? "smartapi" : "none";
 
-  // Mock volume if missing
+  // Safe volume fallback
   const quotes = rawQuotes.map((q) => ({
     ...q,
-    regularMarketVolume:
-      q.regularMarketVolume || Math.floor(Math.random() * 10_000_000),
+    regularMarketVolume: q.regularMarketVolume || 0,
   }));
 
   const mostBought = [...quotes]
@@ -411,10 +410,10 @@ async function fetchPerformersData(
     `[Performers] Found ${performers.length} stocks with historical data`,
   );
 
-  // If we don't have enough historical data, use a different approach
+  // If we don't have enough historical data, fallback to real quote change percentages
   if (performers.length < 8) {
     logger.info(
-      `[Performers] Only found ${performers.length} stocks with historical data, using estimated performance`,
+      `[Performers] Only found ${performers.length} stocks with historical data, using real quote fallbacks`,
     );
 
     const remainingStocks = validStocks.filter(
@@ -423,39 +422,18 @@ async function fetchPerformersData(
         q.regularMarketPrice > 0,
     );
 
-    const timeframeMultipliers: Record<string, number> = {
-      "1W": 2.0,
-      "1M": 5.0,
-      "1Y": 25.0,
-      "5Y": 80.0,
-    };
+    const fallbackPerformers = remainingStocks
+      .map((q) => ({
+        symbol: q.symbol,
+        price: q.regularMarketPrice,
+        changePct: q.regularMarketChangePercent || 0,
+      }))
+      .sort((a, b) => b.changePct - a.changePct)
+      .slice(0, 8 - performers.length);
 
-    const multiplier = timeframeMultipliers[tf] || 1.0;
-
-    const estimated = remainingStocks
-      .map((q) => {
-        const volumeScore = Math.log10((q.regularMarketVolume || 1) / 1000000);
-        const changeScore = q.regularMarketChangePercent * multiplier;
-        const combinedScore = changeScore + volumeScore * 0.5;
-
-        return {
-          symbol: q.symbol,
-          price: q.regularMarketPrice,
-          changePct: changeScore,
-          score: combinedScore,
-        };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8 - performers.length)
-      .map(({ symbol, price, changePct }) => ({
-        symbol,
-        price,
-        changePct,
-      }));
-
-    performers.push(...estimated);
+    performers.push(...fallbackPerformers);
     logger.info(
-      `[Performers] Added ${estimated.length} estimated performers for ${tf} using multiplier ${multiplier}x`,
+      `[Performers] Added ${fallbackPerformers.length} real quote performers for ${tf}`,
     );
   }
 

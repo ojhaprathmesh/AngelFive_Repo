@@ -41,7 +41,6 @@
     "pino-http": "^11.0.0",
     "rimraf": "^5.0.10",
     "speakeasy": "^2.0.0",
-    "tslib": "^2.8.1",
     "uuid": "^14.0.0"
   },
   "devDependencies": {

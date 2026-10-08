@@ -4,6 +4,7 @@ Sentiment service with dual-mode FinBERT support:
 - FINBERT_ENABLED=true                  → Local model (requires >1GB RAM)
 - Neither                               → Returns error suggesting rule-based fallback
 """
+
 import logging
 from threading import Lock
 
@@ -30,7 +31,9 @@ _warmup_ready = False
 _warmup_error = None
 
 # HF Inference API endpoint for FinBERT
-_HF_INFERENCE_URL = f"https://api-inference.huggingface.co/models/{Config.FINBERT_MODEL_NAME}"
+_HF_INFERENCE_URL = (
+    f"https://api-inference.huggingface.co/models/{Config.FINBERT_MODEL_NAME}"
+)
 
 
 def warmup_finbert_model():
@@ -69,7 +72,11 @@ def warmup_finbert_model():
 
 
 def get_finbert_warmup_status() -> dict:
-    mode = "local" if Config.FINBERT_ENABLED else ("api" if Config.HF_TOKEN else "disabled")
+    mode = (
+        "local"
+        if Config.FINBERT_ENABLED
+        else ("api" if Config.HF_TOKEN else "disabled")
+    )
     return {
         "started": _warmup_started,
         "ready": _warmup_ready,
@@ -84,7 +91,9 @@ def _run_finbert_via_api(text: str) -> dict:
     payload = {"inputs": text[:512], "options": {"wait_for_model": True}}
 
     try:
-        resp = requests.post(_HF_INFERENCE_URL, headers=headers, json=payload, timeout=60)
+        resp = requests.post(
+            _HF_INFERENCE_URL, headers=headers, json=payload, timeout=60
+        )
     except requests.Timeout:
         raise RuntimeError("HF Inference API timed out after 60 seconds")
     except requests.ConnectionError as exc:
@@ -95,7 +104,9 @@ def _run_finbert_via_api(text: str) -> dict:
     if resp.status_code == 401:
         raise RuntimeError("Invalid HF_TOKEN. Please verify your Hugging Face token.")
     if not resp.ok:
-        raise RuntimeError(f"HF Inference API error {resp.status_code}: {resp.text[:200]}")
+        raise RuntimeError(
+            f"HF Inference API error {resp.status_code}: {resp.text[:200]}"
+        )
 
     raw = resp.json()
     # API returns [[{"label": "positive", "score": 0.9}, ...]]
@@ -170,14 +181,46 @@ def run_finbert_sentiment(text: str) -> dict:
 def run_rule_based_sentiment(text: str) -> dict:
     text_lower = text.lower()
     bullish_patterns = [
-        "bullish", "breakout", "resistance", "support", "uptrend", "rally",
-        "surge", "gain", "profit", "growth", "strong", "buy", "long", "target", "higher",
+        "bullish",
+        "breakout",
+        "resistance",
+        "support",
+        "uptrend",
+        "rally",
+        "surge",
+        "gain",
+        "profit",
+        "growth",
+        "strong",
+        "buy",
+        "long",
+        "target",
+        "higher",
     ]
     bearish_patterns = [
-        "bearish", "breakdown", "sell-off", "downtrend", "crash", "plunge",
-        "drop", "loss", "decline", "weak", "sell", "short", "lower", "fall",
+        "bearish",
+        "breakdown",
+        "sell-off",
+        "downtrend",
+        "crash",
+        "plunge",
+        "drop",
+        "loss",
+        "decline",
+        "weak",
+        "sell",
+        "short",
+        "lower",
+        "fall",
     ]
-    neutral_patterns = ["consolidate", "sideways", "range", "stable", "unchanged", "flat"]
+    neutral_patterns = [
+        "consolidate",
+        "sideways",
+        "range",
+        "stable",
+        "unchanged",
+        "flat",
+    ]
 
     bullish_score = sum(1 for p in bullish_patterns if p in text_lower)
     bearish_score = sum(1 for p in bearish_patterns if p in text_lower)

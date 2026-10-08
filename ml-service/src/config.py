@@ -7,7 +7,9 @@ class Config:
     DEBUG = os.getenv("FLASK_ENV", "development") == "development"
     BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-    LSTM_MODEL_PATH = os.getenv("LSTM_MODEL_PATH", "model_assets/lstm_timeseries.safetensors")
+    LSTM_MODEL_PATH = os.getenv(
+        "LSTM_MODEL_PATH", "model_assets/lstm_timeseries.safetensors"
+    )
     FINBERT_MODEL_NAME = os.getenv("FINBERT_MODEL_NAME", "ProsusAI/finbert")
     HF_TOKEN = os.getenv("HF_TOKEN")
     # Set to "true" only on instances with >1GB RAM (e.g. Render Starter tier)

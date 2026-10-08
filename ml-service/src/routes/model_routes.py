@@ -1,8 +1,7 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter
-
 
 router = APIRouter(tags=["Models"])
 
@@ -25,6 +24,6 @@ def get_available_models() -> dict[str, Any]:
             "count": len(AVAILABLE_MODELS),
             "supported_symbols": ["SENSEX", "NIFTY50"],
         },
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "ml-service",
     }

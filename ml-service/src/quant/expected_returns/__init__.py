@@ -1,20 +1,18 @@
 import pandas as pd
-from typing import Dict, List, Optional
 from pypfopt import expected_returns
 
+
 def calculate_expected_returns(
-    prices: pd.DataFrame, 
-    method: str = "mean_historical_return",
-    frequency: int = 252
+    prices: pd.DataFrame, method: str = "mean_historical_return", frequency: int = 252
 ) -> pd.Series:
     """
     Calculate expected returns from a dataframe of prices.
-    
+
     Args:
         prices: DataFrame of asset prices
         method: The method to use ('mean_historical_return', 'ema_historical_return', 'capm_return')
         frequency: Number of trading days in a year
-        
+
     Returns:
         pd.Series of expected returns
     """

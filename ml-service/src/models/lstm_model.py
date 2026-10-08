@@ -3,7 +3,13 @@ from torch import nn
 
 
 class TimeSeriesLSTM(nn.Module):
-    def __init__(self, input_size: int = 1, hidden_size: int = 64, num_layers: int = 3, dropout: float = 0.2):
+    def __init__(
+        self,
+        input_size: int = 1,
+        hidden_size: int = 64,
+        num_layers: int = 3,
+        dropout: float = 0.2,
+    ):
         super().__init__()
         self.lstm = nn.LSTM(
             input_size=input_size,

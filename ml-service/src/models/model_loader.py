@@ -3,7 +3,6 @@ from threading import Lock
 
 from src.config import Config
 
-
 _finbert_lock = Lock()
 _lstm_lock = Lock()
 _finbert_tokenizer = None
@@ -17,29 +16,29 @@ def get_finbert():
         with _finbert_lock:
             if _finbert_model is None or _finbert_tokenizer is None:
                 import torch
-                from transformers import AutoModelForSequenceClassification, AutoTokenizer
-                
+                from transformers import (
+                    AutoModelForSequenceClassification,
+                    AutoTokenizer,
+                )
+
                 _finbert_tokenizer = AutoTokenizer.from_pretrained(
-                    Config.FINBERT_MODEL_NAME,
-                    token=Config.HF_TOKEN
+                    Config.FINBERT_MODEL_NAME, token=Config.HF_TOKEN
                 )
                 # Load with low_cpu_mem_usage to prevent memory spikes during weights initialization
                 _finbert_model = AutoModelForSequenceClassification.from_pretrained(
                     Config.FINBERT_MODEL_NAME,
                     use_safetensors=True,
                     token=Config.HF_TOKEN,
-                    low_cpu_mem_usage=True
+                    low_cpu_mem_usage=True,
                 )
-                
+
                 # Render Free Tier has a strict 512MB RAM limit. FinBERT is ~420MB.
                 # Dynamic quantization shrinks the Linear layers to 8-bit integers,
                 # reducing the RAM footprint by ~70% with negligible accuracy loss.
                 _finbert_model = torch.quantization.quantize_dynamic(
-                    _finbert_model, 
-                    {torch.nn.Linear}, 
-                    dtype=torch.qint8
+                    _finbert_model, {torch.nn.Linear}, dtype=torch.qint8
                 )
-                
+
                 _finbert_model.eval()
     return _finbert_tokenizer, _finbert_model
 
@@ -51,8 +50,9 @@ def get_lstm_model():
             if _lstm_model is None:
                 import torch
                 from safetensors.torch import load_file
+
                 from src.models.lstm_model import TimeSeriesLSTM
-                
+
                 model = TimeSeriesLSTM()
                 model_path = Path(Config.LSTM_MODEL_PATH)
 
@@ -64,7 +64,11 @@ def get_lstm_model():
                 elif model_path.exists():
                     # Fallback to pickle (might fail on torch < 2.6 depending on CVE check)
                     try:
-                        state_dict = torch.load(model_path, map_location=torch.device("cpu"), weights_only=True)
+                        state_dict = torch.load(
+                            model_path,
+                            map_location=torch.device("cpu"),
+                            weights_only=True,
+                        )
                         model.load_state_dict(state_dict)
                     except Exception as e:
                         raise RuntimeError(

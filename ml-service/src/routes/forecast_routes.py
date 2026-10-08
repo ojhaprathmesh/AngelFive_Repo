@@ -1,11 +1,10 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.services.forecast_service import run_forecast
-
 
 router = APIRouter(tags=["Forecast"])
 
@@ -36,8 +35,8 @@ def generate_forecast(body: ForecastRequest) -> dict[str, Any]:
         "message": f"Forecast generated successfully for {symbol}",
         "data": {
             **forecast_data,
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "ml-service",
     }

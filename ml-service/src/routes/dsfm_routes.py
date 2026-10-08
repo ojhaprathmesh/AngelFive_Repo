@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -21,12 +20,12 @@ from src.services.sentiment_service import (
     run_rule_based_sentiment,
 )
 
-
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["DSFM"])
 
 
 # ── Request models ────────────────────────────────────────────────────────────
+
 
 class ReturnsRequest(BaseModel):
     returns: list[float]
@@ -54,6 +53,7 @@ class SentimentRequest(BaseModel):
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
+
 
 @router.post("/adf-test")
 def adf_test_route(body: ReturnsRequest) -> dict[str, Any]:
@@ -108,7 +108,9 @@ def finbert_route(body: SentimentRequest) -> dict[str, Any]:
         return run_finbert_sentiment(body.text)
     except RuntimeError as exc:
         # Covers: HF API timeout, model warming up on HF side, auth errors
-        raise HTTPException(status_code=503, detail=str(exc), headers={"Retry-After": "20"}) from exc
+        raise HTTPException(
+            status_code=503, detail=str(exc), headers={"Retry-After": "20"}
+        ) from exc
 
 
 @router.post("/sentiment/rule-based")

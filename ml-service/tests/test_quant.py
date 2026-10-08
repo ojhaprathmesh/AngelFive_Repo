@@ -3,11 +3,16 @@
 import os
 import sys
 import unittest
+
 import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.services.dsfm_service import lstm_forecast, mpt_optimize, black_litterman_optimize
+from src.services.dsfm_service import (
+    black_litterman_optimize,
+    lstm_forecast,
+    mpt_optimize,
+)
 
 
 class QuantServiceTest(unittest.TestCase):

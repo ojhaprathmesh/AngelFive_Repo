@@ -1,13 +1,12 @@
 import os
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter
 
 from src.config import Config
 from src.services.sentiment_service import get_finbert_warmup_status
-
 
 router = APIRouter(tags=["Health"])
 
@@ -27,7 +26,7 @@ def health_check() -> dict[str, Any]:
     return {
         "status": "success",
         "message": "ML service is healthy and running",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "ml-service",
         "version": "3.0.0",
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
@@ -38,11 +37,12 @@ def health_check() -> dict[str, Any]:
 @router.get("/health/detailed")
 def detailed_health_check() -> dict[str, Any]:
     import psutil
+
     warmup = get_finbert_warmup_status()
     return {
         "status": "success",
         "message": "Detailed health check passed",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "ml-service",
         "version": "3.0.0",
         "system": {
@@ -52,6 +52,10 @@ def detailed_health_check() -> dict[str, Any]:
             "memory_usage": f"{psutil.virtual_memory().percent}%",
             "disk_usage": f"{psutil.disk_usage('/').percent}%",
         },
-        "configuration": {"debug": Config.DEBUG, "host": Config.HOST, "port": Config.PORT},
+        "configuration": {
+            "debug": Config.DEBUG,
+            "host": Config.HOST,
+            "port": Config.PORT,
+        },
         "model_warmup": {"finbert": warmup},
     }

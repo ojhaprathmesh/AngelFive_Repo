@@ -426,7 +426,4 @@ export class FirebaseClientAuth {
 
 // Export Firebase services and auth instance
 export { auth };
-export const firebaseClientAuth = FirebaseClientAuth.getInstance();
-
-// Export auth service for easier access
-export const authService = firebaseClientAuth;
+export const authService = FirebaseClientAuth.getInstance();

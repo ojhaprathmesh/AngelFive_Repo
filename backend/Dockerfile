@@ -3,11 +3,13 @@
 # Stage 1: Build
 FROM node:24.16.0-alpine AS builder
 WORKDIR /app
-RUN corepack enable pnpm
+RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
+    corepack enable pnpm
 
 COPY package.json ./
-RUN pnpm install --ignore-scripts
-RUN pnpm rebuild esbuild protobufjs @firebase/util
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --ignore-scripts
+RUN pnpm approve-builds esbuild protobufjs @firebase/util && pnpm rebuild esbuild protobufjs @firebase/util
 
 COPY . .
 RUN npx tsc --build tsconfig.docker.json --force
@@ -15,7 +17,8 @@ RUN npx tsc --build tsconfig.docker.json --force
 # Stage 2: Runtime
 FROM node:24.16.0-alpine AS runner
 WORKDIR /app
-RUN corepack enable pnpm
+RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
+    corepack enable pnpm
 
 ENV NODE_ENV production
 ENV PORT 5000
@@ -25,7 +28,8 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 backend
 
 COPY package.json ./
-RUN pnpm install --prod --ignore-scripts
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --prod --ignore-scripts
 
 COPY --from=builder --chown=backend:nodejs /app/dist ./dist
 

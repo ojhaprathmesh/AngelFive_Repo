@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { UTCTimestamp } from "lightweight-charts";
 import { useEffect, useState } from "react";
 
-import { marketDataService } from "@/lib/market-data";
+import { marketDataService } from "@/features/market/services/market-data";
 
 import { IndexType } from "./useLiveIndexData";
 

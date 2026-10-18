@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ADFTestResult } from "@/lib/types/dsfm";
+import type { ADFTestResult } from "@/features/dsfm/types";
 
 interface StationarityTabProps {
   adfResult: ADFTestResult | null;

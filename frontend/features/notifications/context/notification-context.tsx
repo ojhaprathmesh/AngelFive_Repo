@@ -10,7 +10,7 @@ import React, {
 } from "react";
 import { toast } from "sonner";
 
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth";
 
 export interface Notification {
   id: string;

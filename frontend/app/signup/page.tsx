@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { SignupForm } from "@/components/signup-form";
+import { SignupForm } from "@/features/auth";
 
 export default function SignupPage() {
   return (

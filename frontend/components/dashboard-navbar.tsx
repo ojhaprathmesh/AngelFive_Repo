@@ -38,10 +38,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth";
+import { marketDataService } from "@/features/market";
 import { NotificationDropdown } from "@/features/notifications/components/notification-dropdown";
 import { NotificationErrorBoundary } from "@/features/notifications/error-boundary";
-import { marketDataService } from "@/lib/market-data";
 
 interface MarketData {
   symbol: string;

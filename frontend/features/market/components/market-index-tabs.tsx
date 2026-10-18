@@ -2,7 +2,7 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import React from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { MarketData as LiveMarketData } from "@/lib/market-data";
+import type { MarketData as LiveMarketData } from "@/features/market/services/market-data";
 
 import { IndexType } from "../hooks/useLiveIndexData";
 

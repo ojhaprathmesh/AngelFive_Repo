@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   type MarketData as LiveMarketData,
   marketDataService,
-} from "@/lib/market-data";
+} from "@/features/market/services/market-data";
 
 export type IndexType =
   | "SENSEX"

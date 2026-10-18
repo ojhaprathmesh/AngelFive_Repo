@@ -14,7 +14,7 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
-import type { ArimaResult, GarchResult } from "@/lib/types/dsfm";
+import type { ArimaResult, GarchResult } from "@/features/dsfm/types";
 
 interface ModelsTabProps {
   selectedSymbol: string;

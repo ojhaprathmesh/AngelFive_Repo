@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { LSTMResult } from "@/lib/types/dsfm";
+import type { LSTMResult } from "@/features/dsfm/types";
 
 interface LSTMTabProps {
   selectedSymbol: string;

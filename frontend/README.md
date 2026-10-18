@@ -19,7 +19,7 @@ Next.js 15 dashboard UI for the AngelFive DSFM platform. Provides market discove
 
 This frontend aggressively prioritizes maintainability and performance through architectural decomposition:
 - **Modular Monoliths:** Large UI pages (like the Watchlist and Returns Analysis) are broken down into **Orchestrator Components**, **Custom Hooks** (for side-effects/data fetching), and **Presentational Tabs/Cards**. This ensures high reuse and isolated re-renders.
-- **Strict Data Types:** All cross-service communication with the ML engine and Backend is enforced via `lib/types/dsfm.ts` and `market.ts`.
+- **Strict Data Types:** All cross-service communication with the ML engine and Backend is enforced via `@/features/dsfm/types` and `@/features/market/types`.
 - **API Proxying:** Next.js rewrites proxy `/api/*` to the Express backend. The client *never* communicates directly with the Python ML-Service or third-party APIs, enforcing security.
 - **SSE over WebSocket:** Push notifications and live ticker updates utilize lightweight Server-Sent Events (SSE) with token-based authorization.
 - **Context-Lite State:** Redux/Zustand was intentionally avoided. Auth and notifications exist in React Context, while heavily dynamic API responses utilize SWR caching.

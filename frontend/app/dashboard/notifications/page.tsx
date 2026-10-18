@@ -39,10 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Notification,
-  useNotifications,
-} from "@/contexts/notification-context";
+import { Notification, useNotifications } from "@/features/notifications";
 import { cn } from "@/lib/utils";
 
 export default function NotificationsPage() {

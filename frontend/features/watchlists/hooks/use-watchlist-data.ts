@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth";
 import type { StockItem } from "@/features/market/types";
 import {
   type WatchlistItem,

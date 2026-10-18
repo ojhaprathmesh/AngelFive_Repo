@@ -8,8 +8,8 @@ import React from "react";
 import { Toaster } from "sonner";
 
 import { KeepAlive } from "@/components/keep-alive";
-import { AuthProvider } from "@/contexts/auth-context";
-import { NotificationProvider } from "@/contexts/notification-context";
+import { AuthProvider } from "@/features/auth";
+import { NotificationProvider } from "@/features/notifications";
 
 export const metadata: Metadata = {
   title: "AngelFive - Smart Financial Data Management",

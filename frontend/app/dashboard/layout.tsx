@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect } from "react";
 
 import { DashboardNavbar } from "@/components/dashboard-navbar";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth";
 
 export default function DashboardLayout({
   children,

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/features/auth/context/auth-context";
 import { auth } from "@/lib/firebase";
 
 declare global {

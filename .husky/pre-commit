@@ -1,1 +1,13 @@
+#!/usr/bin/env sh
+
+# 1. Lint and format staged files
 pnpm lint-staged
+
+# 2. Verify Docker builds succeed before committing
+echo "🐳 Verifying Docker builds (frontend, backend, ml-service)..."
+if ! docker compose build; then
+  echo "❌ Error: Docker build failed. Commit aborted."
+  exit 1
+fi
+
+echo "✅ Docker build verification passed."

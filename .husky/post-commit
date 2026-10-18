@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+# Automatically update Graphify knowledge graph after each successful commit
+if command -v graphify >/dev/null 2>&1; then
+  echo "📊 Updating Graphify AST knowledge graph..."
+  graphify . --update
+  echo "✅ Graphify knowledge graph updated."
+fi

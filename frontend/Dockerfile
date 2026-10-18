@@ -28,7 +28,8 @@ COPY . .
 # Build the Next.js app
 # The standalone output mode is configured in next.config.ts
 ENV NEXT_TELEMETRY_DISABLED 1
-RUN pnpm build
+RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
+    pnpm build
 
 # Stage 3: Runner
 FROM node:24.16.0-alpine AS runner

@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+echo "🔍 Running pre-push checks: Auto-linting and formatting..."
+pnpm lint:fix
+pnpm lint
+
+echo "✅ Pre-push verification passed."

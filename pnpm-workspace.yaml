@@ -12,6 +12,11 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
+audit:
+  ignore:
+    - GHSA-86w9-cpqp-85rv
+    - GHSA-vfj7-8cjw-p6xm
+
 overrides:
   uuid: "^11.1.1"
   qs: "^6.15.2"
@@ -24,7 +29,8 @@ overrides:
   ip-address: "^10.7.3"
   proxy-addr: "^2.0.8"
   source-map-js: "^1.2.2"
-  body-parser: "^1.20.3"
+  body-parser: "^1.20.6"
+  "@babel/core": "^7.29.6"
   path-to-regexp: "^0.1.12"
   cookie: "^0.7.2"
   send: "^0.19.0"

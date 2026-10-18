@@ -22,58 +22,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { pollJobResult } from "../utils/polling";
 
-export function CorrelationAnalysis() {
-  const [loading, setLoading] = useState(false);
-  const [correlationData, setCorrelationData] = useState<any>(null);
-  const [timeframe, setTimeframe] = useState<string>("3M");
-  const [error, setError] = useState<string | null>(null);
-  const correlationChartRef = useRef<HTMLDivElement>(null);
-
-  const fetchCorrelationData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const resp = await fetch(`/api/dsfm/correlation?timeframe=${timeframe}`);
-      if (resp.ok) {
-        const { jobId, queueName } = await resp.json();
-        const data = await pollJobResult<any>(queueName, jobId);
-        setCorrelationData(data);
-      } else {
-        const errorData = await resp
-          .json()
-          .catch(() => ({ error: `HTTP ${resp.status}` }));
-        setError(
-          errorData.error ||
-            errorData.message ||
-            "Failed to fetch correlation data",
-        );
-      }
-    } catch (e: unknown) {
-      setError((e as Error).message || "Network error occurred");
-    } finally {
-      setLoading(false);
-    }
-  }, [timeframe]);
+function CorrelationHeatmapTable({ data }: { data: any }) {
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    void fetchCorrelationData();
-  }, [fetchCorrelationData]);
+    const container = containerRef.current;
+    if (!container || !data?.correlationMatrix || !data?.symbols) return;
 
-  useEffect(() => {
-    if (correlationData && correlationChartRef.current) {
-      renderCorrelationHeatmap(correlationData);
-    }
-  }, [correlationData]);
-
-  const renderCorrelationHeatmap = (data: any) => {
-    if (
-      !correlationChartRef.current ||
-      !data.correlationMatrix ||
-      !data.symbols
-    )
-      return;
-
-    correlationChartRef.current.innerHTML = "";
+    container.innerHTML = "";
 
     const matrix = data.correlationMatrix;
     const symbols = data.symbols;
@@ -154,43 +110,88 @@ export function CorrelationAnalysis() {
 
         tr.appendChild(td);
       });
+
       table.appendChild(tr);
     });
 
-    correlationChartRef.current.appendChild(table);
-  };
+    container.appendChild(table);
+
+    return () => {
+      if (container) container.innerHTML = "";
+    };
+  }, [data]);
+
+  return <div ref={containerRef} className="w-full" />;
+}
+
+export function CorrelationAnalysis() {
+  const [loading, setLoading] = useState(false);
+  const [correlationData, setCorrelationData] = useState<any>(null);
+  const [timeframe, setTimeframe] = useState<string>("3M");
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCorrelationData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await fetch(`/api/dsfm/correlation?timeframe=${timeframe}`);
+      if (resp.ok) {
+        const { jobId, queueName } = await resp.json();
+        const data = await pollJobResult<any>(queueName, jobId);
+        setCorrelationData(data);
+      } else {
+        const errorData = await resp
+          .json()
+          .catch(() => ({ error: `HTTP ${resp.status}` }));
+        setError(
+          errorData.error ||
+            errorData.message ||
+            "Failed to fetch correlation data",
+        );
+      }
+    } catch (e: unknown) {
+      setError((e as Error).message || "Network error occurred");
+    } finally {
+      setLoading(false);
+    }
+  }, [timeframe]);
+
+  useEffect(() => {
+    void fetchCorrelationData();
+  }, [fetchCorrelationData]);
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Correlation Matrix Analysis</CardTitle>
+          <CardTitle>Correlation Analysis</CardTitle>
           <CardDescription>
-            Analyze pairwise correlations between NIFTY 50 stocks to understand
-            market relationships
+            Analyze correlation matrix and relationships between NIFTY 50 stocks
           </CardDescription>
           <CardAction>
-            <div className="flex flex-wrap items-center gap-3">
-              <Select
-                value={timeframe}
-                onValueChange={(value) => setTimeframe(value)}
-              >
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder="Select timeframe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1M">1 Month</SelectItem>
-                  <SelectItem value="3M">3 Months</SelectItem>
-                  <SelectItem value="6M">6 Months</SelectItem>
-                  <SelectItem value="1Y">1 Year</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Timeframe:</span>
+                <Select
+                  value={timeframe}
+                  onValueChange={(value) => setTimeframe(value)}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Select timeframe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1M">1 Month</SelectItem>
+                    <SelectItem value="3M">3 Months</SelectItem>
+                    <SelectItem value="6M">6 Months</SelectItem>
+                    <SelectItem value="1Y">1 Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
-                onClick={fetchCorrelationData}
+                onClick={() => void fetchCorrelationData()}
                 disabled={loading}
-                className="bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
               >
-                {loading ? "Loading..." : "Analyze Correlations"}
+                {loading ? "Analyzing..." : "Analyze Correlations"}
               </Button>
             </div>
           </CardAction>
@@ -242,7 +243,7 @@ export function CorrelationAnalysis() {
                 </CardHeader>
                 <CardContent>
                   <div className="max-h-150 overflow-auto rounded-lg border-2 border-gray-200 dark:border-gray-700">
-                    <div ref={correlationChartRef} className="w-full" />
+                    <CorrelationHeatmapTable data={correlationData} />
                   </div>
                   {correlationData?.averageCorrelation && (
                     <div className="mt-4 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,8 +25,8 @@ interface ModelsTabProps {
   garchResult: GarchResult | null;
   loadingARIMA: boolean;
   loadingGARCH: boolean;
-  arimaChartRef: React.RefObject<HTMLDivElement | null>;
-  garchVolChartRef: React.RefObject<HTMLDivElement | null>;
+  arimaChartRef?: React.RefObject<HTMLDivElement | null>;
+  garchVolChartRef?: React.RefObject<HTMLDivElement | null>;
   runArima: (
     symbol: string,
     timeframe: string,
@@ -35,6 +37,193 @@ interface ModelsTabProps {
     timeframe: string,
     order: [number, number],
   ) => Promise<void>;
+}
+
+function ArimaForecastChart({
+  forecast,
+  externalRef,
+}: {
+  forecast: number[];
+  externalRef?: React.RefObject<HTMLDivElement | null>;
+}) {
+  const internalRef = useRef<HTMLDivElement>(null);
+  const containerRef = externalRef ?? internalRef;
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !forecast || forecast.length === 0) return;
+
+    let chartInstance: import("lightweight-charts").IChartApi | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+    let isCancelled = false;
+
+    import("lightweight-charts").then(
+      ({ createChart, LineSeries, ColorType }) => {
+        if (isCancelled || !container) return;
+        container.innerHTML = "";
+
+        const chart = createChart(container, {
+          layout: {
+            background: { type: ColorType.Solid, color: "transparent" },
+            textColor: "#374151",
+          },
+          width: container.clientWidth || 600,
+          height: 240,
+          grid: {
+            vertLines: { color: "#e5e7eb" },
+            horzLines: { color: "#e5e7eb" },
+          },
+        });
+        chartInstance = chart;
+
+        const baseTs = Math.floor(
+          new Date("2000-01-01T00:00:00Z").getTime() / 1000,
+        );
+
+        chart.applyOptions({
+          timeScale: {
+            timeVisible: true,
+            tickMarkFormatter: (t: unknown) => {
+              const ts = typeof t === "number" ? t : 0;
+              const idx = ts
+                ? Math.max(0, Math.round((ts - baseTs) / 86400))
+                : 0;
+              return `Step ${idx}`;
+            },
+          },
+          localization: { timeFormatter: () => "" },
+        });
+
+        const series = chart.addSeries(LineSeries, {
+          color: "#3b82f6",
+          lineWidth: 2,
+        });
+
+        const chartData = forecast.map((v, i) => ({
+          time: (baseTs + i * 86400) as import("lightweight-charts").Time,
+          value: v,
+        }));
+        series.setData(chartData);
+        chart.timeScale().fitContent();
+
+        resizeObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.contentRect.width > 0 && chartInstance) {
+              chartInstance.applyOptions({ width: entry.contentRect.width });
+              chartInstance.timeScale().fitContent();
+            }
+          }
+        });
+        resizeObserver.observe(container);
+      },
+    );
+
+    return () => {
+      isCancelled = true;
+      if (resizeObserver) resizeObserver.disconnect();
+      if (chartInstance) chartInstance.remove();
+      if (container) container.innerHTML = "";
+    };
+  }, [forecast, containerRef]);
+
+  return (
+    <div ref={containerRef} className="mt-2 h-[240px] min-h-[240px] w-full" />
+  );
+}
+
+function GarchVolatilityChart({
+  vols,
+  forecast,
+  externalRef,
+}: {
+  vols: number[];
+  forecast?: number[];
+  externalRef?: React.RefObject<HTMLDivElement | null>;
+}) {
+  const internalRef = useRef<HTMLDivElement>(null);
+  const containerRef = externalRef ?? internalRef;
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !vols || vols.length === 0) return;
+
+    let chartInstance: import("lightweight-charts").IChartApi | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+    let isCancelled = false;
+
+    import("lightweight-charts").then(
+      ({ createChart, HistogramSeries, LineSeries, ColorType }) => {
+        if (isCancelled || !container) return;
+        container.innerHTML = "";
+
+        const chart = createChart(container, {
+          layout: {
+            background: { type: ColorType.Solid, color: "transparent" },
+            textColor: "#374151",
+          },
+          width: container.clientWidth || 600,
+          height: 240,
+          grid: {
+            vertLines: { color: "#e5e7eb" },
+            horzLines: { color: "#e5e7eb" },
+          },
+        });
+        chartInstance = chart;
+
+        const baseTs = Math.floor(
+          new Date("2000-01-01T00:00:00Z").getTime() / 1000,
+        );
+
+        const histSeries = chart.addSeries(HistogramSeries, {
+          color: "#8b5cf6",
+          priceFormat: { type: "volume" },
+        });
+        histSeries.setData(
+          vols.map((v, i) => ({
+            time: (baseTs + i * 86400) as import("lightweight-charts").Time,
+            value: v,
+          })),
+        );
+
+        if (forecast && forecast.length > 0) {
+          const line = chart.addSeries(LineSeries, {
+            color: "#ef4444",
+            lineWidth: 2,
+          });
+          line.setData(
+            forecast.map((v, i) => ({
+              time: (baseTs +
+                (vols.length + i) * 86400) as import("lightweight-charts").Time,
+              value: v,
+            })),
+          );
+        }
+
+        chart.timeScale().fitContent();
+
+        resizeObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.contentRect.width > 0 && chartInstance) {
+              chartInstance.applyOptions({ width: entry.contentRect.width });
+              chartInstance.timeScale().fitContent();
+            }
+          }
+        });
+        resizeObserver.observe(container);
+      },
+    );
+
+    return () => {
+      isCancelled = true;
+      if (resizeObserver) resizeObserver.disconnect();
+      if (chartInstance) chartInstance.remove();
+      if (container) container.innerHTML = "";
+    };
+  }, [vols, forecast, containerRef]);
+
+  return (
+    <div ref={containerRef} className="mt-2 h-[240px] min-h-[240px] w-full" />
+  );
 }
 
 export function ModelsTab({
@@ -104,7 +293,7 @@ export function ModelsTab({
                 <input
                   id="diff-order"
                   type="number"
-                  aria-label="Diff Order"
+                  aria-label="Differencing Order"
                   min="0"
                   max="2"
                   defaultValue="0"
@@ -157,7 +346,10 @@ export function ModelsTab({
                       .map((f: number) => f.toFixed(4))
                       .join(", ")}
                   </p>
-                  <div ref={arimaChartRef} className="mt-2 h-60 w-full" />
+                  <ArimaForecastChart
+                    forecast={arimaResult.forecast}
+                    externalRef={arimaChartRef}
+                  />
                 </div>
               )}
             </div>
@@ -188,7 +380,7 @@ export function ModelsTab({
                 <input
                   id="garch-p"
                   type="number"
-                  aria-label="GARCH p variable"
+                  aria-label="GARCH P"
                   min="1"
                   max="3"
                   defaultValue="1"
@@ -200,7 +392,7 @@ export function ModelsTab({
                 <input
                   id="garch-q"
                   type="number"
-                  aria-label="GARCH q variable"
+                  aria-label="GARCH Q"
                   min="1"
                   max="3"
                   defaultValue="1"
@@ -218,6 +410,22 @@ export function ModelsTab({
                 GARCH Model Results
               </p>
               <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Alpha (ARCH effect):
+                  </span>
+                  <span className="ml-2 font-mono font-bold">
+                    {garchResult.alpha1?.toFixed(4) || "N/A"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Beta (GARCH effect):
+                  </span>
+                  <span className="ml-2 font-mono font-bold">
+                    {garchResult.beta1?.toFixed(4) || "N/A"}
+                  </span>
+                </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">AIC:</span>
                   <span className="ml-2 font-mono font-bold">
@@ -241,7 +449,11 @@ export function ModelsTab({
                       .map((f: number) => f.toFixed(4))
                       .join(", ")}
                   </p>
-                  <div ref={garchVolChartRef} className="mt-2 h-60 w-full" />
+                  <GarchVolatilityChart
+                    vols={garchResult.conditionalVolatility}
+                    forecast={garchResult.forecast}
+                    externalRef={garchVolChartRef}
+                  />
                 </div>
               )}
             </div>

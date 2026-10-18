@@ -194,10 +194,26 @@ export function EfficientFrontierChart({
   );
 
   useEffect(() => {
-    if (shouldRender && frontier && frontier.length > 0) {
-      const timer = setTimeout(() => renderChart(frontier, optimal), 300);
-      return () => clearTimeout(timer);
-    }
+    if (!shouldRender || !frontier || frontier.length === 0) return;
+
+    renderChart(frontier, optimal);
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          renderChart(frontier, optimal);
+        }
+      }
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      if (container) container.innerHTML = "";
+    };
   }, [frontier, optimal, shouldRender, renderChart]);
 
   return (

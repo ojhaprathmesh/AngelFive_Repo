@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,8 +16,100 @@ interface LSTMTabProps {
   selectedSymbol: string;
   lstmResult: LSTMResult | null;
   loadingLSTM: boolean;
-  lstmChartRef: React.RefObject<HTMLDivElement | null>;
+  lstmChartRef?: React.RefObject<HTMLDivElement | null>;
   runLstm: (symbol: string, lookback: number, steps: number) => Promise<void>;
+}
+
+function LstmForecastChart({
+  forecast,
+  externalRef,
+}: {
+  forecast: number[];
+  externalRef?: React.RefObject<HTMLDivElement | null>;
+}) {
+  const internalRef = useRef<HTMLDivElement>(null);
+  const containerRef = externalRef ?? internalRef;
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !forecast || forecast.length === 0) return;
+
+    let chartInstance: import("lightweight-charts").IChartApi | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+    let isCancelled = false;
+
+    import("lightweight-charts").then(
+      ({ createChart, LineSeries, ColorType }) => {
+        if (isCancelled || !container) return;
+        container.innerHTML = "";
+
+        const chart = createChart(container, {
+          layout: {
+            background: { type: ColorType.Solid, color: "transparent" },
+            textColor: "#374151",
+          },
+          width: container.clientWidth || 600,
+          height: 240,
+          grid: {
+            vertLines: { color: "#e5e7eb" },
+            horzLines: { color: "#e5e7eb" },
+          },
+        });
+        chartInstance = chart;
+
+        const baseTs = Math.floor(
+          new Date("2000-01-01T00:00:00Z").getTime() / 1000,
+        );
+
+        chart.applyOptions({
+          timeScale: {
+            timeVisible: true,
+            tickMarkFormatter: (t: unknown) => {
+              const ts = typeof t === "number" ? t : 0;
+              const idx = ts
+                ? Math.max(0, Math.round((ts - baseTs) / 86400))
+                : 0;
+              return `Step ${idx}`;
+            },
+          },
+          localization: { timeFormatter: () => "" },
+        });
+
+        const series = chart.addSeries(LineSeries, {
+          color: "#8b5cf6",
+          lineWidth: 2,
+        });
+
+        const chartData = forecast.map((v, i) => ({
+          time: (baseTs + i * 86400) as import("lightweight-charts").Time,
+          value: v,
+        }));
+        series.setData(chartData);
+        chart.timeScale().fitContent();
+
+        resizeObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.contentRect.width > 0 && chartInstance) {
+              chartInstance.applyOptions({ width: entry.contentRect.width });
+              chartInstance.timeScale().fitContent();
+            }
+          }
+        });
+        resizeObserver.observe(container);
+      },
+    );
+
+    return () => {
+      isCancelled = true;
+      if (resizeObserver) resizeObserver.disconnect();
+      if (chartInstance) chartInstance.remove();
+      if (container) container.innerHTML = "";
+    };
+  }, [forecast, containerRef]);
+
+  return (
+    <div ref={containerRef} className="mt-2 h-[240px] min-h-[240px] w-full" />
+  );
 }
 
 export function LSTMTab({
@@ -58,7 +152,7 @@ export function LSTMTab({
               id="lstm-lookback"
               type="number"
               min="5"
-              max="30"
+              max="60"
               defaultValue="10"
               className="w-full rounded border px-2 py-1 text-sm"
             />
@@ -81,12 +175,12 @@ export function LSTMTab({
           </div>
         </div>
         <Button onClick={handleRun} disabled={loadingLSTM}>
-          {loadingLSTM ? "Training Model..." : "Run LSTM Forecast"}
+          {loadingLSTM ? "Training & Forecasting..." : "Run LSTM Model"}
         </Button>
         {lstmResult && (
-          <div className="mt-4 space-y-2 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
-            <p className="font-semibold text-blue-800 dark:text-blue-200">
-              LSTM Forecast Results
+          <div className="mt-4 space-y-2 rounded-lg bg-purple-50 p-4 dark:bg-purple-900/20">
+            <p className="font-semibold text-purple-800 dark:text-purple-200">
+              LSTM Model Results
             </p>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
@@ -122,7 +216,10 @@ export function LSTMTab({
                     .map((f: number) => f.toFixed(4))
                     .join(", ")}
                 </p>
-                <div ref={lstmChartRef} className="mt-2 h-60 w-full" />
+                <LstmForecastChart
+                  forecast={lstmResult.forecast}
+                  externalRef={lstmChartRef}
+                />
               </div>
             )}
           </div>

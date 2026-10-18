@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import type {
   ArimaResult,
@@ -42,125 +42,6 @@ export function useTimeSeriesModels(): UseTimeSeriesModelsReturn {
   const arimaChartRef = useRef<HTMLDivElement>(null);
   const garchVolChartRef = useRef<HTMLDivElement>(null);
   const lstmChartRef = useRef<HTMLDivElement>(null);
-
-  const renderForecastChart = useCallback(
-    (
-      ref: React.RefObject<HTMLDivElement | null>,
-      forecast: number[],
-      color: string,
-    ) => {
-      if (!ref.current || !forecast || forecast.length === 0) return;
-      ref.current.innerHTML = "";
-      if (ref.current.clientWidth === 0) {
-        setTimeout(() => renderForecastChart(ref, forecast, color), 100);
-        return;
-      }
-      import("lightweight-charts").then(
-        ({ createChart, LineSeries, ColorType }) => {
-          if (!ref.current) return;
-          const chart = createChart(ref.current, {
-            layout: {
-              background: { type: ColorType.Solid, color: "transparent" },
-              textColor: "#374151",
-            },
-            width: ref.current.clientWidth,
-            height: 240,
-            grid: {
-              vertLines: { color: "#e5e7eb" },
-              horzLines: { color: "#e5e7eb" },
-            },
-          });
-          const baseTs = Math.floor(
-            new Date("2000-01-01T00:00:00Z").getTime() / 1000,
-          );
-          chart.applyOptions({
-            timeScale: {
-              timeVisible: true,
-              tickMarkFormatter: (t: any) => {
-                const ts = typeof t === "number" ? t : 0;
-                const idx = ts
-                  ? Math.max(0, Math.round((ts - baseTs) / 86400))
-                  : 0;
-                return `Step ${idx}`;
-              },
-            },
-            localization: { timeFormatter: () => "" },
-          });
-          const series = chart.addSeries(LineSeries, {
-            color,
-            lineWidth: 2,
-            priceScaleId: "",
-          });
-          const chartData = forecast.map((v, i) => ({
-            time: (baseTs + i * 86400) as import("lightweight-charts").Time,
-            value: v,
-          }));
-          series.setData(chartData);
-          chart.timeScale().fitContent();
-        },
-      );
-    },
-    [],
-  );
-
-  const renderGarchVolChart = useCallback(
-    (vols: number[], forecast?: number[]) => {
-      if (!garchVolChartRef.current || !vols || vols.length === 0) return;
-      garchVolChartRef.current.innerHTML = "";
-      if (garchVolChartRef.current.clientWidth === 0) {
-        setTimeout(() => renderGarchVolChart(vols, forecast), 100);
-        return;
-      }
-      import("lightweight-charts").then(
-        ({ createChart, HistogramSeries, LineSeries, ColorType }) => {
-          if (!garchVolChartRef.current) return;
-          const chart = createChart(garchVolChartRef.current, {
-            layout: {
-              background: { type: ColorType.Solid, color: "transparent" },
-              textColor: "#374151",
-            },
-            width: garchVolChartRef.current.clientWidth,
-            height: 240,
-            grid: {
-              vertLines: { color: "#e5e7eb" },
-              horzLines: { color: "#e5e7eb" },
-            },
-          });
-          const baseTs = Math.floor(
-            new Date("2000-01-01T00:00:00Z").getTime() / 1000,
-          );
-          const histSeries = chart.addSeries(HistogramSeries, {
-            color: "#8b5cf6",
-            priceFormat: { type: "volume" },
-            priceScaleId: "",
-          });
-          histSeries.setData(
-            vols.map((v, i) => ({
-              time: (baseTs + i * 86400) as import("lightweight-charts").Time,
-              value: v,
-            })),
-          );
-          if (forecast && forecast.length > 0) {
-            const line = chart.addSeries(LineSeries, {
-              color: "#ef4444",
-              lineWidth: 2,
-              priceScaleId: "",
-            });
-            line.setData(
-              forecast.map((v, i) => ({
-                time: (baseTs +
-                  (vols.length + i) *
-                    86400) as import("lightweight-charts").Time,
-                value: v,
-              })),
-            );
-          }
-          chart.timeScale().fitContent();
-        },
-      );
-    },
-    [],
-  );
 
   const runArima = useCallback(
     async (
@@ -265,38 +146,6 @@ export function useTimeSeriesModels(): UseTimeSeriesModelsReturn {
     },
     [],
   );
-
-  useEffect(() => {
-    if (arimaResult && Array.isArray(arimaResult.forecast)) {
-      setTimeout(
-        () =>
-          renderForecastChart(arimaChartRef, arimaResult.forecast, "#3b82f6"),
-        100,
-      );
-    }
-  }, [arimaResult, renderForecastChart]);
-
-  useEffect(() => {
-    if (garchResult && Array.isArray(garchResult.conditionalVolatility)) {
-      setTimeout(
-        () =>
-          renderGarchVolChart(
-            garchResult.conditionalVolatility,
-            garchResult.forecast,
-          ),
-        100,
-      );
-    }
-  }, [garchResult, renderGarchVolChart]);
-
-  useEffect(() => {
-    if (lstmResult && Array.isArray(lstmResult.forecast)) {
-      setTimeout(
-        () => renderForecastChart(lstmChartRef, lstmResult.forecast, "#8b5cf6"),
-        100,
-      );
-    }
-  }, [lstmResult, renderForecastChart]);
 
   return {
     arimaResult,

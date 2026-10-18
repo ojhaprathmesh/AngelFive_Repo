@@ -4,6 +4,7 @@
 FROM node:24.16.0-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
+ENV pnpm_config_package_import_method=copy
 
 # Enable corepack for pnpm
 RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
@@ -17,6 +18,7 @@ RUN pnpm approve-builds esbuild && pnpm rebuild esbuild
 # Stage 2: Builder
 FROM node:24.16.0-alpine AS builder
 WORKDIR /app
+ENV pnpm_config_package_import_method=copy
 RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
     corepack enable pnpm
 

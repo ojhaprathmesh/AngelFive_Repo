@@ -17,6 +17,7 @@ services:
       - NODE_OPTIONS=--no-warnings=DeprecationWarning
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
+      - pnpm_config_package_import_method=copy
     env_file:
       - ./frontend/.env
     volumes:
@@ -43,6 +44,7 @@ services:
       - FRONTEND_URL=http://localhost:3000,http://frontend:3000
       - ML_SERVICE_URL=http://ml-service:8000
       - REDIS_URL=redis://redis:6379
+      - pnpm_config_package_import_method=copy
       - NODE_OPTIONS=--no-warnings=DeprecationWarning
     env_file:
       - ./backend/.env

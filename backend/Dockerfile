@@ -3,6 +3,7 @@
 # Stage 1: Build
 FROM node:24.16.0-alpine AS builder
 WORKDIR /app
+ENV pnpm_config_package_import_method=copy
 RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
     corepack enable pnpm
 
@@ -17,6 +18,7 @@ RUN npx tsc --build tsconfig.docker.json --force
 # Stage 2: Runtime
 FROM node:24.16.0-alpine AS runner
 WORKDIR /app
+ENV pnpm_config_package_import_method=copy
 RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
     corepack enable pnpm
 

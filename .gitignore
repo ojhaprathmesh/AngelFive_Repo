@@ -12,6 +12,8 @@ dist/
 .pnpm-store/
 **.tsbuildinfo
 next-env.d.ts
+backend/pnpm-lock.yaml
+frontend/pnpm-lock.yaml
 
 # Python
 __pycache__/

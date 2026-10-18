@@ -18,11 +18,11 @@
   },
   "scripts": {
     "dev": "nodemon -L src/server.ts",
-    "dev:worker": "nodemon -L src/worker-run.ts",
+    "dev:worker": "nodemon -L src/workers/runner.ts",
     "clean": "rimraf dist",
     "build": "rimraf dist && tsc --build --force",
     "start": "node dist/server.js",
-    "start:worker": "node dist/worker-run.js",
+    "start:worker": "node dist/workers/runner.js",
     "test": "NODE_ENV=test tsx --test tests/**/*.test.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"

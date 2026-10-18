@@ -2,11 +2,11 @@ import dotenv from "dotenv";
 dotenv.config({ override: true });
 
 // Import workers to initialize background job listeners
-import "./workers";
+import "./index";
 
-import { logger } from "./lib/logger";
-import { initQueues } from "./lib/queue";
-import { shutdownWorkers } from "./lib/worker";
+import { logger } from "../lib/logger";
+import { initQueues } from "../lib/queue";
+import { shutdownWorkers } from "../lib/worker";
 
 logger.info("[Worker Process] Background job workers starting up...");
 

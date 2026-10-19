@@ -42,4 +42,29 @@ describe("Cache Service Configuration & Invariants", () => {
     assert.deepEqual(results[0], results[1]);
     await swrCache.delete(key);
   });
+
+  it("should not poison cache when fetchFn throws an error (e.g. rate limit)", async () => {
+    let attempts = 0;
+    const failingFetch = async () => {
+      attempts++;
+      throw new Error("SmartAPI candle rate limit exceeded");
+    };
+
+    const key = `test:error-cache:${Date.now()}`;
+    await assert.rejects(
+      () => swrCache.get(key, failingFetch, 10_000),
+      /SmartAPI candle rate limit exceeded/,
+    );
+
+    // Second call should attempt fresh fetch instead of serving a cached error
+    const recoveredFetch = async () => {
+      attempts++;
+      return [{ close: 25000 }];
+    };
+
+    const result = await swrCache.get(key, recoveredFetch, 10_000);
+    assert.equal(attempts, 2, "Second attempt must execute fresh supplier");
+    assert.deepEqual(result, [{ close: 25000 }]);
+    await swrCache.delete(key);
+  });
 });

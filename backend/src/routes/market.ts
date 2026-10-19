@@ -383,6 +383,11 @@ async function fetchPerformersData(
   for (let i = 0; i < validStocks.length; i++) {
     if (performers.length >= 8) break;
 
+    // Small inter-request pacing so background performer scans do not starve live charts
+    if (i > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+
     const stock = validStocks[i];
     const historical = await fetchSmartApiHistoricalPrice(
       stock.symbol,
@@ -654,6 +659,107 @@ const INDEX_TOKEN_MAP: Record<string, { exchange: string; token: string }> = {
   "SBIN-EQ": { exchange: "NSE", token: "3045" },
 };
 
+// Direct index fallback mapping to Yahoo Finance symbols when SmartAPI is rate-limited or offline
+const INDEX_YAHOO_MAP: Record<string, string> = {
+  "99919000": "^BSESN", // SENSEX
+  "99926000": "^NSEI", // NIFTY 50
+  "99926009": "^NSEBANK", // BANKNIFTY
+  "99926017": "^INDIAVIX", // INDIAVIX
+  "99926037": "NIFTY_FIN_SERVICE.NS", // FINNIFTY
+};
+
+function mapSmartApiIntervalToYahoo(
+  interval: string,
+  spanDays: number,
+): string {
+  switch (interval.toUpperCase()) {
+    case "ONE_MINUTE":
+      return spanDays <= 7 ? "1m" : "5m";
+    case "THREE_MINUTE":
+    case "FIVE_MINUTE":
+      return spanDays <= 60 ? "5m" : "15m";
+    case "TEN_MINUTE":
+    case "FIFTEEN_MINUTE":
+      return spanDays <= 60 ? "15m" : "1d";
+    case "THIRTY_MINUTE":
+      return spanDays <= 60 ? "30m" : "1d";
+    case "ONE_DAY":
+    default:
+      return "1d";
+  }
+}
+
+async function fetchYahooCandles(
+  symbol: string,
+  fromEpochSec: number,
+  toEpochSec: number,
+  interval: string,
+): Promise<Array<[string, number, number, number, number, number]>> {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${fromEpochSec}&period2=${toEpochSec}&interval=${interval}&events=history`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      logger.warn(
+        `[Yahoo Finance] HTTP error for ${symbol}: ${response.status}`,
+      );
+      return [];
+    }
+
+    const data: any = await response.json();
+    if (data.chart?.error) {
+      logger.warn(`[Yahoo Finance] API error for ${symbol}:`, data.chart.error);
+      return [];
+    }
+
+    const result = data.chart?.result?.[0];
+    if (!result || !result.timestamp || !result.indicators?.quote?.[0]) {
+      return [];
+    }
+
+    const timestamps = result.timestamp;
+    const quote = result.indicators.quote[0];
+    const opens = quote.open || [];
+    const highs = quote.high || [];
+    const lows = quote.low || [];
+    const closes = quote.close || [];
+    const volumes = quote.volume || [];
+
+    const candles: Array<[string, number, number, number, number, number]> = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const timestamp = timestamps[i];
+      const open = opens[i];
+      const high = highs[i];
+      const low = lows[i];
+      const close = closes[i];
+      const volume = volumes[i] || 0;
+
+      if (open == null || high == null || low == null || close == null) {
+        continue;
+      }
+
+      const date = new Date(timestamp * 1000);
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+
+      candles.push([dateStr, open, high, low, close, volume]);
+    }
+
+    return candles;
+  } catch (err: any) {
+    logger.warn(
+      { symbol, err: err?.message },
+      "[Yahoo Finance] Request failed",
+    );
+    return [];
+  }
+}
+
 router.post(
   "/smartapi/quote",
   async (req: Request, res: Response): Promise<void> => {
@@ -744,11 +850,6 @@ router.get(
         return;
       }
 
-      if (!hasSmartApiCredentials()) {
-        res.json({ candles: [], error: "SmartAPI credentials not configured" });
-        return;
-      }
-
       // Intraday intervals get a short TTL; historical get a longer one
       const intradayIntervals = [
         "ONE_MINUTE",
@@ -764,21 +865,74 @@ router.get(
       const cacheKey = `market:candles:${exchange}:${symbolToken}:${interval}:${fromDate}:${toDate}`;
       const candles = await swrCache.get(
         cacheKey,
-        () =>
-          fetchSmartApiCandles(
-            exchange,
-            symbolToken,
-            interval,
-            fromDate,
-            toDate,
-          ),
+        async () => {
+          if (hasSmartApiCredentials()) {
+            try {
+              const fresh = await fetchSmartApiCandles(
+                exchange,
+                symbolToken,
+                interval,
+                fromDate,
+                toDate,
+              );
+              if (fresh && fresh.length > 0) {
+                return fresh;
+              }
+            } catch (smartErr: any) {
+              logger.warn(
+                { symbolToken, err: smartErr?.message },
+                "[SmartAPI] Candle fetch failed, evaluating Yahoo Finance fallback",
+              );
+            }
+          }
+
+          // Fallback to Yahoo Finance for index tokens if SmartAPI failed or returned 0 candles
+          const yahooSymbol = INDEX_YAHOO_MAP[symbolToken];
+          if (yahooSymbol) {
+            try {
+              const fromMs = new Date(fromDate).getTime();
+              const toMs = new Date(toDate).getTime();
+              const spanDays = Math.max(
+                1,
+                Math.round((toMs - fromMs) / (1000 * 60 * 60 * 24)),
+              );
+              const yahooInterval = mapSmartApiIntervalToYahoo(
+                interval,
+                spanDays,
+              );
+              const fromSec = Math.floor(fromMs / 1000);
+              const toSec = Math.floor(toMs / 1000);
+
+              const yahooCandles = await fetchYahooCandles(
+                yahooSymbol,
+                fromSec,
+                toSec,
+                yahooInterval,
+              );
+              if (yahooCandles.length > 0) {
+                logger.info(
+                  `[SmartAPI Fallback] Recovered ${yahooCandles.length} candles from Yahoo Finance for ${symbolToken} (${yahooSymbol})`,
+                );
+                return yahooCandles;
+              }
+            } catch (yahooErr: any) {
+              logger.error(
+                { err: yahooErr?.message },
+                "[SmartAPI Fallback] Yahoo Finance fallback failed",
+              );
+            }
+          }
+
+          // Throwing prevents caching empty results in SWR/Redis
+          throw new Error(`No candle data available for token ${symbolToken}`);
+        },
         ttl,
       );
 
       res.json({ candles });
-    } catch (e) {
-      logger.error({ err: e }, "[SmartAPI] Candles route error");
-      res.status(500).json({ error: "failed_to_fetch_candles" });
+    } catch (e: any) {
+      logger.error({ err: e?.message }, "[SmartAPI] Candles route error");
+      res.status(503).json({ error: "failed_to_fetch_candles", candles: [] });
     }
   },
 );
@@ -823,90 +977,25 @@ router.get(
       const from = to - config.lookbackSeconds;
 
       for (const yahooSymbol of symbolFormats) {
-        try {
-          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?period1=${from}&period2=${to}&interval=${config.interval}&events=history`;
+        logger.info(`[Yahoo Finance] Trying: ${yahooSymbol}`);
+        const candles = await fetchYahooCandles(
+          yahooSymbol,
+          from,
+          to,
+          config.interval,
+        );
 
-          logger.info(`[Yahoo Finance] Trying: ${yahooSymbol}`);
-
-          const response = await fetch(url, {
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-              Accept: "application/json",
-            },
-          });
-
-          if (!response.ok) {
-            logger.warn(
-              `[Yahoo Finance] Error for ${yahooSymbol}: ${response.status}`,
-            );
-            continue;
-          }
-
-          const data: any = await response.json();
-
-          if (data.chart?.error) {
-            logger.warn(
-              `[Yahoo Finance] API error for ${yahooSymbol}:`,
-              data.chart.error,
-            );
-            continue;
-          }
-
-          const result = data.chart?.result?.[0];
-
-          if (!result || !result.timestamp || !result.indicators?.quote?.[0]) {
-            logger.warn(`[Yahoo Finance] Invalid response for ${yahooSymbol}`);
-            continue;
-          }
-
-          const timestamps = result.timestamp;
-          const quote = result.indicators.quote[0];
-          const opens = quote.open || [];
-          const highs = quote.high || [];
-          const lows = quote.low || [];
-          const closes = quote.close || [];
-          const volumes = quote.volume || [];
-
-          const candles: Array<
-            [string, number, number, number, number, number]
-          > = [];
-
-          for (let i = 0; i < timestamps.length; i++) {
-            const timestamp = timestamps[i];
-            const open = opens[i];
-            const high = highs[i];
-            const low = lows[i];
-            const close = closes[i];
-            const volume = volumes[i] || 0;
-
-            if (open == null || high == null || low == null || close == null) {
-              continue;
-            }
-
-            const date = new Date(timestamp * 1000);
-            const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-
-            candles.push([dateStr, open, high, low, close, volume]);
-          }
-
-          if (candles.length > 0) {
-            logger.info(
-              `[Yahoo Finance] ✅ Success for ${yahooSymbol}: ${candles.length} candles`,
-            );
-            res.json({
-              candles,
-              symbol: yahooSymbol,
-              timeframe,
-              interval: config.interval,
-            });
-            return;
-          }
-        } catch (e: any) {
-          logger.warn(
-            `[Yahoo Finance] Error trying ${yahooSymbol}:`,
-            e.message,
+        if (candles.length > 0) {
+          logger.info(
+            `[Yahoo Finance] ✅ Success for ${yahooSymbol}: ${candles.length} candles`,
           );
+          res.json({
+            candles,
+            symbol: yahooSymbol,
+            timeframe,
+            interval: config.interval,
+          });
+          return;
         }
       }
 

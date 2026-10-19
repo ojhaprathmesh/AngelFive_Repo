@@ -260,7 +260,7 @@ export async function fetchSmartApiQuotes(
 /* ---------------------------------- */
 
 let candleFetchQueue = Promise.resolve();
-const CANDLE_INTERVAL_MS = 350; // ~3 RPS
+const CANDLE_INTERVAL_MS = 400; // ~2.5 RPS (stays safely under the 3 RPS limit)
 
 function queueCandleFetch<T>(fn: () => Promise<T>): Promise<T> {
   const next = candleFetchQueue.then(
@@ -278,7 +278,7 @@ export async function fetchSmartApiCandles(
   toDate: string,
 ): Promise<Array<[string, number, number, number, number, number]>> {
   const jwt = await getSmartApiJwtToken();
-  if (!jwt) return [];
+  if (!jwt) throw new Error("SmartAPI JWT token unavailable");
 
   return queueCandleFetch(async () => {
     const start = Date.now();
@@ -320,7 +320,9 @@ export async function fetchSmartApiCandles(
           },
           "[SmartAPI] Candle fetch HTTP error",
         );
-        return [];
+        throw new Error(
+          `SmartAPI candle fetch HTTP ${response.status}: ${errText.slice(0, 200)}`,
+        );
       }
 
       const data: any = await response.json();
@@ -336,7 +338,9 @@ export async function fetchSmartApiCandles(
           },
           "[SmartAPI] Candle fetch returned invalid payload",
         );
-        return [];
+        throw new Error(
+          `SmartAPI candle fetch invalid payload: ${data?.message || "unknown"}`,
+        );
       }
 
       logger.info(
@@ -349,7 +353,7 @@ export async function fetchSmartApiCandles(
         { err: error, durationMs: Date.now() - start },
         "[SmartAPI] Candle fetch failed",
       );
-      return [];
+      throw error;
     }
   });
 }

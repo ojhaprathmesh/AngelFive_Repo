@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { UTCTimestamp } from "lightweight-charts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { marketDataService } from "@/features/market/services/market-data";
 
@@ -20,9 +20,11 @@ export function useTradingChartData(
   const [autoSwitchedFrom, setAutoSwitchedFrom] = useState<TimeFrame | null>(
     null,
   );
+  const hasAutoSwitchedRef = useRef(false);
 
   // Clear auto-switch message when user changes index
   useEffect(() => {
+    hasAutoSwitchedRef.current = false;
     setAutoSwitchedFrom(null);
   }, [selectedIndex]);
 
@@ -175,22 +177,16 @@ export function useTradingChartData(
 
         if (mapped.length === 0 || isSparse1D) {
           setChartDataEmpty(true);
-          const tfList: TimeFrame[] = [
-            "1D",
-            "5D",
-            "1M",
-            "6M",
-            "1Y",
-            "5Y",
-            "Max",
-          ];
-          const idx = tfList.indexOf(timeFrame);
-          if (idx >= 0 && idx < tfList.length - 1) {
-            setAutoSwitchedFrom(timeFrame);
-            setTimeFrame(tfList[idx + 1]);
+          // Only auto-switch once from 1D to 5D (e.g. if market is closed or weekend).
+          // Do not cascade recursively through 1M, 6M, 1Y, 5Y, Max to prevent runaway request hammering.
+          if (timeFrame === "1D" && !hasAutoSwitchedRef.current) {
+            hasAutoSwitchedRef.current = true;
+            setAutoSwitchedFrom("1D");
+            setTimeFrame("5D");
           }
         } else {
           setChartDataEmpty(false);
+          hasAutoSwitchedRef.current = false;
           setAutoSwitchedFrom(null);
           setChartData(mapped);
         }

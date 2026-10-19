@@ -1,6 +1,10 @@
 import { NextFunction, Request, Response } from "express";
 import { getAuth } from "firebase-admin/auth";
 
+import type { AuthenticatedRequest } from "../types/auth";
+
+export type { AuthenticatedRequest };
+
 export const verifyToken = async (
   req: Request,
   res: Response,
@@ -18,7 +22,7 @@ export const verifyToken = async (
     }
 
     const decoded = await getAuth().verifyIdToken(idToken);
-    (req as any).uid = decoded.uid;
+    req.uid = decoded.uid;
     return next();
   } catch (error: any) {
     return res

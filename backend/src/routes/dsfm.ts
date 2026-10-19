@@ -1,7 +1,6 @@
 import { Request, Response, Router } from "express";
 
 import { logger } from "../lib/logger";
-import { enqueueJob, QUEUE_NAMES } from "../lib/queue";
 import * as dsfmService from "../services/dsfm";
 
 const router: Router = Router();
@@ -31,10 +30,8 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const timeframe = (req.query.timeframe as string) || "3M";
-      const job = await enqueueJob(QUEUE_NAMES.ANALYTICS, "correlation", {
-        timeframe,
-      });
-      res.status(202).json({ jobId: job.id, queueName: QUEUE_NAMES.ANALYTICS });
+      const result = await dsfmService.enqueueCorrelationJob(timeframe);
+      res.status(202).json(result);
     } catch (e: any) {
       logger.error({ err: e }, "Error enqueuing correlation job:");
       res.status(500).json({ error: e.message || "failed_to_enqueue_job" });
@@ -54,12 +51,12 @@ router.post("/mpt", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const job = await enqueueJob(QUEUE_NAMES.PORTFOLIO, "mpt", {
+    const result = await dsfmService.enqueueMptJob(
       symbols,
       timeframe,
       riskFreeRate,
-    });
-    res.status(202).json({ jobId: job.id, queueName: QUEUE_NAMES.PORTFOLIO });
+    );
+    res.status(202).json(result);
   } catch (e: any) {
     logger.error({ err: e }, "Error enqueuing MPT job:");
     res.status(500).json({ error: e.message || "failed_to_enqueue_job" });
@@ -80,13 +77,13 @@ router.post(
         return;
       }
 
-      const job = await enqueueJob(QUEUE_NAMES.PORTFOLIO, "black-litterman", {
+      const result = await dsfmService.enqueueBlackLittermanJob(
         symbols,
         timeframe,
         riskAversion,
         tau,
-      });
-      res.status(202).json({ jobId: job.id, queueName: QUEUE_NAMES.PORTFOLIO });
+      );
+      res.status(202).json(result);
     } catch (e: any) {
       logger.error({ err: e }, "Error enqueuing Black-Litterman job:");
       res.status(500).json({ error: e.message || "failed_to_enqueue_job" });
@@ -174,12 +171,8 @@ router.post("/arima", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const job = await enqueueJob(QUEUE_NAMES.FORECASTING, "arima", {
-      symbol,
-      timeframe,
-      order,
-    });
-    res.status(202).json({ jobId: job.id, queueName: QUEUE_NAMES.FORECASTING });
+    const result = await dsfmService.enqueueArimaJob(symbol, timeframe, order);
+    res.status(202).json(result);
   } catch (e: any) {
     logger.error({ err: e }, "Error enqueuing ARIMA job:");
     res.status(500).json({ error: e.message || "failed_to_enqueue_job" });
@@ -196,12 +189,8 @@ router.post("/garch", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const job = await enqueueJob(QUEUE_NAMES.FORECASTING, "garch", {
-      symbol,
-      timeframe,
-      order,
-    });
-    res.status(202).json({ jobId: job.id, queueName: QUEUE_NAMES.FORECASTING });
+    const result = await dsfmService.enqueueGarchJob(symbol, timeframe, order);
+    res.status(202).json(result);
   } catch (e: any) {
     logger.error({ err: e }, "Error enqueuing GARCH job:");
     res.status(500).json({ error: e.message || "failed_to_enqueue_job" });
@@ -218,13 +207,13 @@ router.post("/lstm", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const job = await enqueueJob(QUEUE_NAMES.FORECASTING, "lstm", {
+    const result = await dsfmService.enqueueLstmJob(
       symbol,
       timeframe,
       lookback,
       forecastSteps,
-    });
-    res.status(202).json({ jobId: job.id, queueName: QUEUE_NAMES.FORECASTING });
+    );
+    res.status(202).json(result);
   } catch (e: any) {
     logger.error({ err: e }, "Error enqueuing LSTM job:");
     res.status(500).json({ error: e.message || "failed_to_enqueue_job" });

@@ -1,6 +1,7 @@
 import { ENV } from "../config/env";
 import { logger } from "../lib/logger";
 import { fetchNSEIndex } from "../lib/nse";
+import { enqueueJob, QUEUE_NAMES } from "../lib/queue";
 import {
   calculateCorrelation,
   calculateLogReturns,
@@ -626,4 +627,80 @@ export async function processAcfPacf(
     const errorText = await mlResp.text();
     throw new Error(errorText || "ML service error");
   }
+}
+
+export async function enqueueCorrelationJob(timeframe: string) {
+  const job = await enqueueJob(QUEUE_NAMES.ANALYTICS, "correlation", {
+    timeframe,
+  });
+  return { jobId: job.id, queueName: QUEUE_NAMES.ANALYTICS };
+}
+
+export async function enqueueMptJob(
+  symbols: string[],
+  timeframe: string,
+  riskFreeRate?: number,
+) {
+  const job = await enqueueJob(QUEUE_NAMES.PORTFOLIO, "mpt", {
+    symbols,
+    timeframe,
+    riskFreeRate,
+  });
+  return { jobId: job.id, queueName: QUEUE_NAMES.PORTFOLIO };
+}
+
+export async function enqueueBlackLittermanJob(
+  symbols: string[],
+  timeframe: string,
+  riskAversion?: number,
+  tau?: number,
+) {
+  const job = await enqueueJob(QUEUE_NAMES.PORTFOLIO, "black-litterman", {
+    symbols,
+    timeframe,
+    riskAversion,
+    tau,
+  });
+  return { jobId: job.id, queueName: QUEUE_NAMES.PORTFOLIO };
+}
+
+export async function enqueueArimaJob(
+  symbol: string,
+  timeframe: string,
+  order?: [number, number, number],
+) {
+  const job = await enqueueJob(QUEUE_NAMES.FORECASTING, "arima", {
+    symbol,
+    timeframe,
+    order,
+  });
+  return { jobId: job.id, queueName: QUEUE_NAMES.FORECASTING };
+}
+
+export async function enqueueGarchJob(
+  symbol: string,
+  timeframe: string,
+  order?: [number, number],
+) {
+  const job = await enqueueJob(QUEUE_NAMES.FORECASTING, "garch", {
+    symbol,
+    timeframe,
+    order,
+  });
+  return { jobId: job.id, queueName: QUEUE_NAMES.FORECASTING };
+}
+
+export async function enqueueLstmJob(
+  symbol: string,
+  timeframe: string,
+  lookback?: number,
+  forecastSteps?: number,
+) {
+  const job = await enqueueJob(QUEUE_NAMES.FORECASTING, "lstm", {
+    symbol,
+    timeframe,
+    lookback,
+    forecastSteps,
+  });
+  return { jobId: job.id, queueName: QUEUE_NAMES.FORECASTING };
 }

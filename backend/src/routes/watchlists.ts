@@ -1,574 +1,186 @@
 import { Request, Response, Router } from "express";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
-import { firebaseFirestore } from "../config/firebase";
 import { verifyToken as verifyTokenMiddleware } from "../middleware/auth";
-import { appEvents, AppEventType } from "../services/event-emitter";
+import {
+  watchlistService,
+  WatchlistServiceError,
+} from "../services/watchlist.service";
+import { getAuthUid } from "../types/auth";
 
 const router: Router = Router();
 
-type WatchlistDoc = {
-  id: string;
-  name: string;
-  createdAt: Timestamp;
-  _orderIndex: number | null;
-};
-
-function mapWatchlistDocs(
-  docs: FirebaseFirestore.QueryDocumentSnapshot[],
-): WatchlistDoc[] {
-  return docs.map((d) => {
-    const data = d.data() as {
-      name: string;
-      createdAt?: Timestamp;
-      orderIndex?: number;
-    };
-    return {
-      id: d.id,
-      name: data.name,
-      createdAt: (data.createdAt as Timestamp) || Timestamp.now(),
-      _orderIndex: typeof data.orderIndex === "number" ? data.orderIndex : null,
-    };
-  });
+function handleError(res: Response, error: unknown) {
+  if (error instanceof WatchlistServiceError) {
+    return res.status(error.statusCode).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+  const message = (error as Error)?.message || "Internal server error";
+  return res.status(500).json({ status: "error", message });
 }
 
-function sortWatchlist(
-  items: WatchlistDoc[],
-): Omit<WatchlistDoc, "_orderIndex">[] {
-  return items
-    .sort((a, b) => {
-      const aDef = a.name.toLowerCase() === "default" ? -1 : 0;
-      const bDef = b.name.toLowerCase() === "default" ? -1 : 0;
-      if (aDef !== bDef) return aDef - bDef;
-      const aOrd = typeof a._orderIndex === "number" ? a._orderIndex : null;
-      const bOrd = typeof b._orderIndex === "number" ? b._orderIndex : null;
-      if (aOrd !== null || bOrd !== null) {
-        if (aOrd === null) return 1;
-        if (bOrd === null) return -1;
-        return aOrd - bOrd;
-      }
-      return a.createdAt.toMillis() - b.createdAt.toMillis();
-    })
-    .map(({ id, name, createdAt }) => ({ id, name, createdAt }));
-}
+// SSE real-time stream of watchlists
+router.get("/stream", verifyTokenMiddleware, (req: Request, res: Response) => {
+  try {
+    const uid = getAuthUid(req);
 
-router.get(
-  "/stream",
-  verifyTokenMiddleware,
-  async (req: Request, res: Response) => {
-    try {
-      const uid = (req as any).uid;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
 
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.setHeader("X-Accel-Buffering", "no");
+    const unsubscribe = watchlistService.subscribeToStream(
+      uid,
+      (payload: string) => {
+        res.write(payload);
+      },
+    );
 
-      const colRef = firebaseFirestore
-        .collection("users")
-        .doc(uid)
-        .collection("watchlists");
-      const unsubscribe = colRef
-        .orderBy("createdAt", "asc")
-        .onSnapshot(async (snap) => {
-          if (snap.empty) {
-            try {
-              const defDoc = colRef.doc("default");
-              await defDoc.set(
-                { name: "Default", createdAt: FieldValue.serverTimestamp() },
-                { merge: true },
-              );
-              const symCol = defDoc.collection("symbols");
-              const symSnap = await symCol.limit(1).get();
-              if (symSnap.empty) {
-                const samples = [
-                  {
-                    symbol: "IDEA",
-                    exchange: "NSE",
-                    ltp: 9.97,
-                    changePct: -1.97,
-                  },
-                  {
-                    symbol: "JIOFIN",
-                    exchange: "NSE",
-                    ltp: 253.4,
-                    changePct: 0.85,
-                  },
-                  {
-                    symbol: "TATASTEEL",
-                    exchange: "NSE",
-                    ltp: 132.75,
-                    changePct: -0.62,
-                  },
-                  {
-                    symbol: "TATAPOWER",
-                    exchange: "NSE",
-                    ltp: 108.9,
-                    changePct: 1.25,
-                  },
-                  {
-                    symbol: "YESBANK",
-                    exchange: "NSE",
-                    ltp: 22.15,
-                    changePct: -0.35,
-                  },
-                ];
-                const batch = firebaseFirestore.batch();
-                samples.forEach((s) => {
-                  const ref = symCol.doc(s.symbol);
-                  batch.set(
-                    ref,
-                    {
-                      symbol: s.symbol,
-                      exchange: s.exchange,
-                      ltp: s.ltp,
-                      changePct: s.changePct,
-                      createdAt: FieldValue.serverTimestamp(),
-                    },
-                    { merge: true },
-                  );
-                });
-                await batch.commit();
-              }
-            } catch {}
-            return;
-          }
-          const items = mapWatchlistDocs(snap.docs);
-          const sorted = sortWatchlist(items);
-          res.write(`data: ${JSON.stringify({ items: sorted })}\n\n`);
-        });
+    req.on("close", () => {
+      unsubscribe();
+    });
+  } catch (error: unknown) {
+    handleError(res, error);
+  }
+});
 
-      req.on("close", () => {
-        unsubscribe();
-      });
-      return;
-    } catch (error: any) {
-      res
-        .status(401)
-        .json({ status: "error", message: error.message || "Unauthorized" });
-    }
-  },
-);
-
+// List all watchlists
 router.get("/", verifyTokenMiddleware, async (req: Request, res: Response) => {
   try {
-    const uid = (req as any).uid;
-
-    const colRef = firebaseFirestore
-      .collection("users")
-      .doc(uid)
-      .collection("watchlists");
-    const snap = await colRef.orderBy("createdAt", "asc").get();
-    if (snap.empty) {
-      const defDoc = colRef.doc("default");
-      await defDoc.set(
-        { name: "Default", createdAt: FieldValue.serverTimestamp() },
-        { merge: true },
-      );
-      const symCol = defDoc.collection("symbols");
-      const symSnap = await symCol.limit(1).get();
-      if (symSnap.empty) {
-        const samples = [
-          { symbol: "IDEA", exchange: "NSE", ltp: 9.97, changePct: -1.97 },
-          { symbol: "JIOFIN", exchange: "NSE", ltp: 253.4, changePct: 0.85 },
-          {
-            symbol: "TATASTEEL",
-            exchange: "NSE",
-            ltp: 132.75,
-            changePct: -0.62,
-          },
-          { symbol: "TATAPOWER", exchange: "NSE", ltp: 108.9, changePct: 1.25 },
-          { symbol: "YESBANK", exchange: "NSE", ltp: 22.15, changePct: -0.35 },
-        ];
-        const batch = firebaseFirestore.batch();
-        samples.forEach((s) => {
-          const ref = symCol.doc(s.symbol);
-          batch.set(
-            ref,
-            {
-              symbol: s.symbol,
-              exchange: s.exchange,
-              ltp: s.ltp,
-              changePct: s.changePct,
-              createdAt: FieldValue.serverTimestamp(),
-            },
-            { merge: true },
-          );
-        });
-        await batch.commit();
-      }
-      const refreshed = await colRef.orderBy("createdAt", "asc").get();
-      const refreshedItems = refreshed.docs.map((d) => {
-        const data = d.data() as { name: string; createdAt?: Timestamp };
-        return {
-          id: d.id,
-          name: data.name,
-          createdAt: (data.createdAt as Timestamp) || Timestamp.now(),
-        };
-      });
-      res.json({ items: refreshedItems });
-      return;
-    }
-    const items = mapWatchlistDocs(snap.docs);
-    const sorted = sortWatchlist(items);
-    res.json({ items: sorted });
-  } catch (error: any) {
-    res
-      .status(401)
-      .json({ status: "error", message: error.message || "Unauthorized" });
+    const items = await watchlistService.listWatchlists(getAuthUid(req));
+    res.json({ items });
+  } catch (error: unknown) {
+    handleError(res, error);
   }
 });
 
+// Create a new watchlist
 router.post("/", verifyTokenMiddleware, async (req: Request, res: Response) => {
   try {
-    const uid = (req as any).uid;
-
-    const name = (req.body?.name as string) || "";
-    const trimmed = name.trim();
-    if (!trimmed) {
-      res.status(400).json({ status: "error", message: "Name is required" });
-      return;
-    }
-
-    const colRef = firebaseFirestore
-      .collection("users")
-      .doc(uid)
-      .collection("watchlists");
-    const exists = await colRef.where("name", "==", trimmed).limit(1).get();
-    if (!exists.empty) {
-      res.status(409).json({
-        status: "error",
-        message: "A watchlist with this name already exists",
-      });
-      return;
-    }
-
-    const doc = await colRef.add({
-      name: trimmed,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-
-    // Emit event
-    appEvents.emit(AppEventType.WATCHLIST_CREATED, {
-      userId: uid,
-      type: AppEventType.WATCHLIST_CREATED,
-      title: "Watchlist Created",
-      message: `New watchlist "${trimmed}" has been created.`,
-      category: "watchlist",
-      priority: "low",
-      action: { type: "navigate", url: "/dashboard/watchlist" },
-    });
-
-    res.json({ status: "success", id: doc.id });
-  } catch (error: any) {
-    res
-      .status(401)
-      .json({ status: "error", message: error.message || "Unauthorized" });
+    const result = await watchlistService.createWatchlist(
+      getAuthUid(req),
+      req.body?.name,
+    );
+    res.json({ status: "success", id: result.id });
+  } catch (error: unknown) {
+    handleError(res, error);
   }
 });
 
+// Rename a watchlist
 router.patch(
   "/:id",
   verifyTokenMiddleware,
   async (req: Request, res: Response) => {
     try {
-      const uid = (req as any).uid;
-
-      const id = String(req.params.id || "");
-      const name = (req.body?.name as string) || "";
-      const trimmed = name.trim();
-      if (!id) {
-        res.status(400).json({ status: "error", message: "Invalid id" });
-        return;
-      }
-      if (!trimmed) {
-        res.status(400).json({ status: "error", message: "Name is required" });
-        return;
-      }
-      const colRef = firebaseFirestore
-        .collection("users")
-        .doc(uid)
-        .collection("watchlists");
-      const dup = await colRef.where("name", "==", trimmed).limit(1).get();
-      if (!dup.empty) {
-        const existsId = dup.docs[0].id;
-        if (existsId !== id) {
-          res.status(409).json({
-            status: "error",
-            message: "A watchlist with this name already exists",
-          });
-          return;
-        }
-      }
-      await colRef
-        .doc(id)
-        .set(
-          { name: trimmed, updatedAt: FieldValue.serverTimestamp() },
-          { merge: true },
-        );
+      await watchlistService.renameWatchlist(
+        getAuthUid(req),
+        req.params.id,
+        req.body?.name,
+      );
       res.json({ status: "success" });
-    } catch (error: any) {
-      res
-        .status(401)
-        .json({ status: "error", message: error.message || "Unauthorized" });
+    } catch (error: unknown) {
+      handleError(res, error);
     }
   },
 );
 
+// Delete a watchlist
 router.delete(
   "/:id",
   verifyTokenMiddleware,
   async (req: Request, res: Response) => {
     try {
-      const uid = (req as any).uid;
-
-      const id = String(req.params.id || "");
-      if (!id) {
-        res.status(400).json({ status: "error", message: "Invalid id" });
-        return;
-      }
-      const colRef = firebaseFirestore
-        .collection("users")
-        .doc(uid)
-        .collection("watchlists");
-      await colRef.doc(id).delete();
+      await watchlistService.deleteWatchlist(getAuthUid(req), req.params.id);
       res.json({ status: "success" });
-    } catch (error: any) {
-      res
-        .status(401)
-        .json({ status: "error", message: error.message || "Unauthorized" });
+    } catch (error: unknown) {
+      handleError(res, error);
     }
   },
 );
 
+// Reorder watchlists
 router.post(
   "/reorder",
   verifyTokenMiddleware,
   async (req: Request, res: Response) => {
     try {
-      const uid = (req as any).uid;
-
-      const order = Array.isArray(req.body?.order)
-        ? (req.body.order as string[])
-        : [];
-      if (order.length === 0) {
-        res.status(400).json({ status: "error", message: "Order is required" });
-        return;
-      }
-      const colRef = firebaseFirestore
-        .collection("users")
-        .doc(uid)
-        .collection("watchlists");
-      const batch = firebaseFirestore.batch();
-      order.forEach((wid, idx) => {
-        const ref = colRef.doc(String(wid));
-        batch.set(
-          ref,
-          { orderIndex: idx, updatedAt: FieldValue.serverTimestamp() },
-          { merge: true },
-        );
-      });
-      await batch.commit();
+      await watchlistService.reorderWatchlists(
+        getAuthUid(req),
+        req.body?.order,
+      );
       res.json({ status: "success" });
-    } catch (error: any) {
-      res
-        .status(401)
-        .json({ status: "error", message: error.message || "Unauthorized" });
+    } catch (error: unknown) {
+      handleError(res, error);
     }
   },
 );
 
+// Get symbol counts per watchlist
 router.get(
   "/counts",
   verifyTokenMiddleware,
   async (req: Request, res: Response) => {
     try {
-      const uid = (req as any).uid;
-
-      const colRef = firebaseFirestore
-        .collection("users")
-        .doc(uid)
-        .collection("watchlists");
-      const lists = await colRef.get();
-      const counts: Record<string, number> = {};
-      await Promise.all(
-        lists.docs.map(async (d) => {
-          const sub = await colRef
-            .doc(d.id)
-            .collection("symbols")
-            .limit(1)
-            .get();
-          if (sub.empty) {
-            counts[d.id] = 0;
-          } else {
-            const full = await colRef.doc(d.id).collection("symbols").get();
-            counts[d.id] = full.size;
-          }
-        }),
-      );
+      const counts = await watchlistService.getCounts(getAuthUid(req));
       res.json({ counts });
-    } catch (error: any) {
-      res
-        .status(401)
-        .json({ status: "error", message: error.message || "Unauthorized" });
+    } catch (error: unknown) {
+      handleError(res, error);
     }
   },
 );
 
+// Get symbols inside a watchlist
 router.get(
   "/:id/symbols",
   verifyTokenMiddleware,
   async (req: Request, res: Response) => {
     try {
-      const uid = (req as any).uid;
-
-      const id = String(req.params.id || "");
-      if (!id) {
-        res.status(400).json({ status: "error", message: "Invalid id" });
-        return;
-      }
-      const colRef = firebaseFirestore
-        .collection("users")
-        .doc(uid)
-        .collection("watchlists")
-        .doc(id)
-        .collection("symbols");
-      const snap = await colRef.orderBy("createdAt", "asc").get();
-      const symbols = snap.docs.map((d) => {
-        const data = d.data() as {
-          symbol: string;
-          exchange?: string;
-          ltp?: number;
-          changePct?: number;
-          createdAt?: Timestamp;
-        };
-        return {
-          id: d.id,
-          symbol: data.symbol,
-          exchange: data.exchange || "NSE",
-          ltp: typeof data.ltp === "number" ? data.ltp : 0,
-          changePct: typeof data.changePct === "number" ? data.changePct : 0,
-          createdAt: (data.createdAt as Timestamp) || Timestamp.now(),
-        };
-      });
+      const symbols = await watchlistService.listSymbols(
+        getAuthUid(req),
+        req.params.id,
+      );
       res.json({ symbols });
-    } catch (error: any) {
-      res
-        .status(401)
-        .json({ status: "error", message: error.message || "Unauthorized" });
+    } catch (error: unknown) {
+      handleError(res, error);
     }
   },
 );
 
-// Add symbol to watchlist
+// Add symbol to a watchlist
 router.post(
   "/:id/symbols",
   verifyTokenMiddleware,
   async (req: Request, res: Response) => {
     try {
-      const uid = (req as any).uid;
-
-      const id = String(req.params.id || "");
-      const symbol = String(req.body?.symbol || "")
-        .trim()
-        .toUpperCase();
-      const exchange = String(req.body?.exchange || "NSE")
-        .trim()
-        .toUpperCase();
-
-      if (!id) {
-        res
-          .status(400)
-          .json({ status: "error", message: "Invalid watchlist id" });
-        return;
-      }
-      if (!symbol) {
-        res
-          .status(400)
-          .json({ status: "error", message: "Symbol is required" });
-        return;
-      }
-
-      const colRef = firebaseFirestore
-        .collection("users")
-        .doc(uid)
-        .collection("watchlists")
-        .doc(id)
-        .collection("symbols");
-
-      // Check if symbol already exists
-      const existing = await colRef
-        .where("symbol", "==", symbol)
-        .limit(1)
-        .get();
-      if (!existing.empty) {
-        res
-          .status(409)
-          .json({ status: "error", message: "Symbol already in watchlist" });
-        return;
-      }
-
-      // Add symbol
-      await colRef.doc(symbol).set(
-        {
-          symbol,
-          exchange,
-          ltp: 0,
-          changePct: 0,
-          createdAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true },
+      const result = await watchlistService.addSymbol(
+        getAuthUid(req),
+        req.params.id,
+        req.body?.symbol,
+        req.body?.exchange,
       );
-
-      // Emit event
-      appEvents.emit(AppEventType.WATCHLIST_SYMBOL_ADDED, {
-        userId: uid,
-        type: AppEventType.WATCHLIST_SYMBOL_ADDED,
-        title: "Symbol Added",
-        message: `${symbol} added to your watchlist.`,
-        category: "watchlist",
-        priority: "low",
-        metadata: { symbol, watchlistId: id },
-      });
-
-      res.json({ status: "success", id: symbol });
-    } catch (error: any) {
-      res
-        .status(401)
-        .json({ status: "error", message: error.message || "Unauthorized" });
+      res.json({ status: "success", id: result.id });
+    } catch (error: unknown) {
+      handleError(res, error);
     }
   },
 );
 
-// Remove symbol from watchlist
+// Remove symbol from a watchlist
 router.delete(
   "/:id/symbols/:symbolId",
   verifyTokenMiddleware,
   async (req: Request, res: Response) => {
     try {
-      const uid = (req as any).uid;
-
-      const id = String(req.params.id || "");
-      const symbolId = String(req.params.symbolId || "");
-
-      if (!id || !symbolId) {
-        res.status(400).json({ status: "error", message: "Invalid id" });
-        return;
-      }
-
-      const colRef = firebaseFirestore
-        .collection("users")
-        .doc(uid)
-        .collection("watchlists")
-        .doc(id)
-        .collection("symbols");
-      await colRef.doc(symbolId).delete();
-
+      await watchlistService.removeSymbol(
+        getAuthUid(req),
+        req.params.id,
+        req.params.symbolId,
+      );
       res.json({ status: "success" });
-    } catch (error: any) {
-      res
-        .status(401)
-        .json({ status: "error", message: error.message || "Unauthorized" });
+    } catch (error: unknown) {
+      handleError(res, error);
     }
   },
 );

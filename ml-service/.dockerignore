@@ -13,3 +13,8 @@ venv/
 .coverage
 htmlcov/
 model_cache/
+tests/
+notebooks/
+*.ipynb
+.DS_Store
+.git

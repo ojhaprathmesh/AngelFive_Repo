@@ -5,3 +5,10 @@ dist
 .git
 .env*
 !.env.example
+tests/
+*.test.ts
+*.spec.ts
+coverage/
+.pnpm-store
+.npm
+.DS_Store

@@ -5,3 +5,13 @@ README.md
 .git
 .env*
 !.env.example
+playwright-report/
+test-results/
+e2e/
+tests/
+*.test.ts
+*.spec.ts
+coverage/
+.pnpm-store
+.npm
+.DS_Store

@@ -10,9 +10,9 @@ ENV pnpm_config_package_import_method=copy
 RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
     corepack enable pnpm
 
-COPY package.json ./
+COPY package.json pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --ignore-scripts
+    pnpm install --frozen-lockfile --ignore-scripts
 RUN pnpm approve-builds esbuild && pnpm rebuild esbuild
 
 # Stage 2: Builder
@@ -25,33 +25,29 @@ RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the Next.js app
-# The standalone output mode is configured in next.config.ts
-ENV NEXT_TELEMETRY_DISABLED 1
+# Build the Next.js app in standalone output mode
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
     pnpm build
 
-# Stage 3: Runner
+# Stage 3: Minimal Production Runner
 FROM node:24.16.0-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME="0.0.0.0" \
+    NODE_OPTIONS="--max-old-space-size=512"
 
-# Set up non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Set up non-root user and directories in single layer
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs && \
+    mkdir -p .next && \
+    chown nextjs:nodejs .next
 
-# Copy standalone output
+# Copy public assets and standalone output
 COPY --from=builder /app/public ./public
-
-# Set permissions for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 

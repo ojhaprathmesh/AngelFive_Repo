@@ -7,9 +7,9 @@ ENV pnpm_config_package_import_method=copy
 RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
     corepack enable pnpm
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts
+    pnpm install --ignore-scripts
 RUN pnpm approve-builds esbuild protobufjs @firebase/util && pnpm rebuild esbuild protobufjs @firebase/util
 
 COPY . .
@@ -22,9 +22,9 @@ ENV pnpm_config_package_import_method=copy
 RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
     corepack enable pnpm
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --prod --frozen-lockfile --ignore-scripts
+    pnpm install --prod --ignore-scripts
 
 # Stage 3: Minimal Production Runtime
 FROM node:24.16.0-alpine AS runner

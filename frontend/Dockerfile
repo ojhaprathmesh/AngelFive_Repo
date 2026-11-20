@@ -10,9 +10,9 @@ ENV pnpm_config_package_import_method=copy
 RUN --mount=type=cache,id=corepack,target=/root/.cache/node/corepack \
     corepack enable pnpm
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts
+    pnpm install --ignore-scripts
 RUN pnpm approve-builds esbuild && pnpm rebuild esbuild
 
 # Stage 2: Builder

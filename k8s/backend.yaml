@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: angelfive
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: angelfive
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/part-of: angelfive
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/ojhaprathmesh/angelfive_repo-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: PORT_BACKEND
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: NODE_ENV
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: REDIS_URL
+            - name: ML_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: ML_SERVICE_URL
+            - name: FRONTEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: FRONTEND_URL
+            - name: NODE_OPTIONS
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: NODE_OPTIONS
+          envFrom:
+            - secretRef:
+                name: angelfive-secrets
+                optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: angelfive
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: angelfive
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+      name: http

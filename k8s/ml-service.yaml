@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-model-cache-pvc
+  namespace: angelfive
+  labels:
+    app.kubernetes.io/name: ml-service
+    app.kubernetes.io/part-of: angelfive
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-service
+  namespace: angelfive
+  labels:
+    app.kubernetes.io/name: ml-service
+    app.kubernetes.io/part-of: angelfive
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ml-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ml-service
+        app.kubernetes.io/part-of: angelfive
+    spec:
+      containers:
+        - name: ml-service
+          image: ghcr.io/ojhaprathmesh/angelfive_repo-ml-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: PORT_ML
+            - name: TRANSFORMERS_CACHE
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: TRANSFORMERS_CACHE
+            - name: HF_HOME
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: HF_HOME
+            - name: MALLOC_ARENA_MAX
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: MALLOC_ARENA_MAX
+            - name: FINBERT_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: angelfive-config
+                  key: FINBERT_ENABLED
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2048Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+          volumeMounts:
+            - name: model-cache
+              mountPath: /app/model_cache
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: ml-model-cache-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-service
+  namespace: angelfive
+  labels:
+    app.kubernetes.io/name: ml-service
+    app.kubernetes.io/part-of: angelfive
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ml-service
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http

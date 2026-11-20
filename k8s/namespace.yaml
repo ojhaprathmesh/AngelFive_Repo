@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: angelfive
+  labels:
+    app.kubernetes.io/name: angelfive
+    app.kubernetes.io/part-of: angelfive

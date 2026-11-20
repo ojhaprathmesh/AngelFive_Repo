@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: angelfive-config
+  namespace: angelfive
+  labels:
+    app.kubernetes.io/name: angelfive
+    app.kubernetes.io/part-of: angelfive
+data:
+  NODE_ENV: "production"
+  PORT_BACKEND: "5000"
+  PORT_ML: "8000"
+  PORT_FRONTEND: "3000"
+  REDIS_URL: "redis://redis-service:6379"
+  ML_SERVICE_URL: "http://ml-service:8000"
+  FRONTEND_URL: "http://frontend-service:3000"
+  BACKEND_INTERNAL_URL: "http://backend-service:5000"
+  NEXT_PUBLIC_BACKEND_URL: "/api"
+  MALLOC_ARENA_MAX: "2"
+  NODE_OPTIONS: "--max-old-space-size=512"
+  TRANSFORMERS_CACHE: "/app/model_cache"
+  HF_HOME: "/app/model_cache"
+  FINBERT_ENABLED: "false"
